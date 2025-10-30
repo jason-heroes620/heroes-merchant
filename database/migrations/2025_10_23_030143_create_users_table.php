@@ -22,6 +22,7 @@ return new class extends Migration {
             // Optional contact info
             $table->string('contact_number')->nullable();
             $table->string('address')->nullable();
+            $table->string('profile_picture')->nullable();
 
             // Status
             $table->enum('status', ['active', 'inactive'])->default('active');

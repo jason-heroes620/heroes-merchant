@@ -1,8 +1,12 @@
 export interface User {
-    id: number;
-    name: string;
+    id: string;
+    full_name: string;
     email: string;
-    email_verified_at?: string;
+    role: "admin" | "merchant" | "customer";
+    contact_number?: string;
+    address?: string;
+    profile_picture?: string;
+    merchant?: Merchant;
 }
 
 export type PageProps<
@@ -11,4 +15,8 @@ export type PageProps<
     auth: {
         user: User;
     };
+    customers: Customer[];
+    merchants: Merchant[];
 };
+
+export type Entity = Merchant | Customer;

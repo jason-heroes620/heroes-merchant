@@ -3,52 +3,122 @@
 namespace App\Http\Controllers;
 
 use App\Models\Merchant;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class MerchantController extends Controller
 {
-    // 🔹 Get all merchants
+    // 🔹 Show create merchant form
+    public function create()
+    {
+        return inertia('Admin/CreateMerchant');
+    }
+
+    // 🔹 Store new merchant
+    public function store(Request $request)
+    {
+        $request->validate([
+            'full_name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email',
+            'password' => 'required|string|min:8|confirmed',
+            'contact_number' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:255',
+            'company_name' => 'required|string|max:255',
+            'business_registration_number' => 'nullable|string|max:255',
+            'company_details' => 'nullable|string',
+        ]);
+
+        // Create user
+        $user = User::create([
+            'full_name' => $request->full_name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'role' => 'merchant',
+            'contact_number' => $request->contact_number,
+            'address' => $request->address,
+        ]);
+
+        // Create merchant profile
+        Merchant::create([
+            'user_id' => $user->id,
+            'company_name' => $request->company_name,
+            'business_registration_number' => $request->business_registration_number,
+            'company_details' => $request->company_details,
+            'business_status' => 'pending_verification',
+        ]);
+
+        return redirect()->route('admin.merchants.index')->with('success', 'Merchant created successfully!');
+    }
+
+    // 🔹 List all merchants (for admin)
     public function index()
     {
         $merchants = Merchant::with('user')->get();
-        return response()->json($merchants);
+        return inertia('Admin/MerchantList', [
+            'merchants' => $merchants,
+        ]);
     }
 
-    // 🔹 Show specific merchant
-    public function show($id)
+    // 🔹 View a specific merchant's profile 
+    public function showProfile($id)
     {
         $merchant = Merchant::with('user')->findOrFail($id);
-        return response()->json($merchant);
-    }
 
-    // 🔹 Update merchant details
-    public function update(Request $request, $id)
-    {
-        $merchant = Merchant::findOrFail($id);
-
-        $merchant->update($request->only([
-            'company_name',
-            'business_registration_number',
-            'company_details',
-            'business_status',
-            'rejection_reason',
-        ]));
-
-        return response()->json([
-            'message' => 'Merchant updated successfully',
+        return inertia('Admin/ViewMerchantProfile', [
             'merchant' => $merchant,
         ]);
     }
 
-    // 🔹 Soft deactivate merchant (and linked user)
-    public function deactivate($id)
+    // 🔹 Update merchant details (user info, status, rejection reason, etc.)
+    public function update(Request $request, $id)
     {
         $merchant = Merchant::with('user')->findOrFail($id);
+        
+        $request->validate([
+            'full_name' => 'required|string|max:255',
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                Rule::unique('users', 'email')->ignore($merchant->user_id),
+            ],
+            'password' => 'nullable|string|min:8|confirmed',
+            'contact_number' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:255',
+            'company_name' => 'required|string|max:255',
+            'business_registration_number' => 'nullable|string|max:255',
+            'company_details' => 'nullable|string',
+            'business_status' => 'required|in:verified,pending_verification,rejected',
+            'rejection_reason' => 'nullable|string',
+        ]);
 
-        if ($merchant->user) {
-            $merchant->user->update(['status' => 'inactive']);
+        // Update user information
+        $userData = [
+            'full_name' => $request->full_name,
+            'email' => $request->email,
+            'contact_number' => $request->contact_number,
+            'address' => $request->address,
+        ];
+
+        // Only update password if provided
+        if ($request->filled('password')) {
+            $userData['password'] = Hash::make($request->password);
         }
 
-        return response()->json(['message' => 'Merchant deactivated successfully']);
+        $merchant->user->update($userData);
+
+        // Update merchant information
+        $merchant->update([
+            'company_name' => $request->company_name,
+            'business_registration_number' => $request->business_registration_number,
+            'company_details' => $request->company_details,
+            'business_status' => $request->business_status,
+            'rejection_reason' => $request->rejection_reason,
+        ]);
+
+        return redirect()->route('admin.merchants.index')->with('success', 'Merchant updated successfully!');
     }
 }

@@ -36,6 +36,7 @@ class AuthController extends Controller
 
         if ($isApi) {
             $rules['role'] = 'required|string|in:customer,merchant,admin';
+            $rules['device_id'] = 'required|string';
         } else {
             $rules['company_name'] = 'required|string|max:255';
         }
@@ -43,6 +44,16 @@ class AuthController extends Controller
         $validated = $request->validate($rules);
 
         $role = $isApi ? $validated['role'] : 'merchant';
+
+         // Prevent duplicate device ID for API customers
+        if ($isApi && $role === 'customer') {
+            $existingCustomer = \App\Models\Customer::where('device_id', $validated['device_id'])->first();
+            if ($existingCustomer) {
+                return response()->json([
+                    'message' => 'This device is already registered with another account.'
+                ], 422);
+            }
+        }
 
         $user = User::create([
             'full_name' => $validated['full_name'],
@@ -59,6 +70,14 @@ class AuthController extends Controller
                 'user_id' => $user->id,
                 'company_name' => $validated['company_name'] ?? 'N/A',
                 'business_status' => 'pending_verification',
+            ]);
+        }
+
+        // Create customer profile if API customer
+        if ($isApi && $role === 'customer') {
+            \App\Models\Customer::create([
+                'user_id' => $user->id,
+                'device_id' => $validated['device_id'],
             ]);
         }
 
@@ -180,21 +199,6 @@ class AuthController extends Controller
         return $status === Password::PASSWORD_RESET
             ? redirect()->route('login')->with('status', __($status))
             : back()->withErrors(['email' => [__($status)]]);
-    }
-
-    /**Deactivate (shared)*/
-    public function deactivate($id)
-    {
-        $user = User::findOrFail($id);
-        $user->update(['status' => 'inactive']);
-
-        Log::info('User deactivated', ['user_id' => $id]);
-
-        if (request()->expectsJson()) {
-            return response()->json(['message' => 'User account deactivated successfully']);
-        }
-
-        return redirect()->route('dashboard')->with('success', 'User deactivated successfully.');
     }
 
     public function profile(Request $request)

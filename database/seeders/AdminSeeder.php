@@ -2,26 +2,25 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use App\Models\User;
 
-class DatabaseSeeder extends Seeder
+class AdminSeeder extends Seeder
 {
     public function run(): void
     {
         User::updateOrCreate(
-            ['email' => 'test@example.com'], 
+            ['email' => 'admin@example.com'],
             [
                 'id' => (string) Str::uuid(),
-                'full_name' => 'Test User',
-                'password' => Hash::make('password123'),
-                'role' => 'customer',
+                'full_name' => 'System Admin',
+                'password' => Hash::make('admin123'), 
+                'role' => 'admin',
+                'status' => 'active'
             ]
         );
-
-        $this->call(AdminSeeder::class);
     }
 }
 

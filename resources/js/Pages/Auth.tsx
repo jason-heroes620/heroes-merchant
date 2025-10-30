@@ -89,8 +89,8 @@ const Auth: React.FC = () => {
                         Welcome to Heroes
                     </h1>
                     <p className="text-orange-100 text-lg leading-relaxed">
-                        Your all-in-one platform for managing
-                        events and streamline operations
+                        Your all-in-one platform for managing events and
+                        streamline operations
                     </p>
                 </div>
             </div>
@@ -143,7 +143,7 @@ const Auth: React.FC = () => {
                                     </label>
                                     <input
                                         type="text"
-                                        placeholder="Your Full "
+                                        placeholder="Your Full Name"
                                         value={fullName}
                                         onChange={(e) =>
                                             setFullName(e.target.value)

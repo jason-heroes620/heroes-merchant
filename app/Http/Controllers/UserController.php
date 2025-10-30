@@ -7,6 +7,7 @@ use App\Models\Merchant;
 use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
 {
@@ -32,7 +33,15 @@ class UserController extends Controller
             'email'     => 'required|string|email|max:255|unique:users',
             'password'  => 'required|string|min:8|confirmed',
             'role'      => 'required|in:admin,merchant,customer',
+            'contact_number' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:255',
+            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
+
+        $profilePicturePath = null;
+        if ($request->hasFile('profile_picture')) {
+            $profilePicturePath = $request->file('profile_picture')->store('profile_pictures', 'public');
+        }
 
         $user = User::create([
             'full_name' => $request->full_name,
@@ -41,6 +50,7 @@ class UserController extends Controller
             'role'      => $request->role,
             'contact_number' => $request->contact_number,
             'address' => $request->address,
+            'profile_picture' => $profilePicturePath,
         ]);
 
         // ✅ Auto-create merchant or customer profile
@@ -66,20 +76,32 @@ class UserController extends Controller
         ], 201);
     }
 
-    // 🔹 Update user details (role-specific updates supported)
     public function update(Request $request, $id)
     {
         $user = User::with(['merchant', 'customer'])->findOrFail($id);
 
-        $user->update($request->only([
-            'full_name',
-            'email',
-            'contact_number',
-            'address',
-            'status',
-        ]));
+        $request->validate([
+            'full_name' => 'nullable|string|max:255',
+            'email' => 'nullable|string|email|max:255|unique:users,email,' . $user->id,
+            'contact_number' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:255',
+            'status' => 'nullable|string|in:active,inactive',
+            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
 
-        // Update related model based on role
+        // Update basic info
+        $data = $request->only(['full_name', 'email', 'contact_number', 'address', 'status']);
+        $user->update($data);
+
+        // Handle image upload
+        if ($request->hasFile('profile_picture')) {
+            if ($user->profile_picture) {
+                Storage::disk('public')->delete($user->profile_picture);
+            }
+            $user->profile_picture = $request->file('profile_picture')->store('profile_pictures', 'public');
+        }
+
+        // Update related profile
         if ($user->role === 'merchant' && $user->merchant) {
             $user->merchant->update($request->only([
                 'company_name',
@@ -107,6 +129,7 @@ class UserController extends Controller
     {
         $user = User::findOrFail($id);
         $user->update(['status' => 'inactive']);
+
         return response()->json(['message' => 'User deactivated successfully']);
     }
 }
