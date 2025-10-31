@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { Inertia } from "@inertiajs/inertia";
 import toast from "react-hot-toast";
 import { User, Lock, Building2, FileText, Gift, Loader2 } from "lucide-react";
-import type { PageProps } from "../../types/index";
 
 type EntityType = "merchant" | "customer";
 
@@ -33,7 +32,7 @@ interface Customer extends BaseEntity {
     referral_code?: string;
 }
 
-interface Props extends PageProps {
+interface Props {
     type: EntityType;
     entity: Merchant | Customer;
     updateRoute: string;
@@ -108,16 +107,26 @@ export default function EntityProfileForm({
         });
     };
 
-    const getStatusBadge = (status: string) => {
-        const styles = {
-            verified: "bg-green-100 text-green-800 border-green-200",
-            pending_verification:
-                "bg-yellow-100 text-yellow-800 border-yellow-200",
-            rejected: "bg-red-100 text-red-800 border-red-200",
-        };
+    const STATUS_STYLES: Record<string, string> = {
+        verified: "bg-green-100 text-green-800 border-green-200",
+        pending_verification: "bg-yellow-100 text-yellow-800 border-yellow-200",
+        rejected: "bg-red-100 text-red-800 border-red-200",
+    };
+
+    const getStatusBadgeClass = (status?: string) => {
         return (
-            styles[status as keyof typeof styles] || styles.pending_verification
+            STATUS_STYLES[status as keyof typeof STATUS_STYLES] ??
+            STATUS_STYLES.pending_verification
         );
+    };
+
+    const getStatusLabel = (status?: string) => {
+        const labels: Record<string, string> = {
+            verified: "Verified",
+            pending_verification: "Pending Verification",
+            rejected: "Rejected",
+        };
+        return labels[status as keyof typeof labels] ?? "Pending Verification";
     };
 
     const title = type === "merchant" ? "Merchant Profile" : "Customer Profile";
@@ -138,15 +147,13 @@ export default function EntityProfileForm({
                             </h1>
                             <p className="text-orange-100 mt-1">{subtitle}</p>
                         </div>
-                        {type === "merchant" && (
+                        {type === "merchant" && "business_status" in form && (
                             <div
-                                className={`px-4 py-2 rounded-lg border-2 font-semibold ${getStatusBadge(
-                                    type === "merchant" && "business_status" in form ? form.business_status : ""
+                                className={`px-4 py-2 rounded-lg border-2 font-semibold ${getStatusBadgeClass(
+                                    form.business_status
                                 )}`}
                             >
-                                {type === "merchant" && "business_status" in form ? form.business_status : ""
-                                    ?.replace("_", " ")
-                                    .toUpperCase()}
+                                {getStatusLabel(form.business_status)}
                             </div>
                         )}
                     </div>
@@ -268,7 +275,6 @@ export default function EntityProfileForm({
     );
 }
 
-/* --- Helper Components --- */
 const Section = ({
     title,
     icon: Icon,
