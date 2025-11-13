@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Illuminate\Notifications\Notifiable;
 
 class Merchant extends Model
 {
-    use HasFactory;
+    use HasFactory, Notifiable;
 
     protected $keyType = 'string';
     public $incrementing = false;
@@ -37,5 +38,15 @@ class Merchant extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function events()
+    {
+        return $this->hasMany(Event::class);
+    }
+
+    public function routeNotificationForMail($notification)
+    {
+        return $this->user?->email; // send via the linked user’s email
     }
 }

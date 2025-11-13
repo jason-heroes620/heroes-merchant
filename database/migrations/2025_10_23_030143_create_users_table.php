@@ -21,7 +21,11 @@ return new class extends Migration {
 
             // Optional contact info
             $table->string('contact_number')->nullable();
-            $table->string('address')->nullable();
+            $table->string('street_name')->nullable();
+            $table->integer('postcode')->nullable();
+            $table->string('city')->nullable();
+            $table->string('state')->nullable();
+            $table->string('country')->nullable();
             $table->string('profile_picture')->nullable();
 
             // Status

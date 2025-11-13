@@ -1,6 +1,6 @@
 import { useForm } from "@inertiajs/react";
 import { Loader2 } from "lucide-react";
-import FormField from "../../components/admin/UserBaseForm";
+import FormField from "../../components/UserBaseForm";
 
 interface BaseForm {
     full_name: string;
@@ -74,7 +74,9 @@ export default function CreateUserForm({ type }: Props) {
                 <div className="bg-white rounded-xl shadow-lg overflow-hidden">
                     {/* Header */}
                     <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-8 py-6">
-                        <h1 className="text-3xl font-bold text-white">{title}</h1>
+                        <h1 className="text-3xl font-bold text-white">
+                            {title}
+                        </h1>
                         <p className="text-orange-100 mt-1">{subtitle}</p>
                     </div>
 
@@ -98,7 +100,9 @@ export default function CreateUserForm({ type }: Props) {
                                     label="Email Address"
                                     type="email"
                                     value={data.email}
-                                    onChange={(e) => setData("email", e.target.value)}
+                                    onChange={(e) =>
+                                        setData("email", e.target.value)
+                                    }
                                     error={errors.email}
                                     disabled={processing}
                                 />
@@ -107,7 +111,10 @@ export default function CreateUserForm({ type }: Props) {
                                     type="tel"
                                     value={data.contact_number}
                                     onChange={(e) =>
-                                        setData("contact_number", e.target.value)
+                                        setData(
+                                            "contact_number",
+                                            e.target.value
+                                        )
                                     }
                                     error={errors.contact_number}
                                     disabled={processing}
@@ -167,21 +174,29 @@ export default function CreateUserForm({ type }: Props) {
                                         label="Company Name"
                                         value={data.company_name || ""}
                                         onChange={(e) =>
-                                            setData("company_name", e.target.value)
+                                            setData(
+                                                "company_name",
+                                                e.target.value
+                                            )
                                         }
                                         error={errors.company_name}
                                         disabled={processing}
                                     />
                                     <FormField
                                         label="Business Registration Number"
-                                        value={data.business_registration_number || ""}
+                                        value={
+                                            data.business_registration_number ||
+                                            ""
+                                        }
                                         onChange={(e) =>
                                             setData(
                                                 "business_registration_number",
                                                 e.target.value
                                             )
                                         }
-                                        error={errors.business_registration_number}
+                                        error={
+                                            errors.business_registration_number
+                                        }
                                         disabled={processing}
                                     />
                                     <FormField
@@ -190,7 +205,10 @@ export default function CreateUserForm({ type }: Props) {
                                         rows={4}
                                         value={data.company_details || ""}
                                         onChange={(e) =>
-                                            setData("company_details", e.target.value)
+                                            setData(
+                                                "company_details",
+                                                e.target.value
+                                            )
                                         }
                                         error={errors.company_details}
                                         disabled={processing}
@@ -208,7 +226,10 @@ export default function CreateUserForm({ type }: Props) {
                                         type="date"
                                         value={data.date_of_birth || ""}
                                         onChange={(e) =>
-                                            setData("date_of_birth", e.target.value)
+                                            setData(
+                                                "date_of_birth",
+                                                e.target.value
+                                            )
                                         }
                                         error={errors.date_of_birth}
                                         disabled={processing}
@@ -226,7 +247,10 @@ export default function CreateUserForm({ type }: Props) {
                                         label="Referred By (Customer ID)"
                                         value={data.referred_by || ""}
                                         onChange={(e) =>
-                                            setData("referred_by", e.target.value)
+                                            setData(
+                                                "referred_by",
+                                                e.target.value
+                                            )
                                         }
                                         error={errors.referred_by}
                                         disabled={processing}
@@ -248,7 +272,10 @@ export default function CreateUserForm({ type }: Props) {
                             >
                                 {processing ? (
                                     <span className="flex items-center gap-2">
-                                        <Loader2 className="animate-spin" size={20} />
+                                        <Loader2
+                                            className="animate-spin"
+                                            size={20}
+                                        />
                                         {type === "merchant"
                                             ? "Creating Merchant..."
                                             : "Creating Customer..."}

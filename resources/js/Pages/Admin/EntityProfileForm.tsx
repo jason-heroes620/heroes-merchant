@@ -29,6 +29,7 @@ interface Merchant extends BaseEntity {
 interface Customer extends BaseEntity {
     date_of_birth?: string;
     age?: number;
+    device_id: string;
     referral_code?: string;
 }
 
@@ -66,6 +67,7 @@ export default function EntityProfileForm({
               }
             : {
                   date_of_birth: (entity as Customer).date_of_birth || "",
+                  device_id: (entity as Customer).device_id|| "",
                   referral_code: (entity as Customer).referral_code || "",
               }),
     });
@@ -399,6 +401,13 @@ const CustomerFields = ({ form, handleChange, isSubmitting }: any) => (
             label="Date of Birth"
             type="date"
             value={form.date_of_birth}
+            onChange={handleChange}
+            disabled={isSubmitting}
+        />
+        <TextInput
+            name="device_id"
+            label="Device ID"
+            value={form.device_id}
             onChange={handleChange}
             disabled={isSubmitting}
         />
