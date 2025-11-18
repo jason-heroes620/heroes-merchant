@@ -342,14 +342,17 @@ class EventController extends Controller
             'end_time' => 'nullable|string',
             'location' => 'required|array',
             'location.location_name' => 'required|string|max:255',
+            'location.latitude' => 'nullable|numeric',
+            'location.longitude' => 'nullable|numeric',
+            'location.how_to_get_there' => 'nullable|string',
 
             'age_groups' => 'nullable|array',
             'age_groups.*.id' => 'nullable|uuid',
             'age_groups.*.label' => 'nullable|string|max:50',
             'age_groups.*.min_age' => 'nullable|integer|min:0',
             'age_groups.*.max_age' => 'nullable|integer|min:0',
-            'age_groups.*.fixed_price_in_cents' => 'nullable|integer|min:0', 
-            'age_groups.*.weekday_price_in_cents' => 'nullable|integer|min:0', 
+            'age_groups.*.fixed_price_in_cents' => 'nullable|integer|min:0',
+            'age_groups.*.weekday_price_in_cents' => 'nullable|integer|min:0',
             'age_groups.*.weekend_price_in_cents' => 'nullable|integer|min:0',
 
             'prices' => 'nullable|array',
@@ -363,13 +366,16 @@ class EventController extends Controller
             'frequencies' => 'nullable|array',
             'frequencies.*.id' => 'nullable|uuid',
             'frequencies.*.type' => 'required|string|in:one_time,daily,weekly,biweekly,monthly,annually,custom',
-            'frequencies.*.start_date' => 'required|date',
-            'frequencies.*.end_date' => 'nullable|date',
+            'frequencies.*.start_date' => 'required_if:frequencies.*.type,!=,one_time|date',
+            'frequencies.*.end_date' => 'nullable|date|after_or_equal:frequencies.*.start_date',
             'frequencies.*.start_time' => 'nullable|string',
             'frequencies.*.end_time' => 'nullable|string',
             'frequencies.*.capacity' => 'nullable|integer|min:1',
             'frequencies.*.days_of_week' => 'nullable|array',
             'frequencies.*.selected_dates' => 'nullable|array',
+
+            'media' => 'nullable|array',
+            'media.*' => 'file|mimes:jpeg,jpg,png,gif,mp4,mov|max:10240',
         ]);
 
         Log::info('Validated Event Payload:', $validated);
@@ -407,6 +413,12 @@ class EventController extends Controller
                             'min_age' => $group['min_age'] ?? null,
                             'max_age' => $group['max_age'] ?? null,
                         ]);
+                    } else {
+                        $ag = $event->ageGroups()->create([
+                            'label' => $group['label'],
+                            'min_age' => $group['min_age'] ?? null,
+                            'max_age' => $group['max_age'] ?? null,
+                        ]);
                     }
                 } else {
                     $ag = $event->ageGroups()->create([
@@ -418,12 +430,10 @@ class EventController extends Controller
                 $submittedAgeGroupIds[] = $ag->id;
                 $ageGroupsMap[$group['label']] = $ag->id;
             }
-
             $event->ageGroups()->whereNotIn('id', $submittedAgeGroupIds)->delete();
 
             // 4️⃣ Sync Prices
             $submittedPriceIds = [];
-
             foreach ($validated['prices'] ?? [] as $price) {
                 $ageGroupId = isset($price['age_group_label'])
                     ? ($ageGroupsMap[$price['age_group_label']] ?? null)
@@ -450,6 +460,14 @@ class EventController extends Controller
                             'weekday_price_in_cents' => $weekday,
                             'weekend_price_in_cents' => $weekend,
                         ]);
+                    } else {
+                        $p = $event->prices()->create([
+                            'event_age_group_id' => $ageGroupId,
+                            'pricing_type' => $price['pricing_type'],
+                            'fixed_price_in_cents' => $price['fixed_price_in_cents'] ?? 0,
+                            'weekday_price_in_cents' => $weekday,
+                            'weekend_price_in_cents' => $weekend,
+                        ]);
                     }
                 } else {
                     $p = $event->prices()->create([
@@ -460,20 +478,20 @@ class EventController extends Controller
                         'weekend_price_in_cents' => $weekend,
                     ]);
                 }
+
                 $submittedPriceIds[] = $p->id;
             }
-
             $event->prices()->whereNotIn('id', $submittedPriceIds)->delete();
 
             // 5️⃣ Frequencies & Slots
             $frequencies = [];
-
             if (!empty($validated['is_recurring']) && $validated['is_recurring'] === true) {
                 $frequencies = $validated['frequencies'] ?? [];
             } else {
                 $frequencies[] = [
                     'type' => 'one_time',
                     'start_date' => $validated['start_date'] ?? now()->toDateString(),
+                    'end_date' => null,
                     'days_of_week' => null,
                     'selected_dates' => null,
                     'is_all_day' => $validated['is_all_day'] ?? false,
@@ -485,21 +503,19 @@ class EventController extends Controller
             }
 
             $submittedFreqIds = [];
-
             foreach ($frequencies as $freqData) {
-
-                // Ensure start_time/end_time exist for recurring events
                 $freqData['start_time'] = $freqData['start_time'] ?? $validated['start_time'] ?? null;
                 $freqData['end_time'] = $freqData['end_time'] ?? $validated['end_time'] ?? null;
                 $freqData['is_all_day'] = $freqData['is_all_day'] ?? false;
                 $freqData['capacity'] = $freqData['capacity'] ?? $validated['default_capacity'] ?? null;
                 $freqData['is_unlimited_capacity'] = $freqData['is_unlimited_capacity'] ?? false;
 
-                // 1️⃣ Create or update frequency
                 if (!empty($freqData['id'])) {
                     $frequency = $event->frequencies()->find($freqData['id']);
                     if ($frequency) {
                         $frequency->update($freqData);
+                    } else {
+                        $frequency = $event->frequencies()->create($freqData);
                     }
                 } else {
                     $frequency = $event->frequencies()->create($freqData);
@@ -507,7 +523,7 @@ class EventController extends Controller
 
                 $submittedFreqIds[] = $frequency->id;
 
-                // 2️⃣ Generate slots
+                // Generate slots
                 $slotService->generateSlots($event, $frequency, [
                     'is_all_day' => $freqData['is_all_day'],
                     'start_time' => $freqData['start_time'],
@@ -516,9 +532,20 @@ class EventController extends Controller
                     'is_unlimited' => $freqData['is_unlimited_capacity'],
                 ]);
             }
-
-            // 3️⃣ Remove frequencies that were deleted in the request
             $event->frequencies()->whereNotIn('id', $submittedFreqIds)->delete();
+
+            // 6️⃣ Media
+            if ($request->hasFile('media')) {
+                foreach ($request->file('media') as $file) {
+                    $filename = Str::uuid() . '_' . $file->getClientOriginalName();
+                    $path = $file->storeAs('event_media', $filename, 'public');
+                    $event->media()->create([
+                        'file_path' => $path,
+                        'file_type' => $file->getClientMimeType(),
+                        'file_size' => $file->getSize(),
+                    ]);
+                }
+            }
 
             DB::commit();
 
@@ -567,19 +594,45 @@ class EventController extends Controller
                 'raw_place' => null,
                 'how_to_get_there' => '',
             ],
-            'age_groups' => $event->ageGroups->map(fn($group) => [
-            ...$group->toArray(),
-            'prices' => $group->prices->map(fn($price) => $price->toArray())->toArray(),
-            ])->toArray(),
-            'frequencies' => $event->frequencies->map(fn($freq) => [
-                ...$freq->toArray(),
-                'slots' => $freq->slots->map(fn($slot) => $slot->toArray())->toArray(),
-            ])->toArray(),
-            'media' => $event->media->map(fn($m) => $m->toArray())->toArray(),
+            'age_groups' => $event->ageGroups->map(function($group) {
+                return array_merge($group->toArray(), [
+                    'prices' => $group->prices->map(function($price) {
+                        return [
+                            'id' => $price->id,
+                            'age_group_label' => $price->age_group_label ?? null,
+                            'pricing_type' => $price->pricing_type ?? 'fixed',
+                            'fixed_price_in_cents' => $price->fixed_price_in_cents ?? 0,
+                            'weekday_price_in_cents' => $price->weekday_price_in_cents ?? 0,
+                            'weekend_price_in_cents' => $price->weekend_price_in_cents ?? 0,
+                        ];
+                    })->toArray(),
+                ]);
+            })->toArray(),
+            'frequencies' => $event->frequencies->map(function($freq) {
+                return array_merge($freq->toArray(), [
+                    'slots' => $freq->slots->map(function($slot) {
+                        return [
+                            'id' => $slot->id,
+                            'start_time' => $slot->start_time ?? null,
+                            'end_time' => $slot->end_time ?? null,
+                            'is_all_day' => $slot->is_all_day ?? false,
+                            'capacity' => $slot->capacity ?? null,
+                            'is_unlimited_capacity' => $slot->is_unlimited_capacity ?? false,
+                        ];
+                    })->toArray(),
+                ]);
+            })->toArray(),
+            'media' => $event->media->map(function($m) {
+                return [
+                    'id' => $m->id,
+                    'file_path' => $m->file_path,
+                    'file_type' => $m->file_type,
+                    'file_size' => $m->file_size,
+                ];
+            })->toArray(),
         ];
 
-        Log::info('Editing Event:', ['event' => $event]);
-        
+        Log::info('Editing Event:', ['event_id' => $event->id, 'age_groups_count' => count($eventData['age_groups']), 'frequencies_count' => count($eventData['frequencies'])]);
 
         return Inertia::render('Events/Edit', [
             'event' => $eventData,
