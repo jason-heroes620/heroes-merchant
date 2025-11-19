@@ -28,6 +28,9 @@ return new class extends Migration {
             $table->string('country')->nullable();
             $table->string('profile_picture')->nullable();
 
+            //Push notification token
+            $table->string('expo_push_token')->nullable();
+
             // Status
             $table->enum('status', ['active', 'inactive'])->default('active');
 

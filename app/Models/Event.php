@@ -68,5 +68,14 @@ class Event extends Model
     {
         return $this->hasMany(EventSlot::class);
     }
-}
 
+    public function likedBy()
+    {
+        return $this->belongsToMany(Customer::class, 'event_likes');
+    }
+
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class);
+    }
+}

@@ -61,4 +61,14 @@ class Customer extends Model
     {
         return $this->hasMany(Customer::class, 'referred_by');
     }
+    
+    public function likedEvents()
+    {
+        return $this->belongsToMany(Event::class, 'event_likes', 'customer_id', 'event_id');
+    }
+
+    public function wallet()
+    {
+        return $this->hasOne(CustomerWallet::class);
+    }
 }
