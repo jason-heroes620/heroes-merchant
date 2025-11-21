@@ -16,57 +16,48 @@ class Event extends Model
         'title',
         'description',
         'category',
-        'default_capacity',
-        'is_unlimited_capacity',
         'is_suitable_for_all_ages',
-        'is_recurring' => 'boolean',
+        'is_recurring',
         'featured',
+        'like_count',
+        'click_count',
         'status',
         'rejected_reason',
     ];
 
     protected $casts = [
-        'is_unlimited_capacity' => 'boolean',
         'is_suitable_for_all_ages' => 'boolean',
         'is_recurring' => 'boolean',
         'featured' => 'boolean',
+        'like_count' => 'integer',
+        'click_count' => 'integer',
     ];
 
-    /** ─── Relationships ─── */
+    /** Relationships */
+    public function merchant() { return $this->belongsTo(Merchant::class); }
 
-    public function merchant()
-    {
-        return $this->belongsTo(Merchant::class);
-    }
+    public function location() { return $this->hasOne(EventLocation::class); }
 
-    public function location()
-    {
-        return $this->hasOne(EventLocation::class);
-    }
+    public function media() { return $this->hasMany(EventMedia::class); }
 
-    public function media()
-    {
-        return $this->hasMany(EventMedia::class);
-    }
+    public function ageGroups() { return $this->hasMany(EventAgeGroup::class); }
 
-    public function ageGroups()
-    {
-        return $this->hasMany(EventAgeGroup::class);
-    }
+    public function prices() { return $this->hasMany(EventPrice::class); }
 
-    public function prices()
-    {
-        return $this->hasMany(EventPrice::class);
-    }
+    public function frequencies() { return $this->hasMany(EventFrequency::class); }
 
-    public function frequencies()
-    {
-        return $this->hasMany(EventFrequency::class);
-    }
+    public function dates() { return $this->hasMany(EventDate::class); }
 
     public function slots()
     {
-        return $this->hasMany(EventSlot::class);
+        return $this->hasManyThrough(
+            EventSlot::class,
+            EventDate::class,
+            'event_id',
+            'event_date_id',
+            'id',
+            'id'
+        );
     }
 
     public function likedBy()

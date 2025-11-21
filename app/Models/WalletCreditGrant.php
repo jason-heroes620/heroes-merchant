@@ -6,28 +6,26 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
-class CustomerCreditTransaction extends Model
+class WalletCreditGrant extends Model
 {
     use HasFactory, HasUuids;
 
     protected $fillable = [
         'wallet_id',
-        'type',
-        'before_free_credits',
-        'before_paid_credits',
-        'delta_free',
-        'delta_paid',
-        'description',
-        'booking_id',
+        'grant_type',
+        'credits',
+        'credits_remaining',
+        'expires_at',
         'purchase_package_id',
-        'transaction_id',
+        'reference_id',
+        'credits_per_rm',
     ];
 
     protected $casts = [
-        'before_free_credits' => 'integer',
-        'before_paid_credits' => 'integer',
-        'delta_free' => 'integer',
-        'delta_paid' => 'integer',
+        'credits' => 'integer',
+        'credits_remaining' => 'integer',
+        'expires_at' => 'datetime',
+        'credits_per_rm' => 'decimal:6',
     ];
 
     /** Relationships */
@@ -37,12 +35,7 @@ class CustomerCreditTransaction extends Model
         return $this->belongsTo(CustomerWallet::class, 'wallet_id');
     }
 
-    public function booking()
-    {
-        return $this->belongsTo(Booking::class, 'booking_id');
-    }
-
-    public function package()
+    public function purchasePackage()
     {
         return $this->belongsTo(PurchasePackage::class, 'purchase_package_id');
     }
