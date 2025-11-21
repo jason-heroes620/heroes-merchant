@@ -9,18 +9,17 @@ return new class extends Migration {
         Schema::create('event_prices', function (Blueprint $table) {
             $table->uuid('id')->primary();
 
-            $table->uuid('event_id');
-            $table->foreign('event_id')->references('id')->on('events')->onDelete('cascade');
+            $table->foreignUuid('event_id')->constrained('events')->onDelete('cascade');
 
-            $table->uuid('event_age_group_id')->nullable();
-            $table->foreign('event_age_group_id')->references('id')->on('event_age_groups')->onDelete('cascade');
+            $table->foreignUuid('event_age_group_id')->nullable()->constrained('event_age_groups')->onDelete('cascade');
 
-            $table->string('pricing_type'); // fixed, age_based, day_type, mixed
-            $table->unsignedInteger('fixed_price_in_cents')->nullable();
-            $table->unsignedInteger('weekday_price_in_cents')->nullable();
-            $table->unsignedInteger('weekend_price_in_cents')->nullable();
-
+            $table->enum('pricing_type', ['fixed','age_based','day_type','mixed']);
+            $table->decimal('fixed_price_in_rm', 10, 2)->nullable();
+            $table->decimal('weekday_price_in_rm', 10, 2)->nullable();
+            $table->decimal('weekend_price_in_rm', 10, 2)->nullable();
+            
             $table->timestamps();
+            $table->index(['event_id', 'pricing_type']);
         });
     }
 

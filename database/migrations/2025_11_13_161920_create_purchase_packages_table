@@ -11,13 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('customer_wallets', function (Blueprint $table) {
+        Schema::create('purchase_packages', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('customer_id')->constrained('customers')->onDelete('cascade');
-
-            $table->integer('cached_free_credits')->default(0);
-            $table->integer('cached_paid_credits')->default(0);
-            
+            $table->string('name');
+            $table->decimal('price_in_rm', 10, 2);
+            $table->integer('paid_credits'); 
+            $table->integer('free_credits')->default(0);
+            $table->integer('validity_days')->nullable(); 
+            $table->boolean('active')->default(true);
             $table->timestamps();
         });
     }
@@ -27,6 +28,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('customer_wallets');
+        Schema::dropIfExists('purchase_packages');
     }
 };

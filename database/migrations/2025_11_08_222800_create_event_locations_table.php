@@ -10,8 +10,7 @@ return new class extends Migration
     {
         Schema::create('event_locations', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->uuid('event_id');
-            $table->foreign('event_id')->references('id')->on('events')->onDelete('cascade');
+            $table->foreignUuid('event_id')->constrained('events')->onDelete('cascade');
 
             $table->string('place_id')->nullable()->index();
             $table->string('location_name')->nullable();

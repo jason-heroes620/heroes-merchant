@@ -9,30 +9,25 @@ return new class extends Migration {
         Schema::create('event_slots', function (Blueprint $table) {
             $table->uuid('id')->primary();
 
-            $table->uuid('event_id');
-            $table->foreign('event_id')->references('id')->on('events')->onDelete('cascade');
+            $table->foreignUuid('event_id')->constrained('events')->onDelete('cascade');
+            $table->foreignUuid('event_date_id')->constrained('event_dates')->onDelete('cascade');
+            $table->foreignUuid('event_price_id')->nullable()->constrained('event_prices')->onDelete('set null');
 
-            $table->foreignUuid('frequency_id')
-                ->nullable()
-                ->constrained('event_frequencies')
-                ->onDelete('cascade');
-
-            $table->date('date'); 
-            $table->boolean('is_all_day')->default(false);
             $table->time('start_time')->nullable();
             $table->time('end_time')->nullable();           
-            $table->integer('duration'); //  minutes
+            $table->unsignedInteger('duration')->nullable(); //  minutes
 
-            // slot capacity (per slot)
+            // Capacity
             $table->unsignedInteger('capacity')->nullable();
             $table->boolean('is_unlimited')->default(false);
-            $table->unsignedInteger('booked')->default(0);
-            
-            $table->string('slot_type')->nullable(); // weekday, weekend, custom
 
-            // final price assigned automatically based on pricing rules
-            $table->unsignedInteger('price_in_cents')->nullable();
-            $table->unsignedInteger('price_in_credits')->nullable();
+            // Final applied price
+            $table->decimal('price_in_rm', 10, 2)->nullable();
+
+            // Credits
+            $table->unsignedInteger('total_credits')->nullable();
+            $table->unsignedInteger('free_credits')->nullable();
+            $table->unsignedInteger('paid_credits')->nullable();
 
             $table->timestamps();
         });

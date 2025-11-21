@@ -14,26 +14,23 @@ return new class extends Migration
         Schema::create('bookings', function (Blueprint $table) {
             $table->uuid('id')->primary();
 
-            $table->uuid('customer_id');
-            $table->foreign('customer_id')->references('id')->on('customers')->onDelete('cascade');
+            $table->foreignUuid('customer_id')->constrained('customers')->onDelete('cascade');
+            $table->foreignUuid('event_id')->constrained('events')->onDelete('cascade');
+            $table->foreignUuid('slot_id')->constrained('event_slots')->onDelete('cascade');
+            $table->foreignUuid('wallet_id')->nullable()->constrained('customer_wallets')->onDelete('set null');
 
-            $table->uuid('event_id');
-            $table->foreign('event_id')->references('id')->on('events')->onDelete('cascade');
+            $table->integer('free_credits_spent')->default(0);
+            $table->integer('paid_credits_spent')->default(0);
+            $table->integer('quantity')->default(1);
 
-            $table->uuid('slot_id');
-            $table->foreign('slot_id')->references('id')->on('event_slots')->onDelete('cascade');
+            $table->decimal('amount_paid_in_rm', 10, 2)->default(0);
 
-            $table->integer('credits_spent')->default(0); 
-            $table->integer('quantity')->default(1); 
-            
             $table->enum('status', ['pending', 'confirmed', 'cancelled', 'refunded'])->default('confirmed');
             $table->string('qr_code_path')->nullable();
 
             $table->timestamp('booked_at')->default(DB::raw('CURRENT_TIMESTAMP'));
-            $table->timestamp('cancelled_at')->nullable();
-            
-            $table->uuid('wallet_id')->nullable();
-            $table->foreign('wallet_id')->references('id')->on('customer_wallets')->onDelete('set null');
+            $table->timestamp('cancelled_at')->nullable();    
+
             $table->timestamps();
         });
     }

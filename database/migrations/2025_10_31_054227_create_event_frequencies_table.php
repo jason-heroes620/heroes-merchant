@@ -12,19 +12,14 @@ return new class extends Migration {
             $table->uuid('event_id');
             $table->foreign('event_id')->references('id')->on('events')->onDelete('cascade');
 
-            // recurrence pattern
             $table->enum('type', [
-                'one_time',
                 'daily',
                 'weekly',
                 'biweekly',
                 'monthly',
                 'annually',
                 'custom'
-            ])->default('one_time');
-
-            $table->date('start_date')->nullable();
-            $table->date('end_date')->nullable();
+            ])->default('weekly');
 
             $table->json('days_of_week')->nullable(); // [0,1,2,3,4,5,6] for selected days
             $table->json('selected_dates')->nullable(); // for custom dates

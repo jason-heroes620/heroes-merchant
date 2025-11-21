@@ -13,13 +13,21 @@ return new class extends Migration
     {
         Schema::create('customer_credit_transactions', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->uuid('wallet_id');
-            $table->foreign('wallet_id')->references('id')->on('customer_wallets')->onDelete('cascade');
+            $table->foreignUuid('wallet_id')->constrained('customer_wallets')->onDelete('cascade');
 
             $table->enum('type', ['purchase', 'booking', 'refund', 'bonus']);
-            $table->integer('amount_in_credits');
+            $table->integer('before_free_credits')->nullable();
+            $table->integer('before_paid_credits')->nullable();
+
+             // delta shows actual change (+/-)
+            $table->integer('delta_free')->default(0);
+            $table->integer('delta_paid')->default(0);
+
             $table->text('description')->nullable();
-            $table->uuid('transaction_id')->nullable(); 
+            $table->uuid('booking_id')->nullable();
+            $table->uuid('purchase_package_id')->nullable();
+            $table->string('transaction_id')->nullable();
+            
             $table->timestamps();
         });
     }
