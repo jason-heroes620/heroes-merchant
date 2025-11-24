@@ -16,17 +16,15 @@ import {
     CheckCircle,
     XCircle,
     Clock,
+    Star,
+    TrendingUp,
     Grid3x3,
     List,
-    Repeat,
-    Infinity,
-    Sun,
 } from "lucide-react";
 import type {
     Location,
     AgeGroup,
     Price,
-    Frequency,
     Slot,
     Media,
 } from "../../types/events";
@@ -46,7 +44,6 @@ interface EventType {
     age_groups?: AgeGroup[];
     prices?: Price[];
     slots?: Slot[];
-    frequencies?: Frequency[];
     created_at: string;
     like_count?: number;
     click_count?: number;
@@ -67,7 +64,6 @@ export default function EventsIndexPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [typeFilter, setTypeFilter] = useState("all");
-    const [locationFilter, setLocationFilter] = useState("all");
     const [viewMode, setViewMode] = useState<"table" | "grid">("table");
 
     const statusColors = {
@@ -82,12 +78,6 @@ export default function EventsIndexPage() {
         draft: { bg: "bg-blue-100", text: "text-blue-800", icon: AlertCircle },
     } as const;
 
-    const uniqueLocations = Array.from(
-        new Set(
-            events.data.map((e) => e.location?.location_name).filter(Boolean)
-        )
-    );
-
     const filteredEvents = events.data.filter((event) => {
         const matchesSearch =
             event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -95,10 +85,7 @@ export default function EventsIndexPage() {
         const matchesStatus =
             statusFilter === "all" || event.status === statusFilter;
         const matchesType = typeFilter === "all" || event.type === typeFilter;
-        const matchesLocation =
-            locationFilter === "all" ||
-            event.location?.location_name === locationFilter;
-        return matchesSearch && matchesStatus && matchesType && matchesLocation;
+        return matchesSearch && matchesStatus && matchesType;
     });
 
     const getEventTypeLabel = (type: string) => {
@@ -110,129 +97,67 @@ export default function EventsIndexPage() {
         return labels[type] || type;
     };
 
-    const formatPrice = (prices?: Price[]) => {
-        if (!prices || prices.length === 0) return "Free";
+    const formatPrice = (price?: Price) => {
+        if (!price) return "Free";
 
-        const price = prices[0];
-
-        const toRM = (cents?: number | null) =>
-            cents != null && cents > 0 ? `RM${(cents / 100).toFixed(0)}` : null;
+        const format = (value?: number | null) =>
+            value != null ? `RM ${(value / 100).toFixed(2)}` : "Free";
 
         switch (price.pricing_type) {
             case "fixed":
-                return toRM(price.fixed_price_in_cents) || "Free";
+                return `RM ${(price.fixed_price_in_cents ?? 0) / 100}`;
 
-            case "age_based": {
-                const child = toRM(price.weekday_price_in_cents);
-                const adult = toRM(price.fixed_price_in_cents);
-                if (child && adult)
-                    return `${child} (Child) • ${adult} (Adult)`;
-                return child || adult || "Free";
-            }
+            case "age_based":
+                return `Children RM ${
+                    (price.weekday_price_in_cents ?? 0) / 100
+                } / Adult RM ${(price.fixed_price_in_cents ?? 0) / 100}`;
 
-            case "day_type": {
-                const weekday = toRM(price.weekday_price_in_cents);
-                const weekend = toRM(price.weekend_price_in_cents);
-                if (weekday && weekend)
-                    return `${weekday} (Weekday) • ${weekend} (Weekend)`;
-                return weekday || weekend || "Free";
-            }
+            case "day_type":
+                const weekdayPrice = format(price.weekday_price_in_cents);
+                const weekendPrice = format(price.weekend_price_in_cents);
+                return `Weekday ${weekdayPrice} / Weekend ${weekendPrice}`;
 
-            case "mixed": {
-                const parts: string[] = [];
-                if (price.weekday_price_in_cents) {
-                    parts.push(`Child: ${toRM(price.weekday_price_in_cents)}`);
-                }
-                if (price.weekend_price_in_cents) {
-                    parts.push(`Adult: ${toRM(price.fixed_price_in_cents)}`);
-                }
-                return parts.length > 0 ? parts.join(" • ") : "Free";
-            }
-
+            case "mixed":
+                return `Children RM ${
+                    (price.weekday_price_in_cents ?? 0) / 100
+                } (Weekday) / RM ${
+                    (price.weekend_price_in_cents ?? 0) / 100
+                } (Weekend)
+Adult RM ${(price.fixed_price_in_cents ?? 0) / 100} (Weekday) / RM ${
+                    (price.weekend_price_in_cents ?? 0) / 100
+                } (Weekend)`;
             default:
                 return "Free";
         }
     };
 
-    const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const getUpcomingDates = (slots?: Slot[]) => {
+        if (!slots || slots.length === 0) return [];
 
-    const getScheduleInfo = (event: EventType) => {
-        if (event.frequencies && event.frequencies.length > 0) {
-            const freq = event.frequencies[0];
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-            const typeLabels: Record<string, string> = {
-                one_time: "One-time",
-                daily: "Daily",
-                weekly: "Weekly",
-                biweekly: "Bi-weekly",
-                monthly: "Monthly",
-                annually: "Annually",
-                custom: "Custom",
-            };
-
-            const label = typeLabels[freq.type] ?? freq.type;
-
-            // Convert numeric days_of_week to weekday labels
-            const days =
-                freq.days_of_week
-                    ?.map((d) => weekdayLabels[d] ?? "")
-                    ?.join(", ") ?? "";
-
-            return {
-                type: "frequency" as const,
-                label: days ? `${label} (${days})` : label,
-                details: freq.end_date
-                    ? `${formatFullDate(freq.start_date)} - ${formatFullDate(
-                          freq.end_date
-                      )}`
-                    : `${formatFullDate(freq.start_date)}`,
-            };
-        }
-
-        // 2️⃣ Handle one-time slots
-        if (event.slots && event.slots.length > 0) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            const upcoming = event.slots
-                .filter((slot) => new Date(slot.date) >= today)
-                .sort(
-                    (a, b) =>
-                        new Date(a.date).getTime() - new Date(b.date).getTime()
-                )
-                .slice(0, 3);
-
-            if (upcoming.length > 0) {
-                return {
-                    type: "slots" as const,
-                    slots: upcoming,
-                };
-            }
-        }
-
-        return null;
+        return slots
+            .filter((slot) => new Date(slot.date) >= today)
+            .sort(
+                (a, b) =>
+                    new Date(a.date).getTime() - new Date(b.date).getTime()
+            )
+            .slice(0, 3);
     };
 
-    const formatFullDate = (dateString: string) => {
+    const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleDateString("en-MY", {
-            day: "numeric",
-            month: "long",
+            day: "2-digit",
+            month: "short",
             year: "numeric",
         });
     };
 
-    const formatTimeRange = (slot: Slot) => {
-        if (slot.is_all_day) {
-            return "All Day";
-        }
-        return `${slot.start_time.slice(0, 5)} - ${slot.end_time.slice(0, 5)}`;
-    };
-
-    const formatAgeGroup = (group: AgeGroup) => {
-        if (group.min_age !== null && group.max_age !== null) {
-            return `${group.label} (${group.min_age}-${group.max_age})`;
-        }
-        return group.label;
+    const formatTime = (timeString: string) => {
+        if (!timeString) return "";
+        const [hours, minutes] = timeString.split(":");
+        return `${hours}:${minutes}`;
     };
 
     const handleDeactivate = (id: string) => {
@@ -259,83 +184,95 @@ export default function EventsIndexPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 py-6 px-4">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
             <div className="max-w-[1600px] mx-auto">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl shadow-lg px-8 py-6 mb-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h1 className="text-3xl font-bold text-white mb-1">
-                                {userRole === "admin"
-                                    ? "All Events"
-                                    : "My Events"}
-                            </h1>
-                            <p className="text-orange-100">
-                                {userRole === "admin"
-                                    ? "Manage and review all events on the platform"
-                                    : "Manage your events and programs"}
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="flex bg-white rounded-lg p-1 shadow">
-                                <button
-                                    onClick={() => setViewMode("table")}
-                                    className={`p-2 rounded transition-all ${
-                                        viewMode === "table"
-                                            ? "bg-orange-500 text-white"
-                                            : "text-gray-600 hover:bg-gray-100"
-                                    }`}
-                                >
-                                    <List size={18} />
-                                </button>
-                                <button
-                                    onClick={() => setViewMode("grid")}
-                                    className={`p-2 rounded transition-all ${
-                                        viewMode === "grid"
-                                            ? "bg-orange-500 text-white"
-                                            : "text-gray-600 hover:bg-gray-100"
-                                    }`}
-                                >
-                                    <Grid3x3 size={18} />
-                                </button>
+                <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                    <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 px-8 py-8">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h1 className="text-4xl font-bold text-white mb-2">
+                                    {userRole === "admin"
+                                        ? "All Events"
+                                        : "My Events"}
+                                </h1>
+                                <p className="text-orange-50 text-lg">
+                                    {userRole === "admin"
+                                        ? "Manage and review all events on the platform"
+                                        : "Manage your events and programs"}
+                                </p>
                             </div>
-                            {userRole === "merchant" && (
-                                <button className="flex items-center gap-2 px-5 py-2.5 bg-white text-orange-600 rounded-lg font-semibold hover:bg-orange-50 transition-all shadow">
-                                    <Plus size={18} />
-                                    Create Event
-                                </button>
-                            )}
+                            <div className="flex items-center gap-3">
+                                {/* View Toggle */}
+                                <div className="flex bg-white rounded-xl p-1 shadow-lg">
+                                    <button
+                                        onClick={() => setViewMode("table")}
+                                        className={`px-4 py-2 rounded-lg transition-all ${
+                                            viewMode === "table"
+                                                ? "bg-orange-500 text-white"
+                                                : "text-gray-600 hover:bg-orange-50"
+                                        }`}
+                                    >
+                                        <List size={20} />
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode("grid")}
+                                        className={`px-4 py-2 rounded-lg transition-all ${
+                                            viewMode === "grid"
+                                                ? "bg-orange-500 text-white"
+                                                : "text-gray-600 hover:bg-orange-50"
+                                        }`}
+                                    >
+                                        <Grid3x3 size={20} />
+                                    </button>
+                                </div>
+
+                                {userRole === "merchant" && (
+                                    <button
+                                        onClick={() =>
+                                            router.visit(
+                                                "/merchant/events/create"
+                                            )
+                                        }
+                                        className="flex items-center gap-2 px-6 py-3 bg-white text-orange-600 rounded-xl font-bold hover:bg-orange-50 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+                                    >
+                                        <Plus size={20} />
+                                        Create Event
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Filters */}
-                <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                    <div className="grid md:grid-cols-3 gap-4">
                         <div className="relative">
                             <Search
-                                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                                size={18}
+                                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                                size={20}
                             />
                             <input
                                 type="text"
                                 placeholder="Search events..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                             />
                         </div>
+
                         <div className="relative">
                             <Filter
-                                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                                size={18}
+                                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                                size={20}
                             />
                             <select
                                 value={statusFilter}
                                 onChange={(e) =>
                                     setStatusFilter(e.target.value)
                                 }
-                                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent appearance-none bg-white"
+                                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent appearance-none bg-white"
                             >
                                 <option value="all">All Status</option>
                                 <option value="active">Active</option>
@@ -345,86 +282,80 @@ export default function EventsIndexPage() {
                                 <option value="draft">Draft</option>
                             </select>
                         </div>
+
                         <select
                             value={typeFilter}
                             onChange={(e) => setTypeFilter(e.target.value)}
-                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent appearance-none bg-white"
+                            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent appearance-none bg-white"
                         >
                             <option value="all">All Types</option>
                             <option value="event">Events</option>
                             <option value="trial_class">Trial Classes</option>
                             <option value="location_based">Field Trips</option>
                         </select>
-                        <div className="relative">
-                            <MapPin
-                                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                                size={18}
-                            />
-                            <select
-                                value={locationFilter}
-                                onChange={(e) =>
-                                    setLocationFilter(e.target.value)
-                                }
-                                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent appearance-none bg-white"
-                            >
-                                <option value="all">All Locations</option>
-                                {uniqueLocations.map((location, idx) => (
-                                    <option key={idx} value={location}>
-                                        {location}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
                     </div>
                 </div>
 
                 {/* Events Display */}
                 {filteredEvents.length === 0 ? (
-                    <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-                        <Calendar className="mx-auto h-16 w-16 text-gray-300 mb-3" />
-                        <h3 className="text-xl font-bold text-gray-800 mb-2">
+                    <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+                        <Calendar className="mx-auto h-20 w-20 text-gray-300 mb-4" />
+                        <h3 className="text-2xl font-bold text-gray-800 mb-2">
                             No events found
                         </h3>
                         <p className="text-gray-600 mb-6">
                             {searchQuery ||
                             statusFilter !== "all" ||
-                            typeFilter !== "all" ||
-                            locationFilter !== "all"
+                            typeFilter !== "all"
                                 ? "Try adjusting your filters"
                                 : "Create your first event to get started"}
                         </p>
                         {userRole === "merchant" && (
-                            <button className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-all">
-                                <Plus size={18} />
+                            <button
+                                onClick={() =>
+                                    router.visit("/merchant/events/create")
+                                }
+                                className="inline-flex items-center gap-2 px-6 py-3 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-all"
+                            >
+                                <Plus size={20} />
                                 Create Event
                             </button>
                         )}
                     </div>
                 ) : viewMode === "table" ? (
-                    /* Table View - Simplified with only essential columns */
-                    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                    /* Table View */
+                    <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full">
-                                <thead className="bg-gray-50 border-b border-gray-200">
+                                <thead className="bg-gradient-to-r from-orange-50 to-red-50 border-b-2 border-orange-200">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
+                                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                                             Event
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
-                                            Schedule
+                                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                            Type
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
-                                            Price
+                                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                            Location
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
+                                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                            Age Groups
+                                        </th>
+                                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                            Upcoming Dates
+                                        </th>
+                                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                            Capacity
+                                        </th>
+                                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                                             Status
                                         </th>
-                                        <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase">
+                                        <th className="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                                             Actions
                                         </th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100">
+                                <tbody className="divide-y divide-gray-200">
                                     {filteredEvents.map((event) => {
                                         const statusKey =
                                             event.status as keyof typeof statusColors;
@@ -433,17 +364,18 @@ export default function EventsIndexPage() {
                                         const statusStyle =
                                             statusColors[statusKey] ||
                                             statusColors.draft;
-                                        const scheduleInfo =
-                                            getScheduleInfo(event);
+                                        const upcomingDates = getUpcomingDates(
+                                            event.slots
+                                        );
 
                                         return (
                                             <tr
                                                 key={event.id}
-                                                className="hover:bg-gray-50 transition-colors"
+                                                className="hover:bg-orange-50/30 transition-colors"
                                             >
-                                                {/* Event Column - More detailed */}
+                                                {/* Event Column */}
                                                 <td className="px-6 py-4">
-                                                    <div className="flex items-start gap-4">
+                                                    <div className="flex items-center gap-4">
                                                         <div className="relative flex-shrink-0">
                                                             {event
                                                                 .media?.[0] ? (
@@ -456,186 +388,177 @@ export default function EventsIndexPage() {
                                                                     alt={
                                                                         event.title
                                                                     }
-                                                                    className="w-20 h-20 object-cover rounded-lg"
+                                                                    className="w-20 h-20 object-cover rounded-lg shadow-md"
                                                                 />
                                                             ) : (
-                                                                <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-orange-500 rounded-lg flex items-center justify-center">
+                                                                <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-red-400 rounded-lg flex items-center justify-center">
                                                                     <Calendar className="h-8 w-8 text-white" />
+                                                                </div>
+                                                            )}
+                                                            {event.featured && (
+                                                                <div className="absolute -top-2 -right-2 bg-yellow-400 rounded-full p-1">
+                                                                    <Star
+                                                                        size={
+                                                                            12
+                                                                        }
+                                                                        className="text-yellow-900"
+                                                                        fill="currentColor"
+                                                                    />
                                                                 </div>
                                                             )}
                                                         </div>
                                                         <div className="min-w-0 flex-1">
-                                                            <p className="text-sm font-semibold text-gray-900 mb-1">
+                                                            <p className="text-sm font-bold text-gray-900 truncate">
                                                                 {event.title}
                                                             </p>
-                                                            <div className="flex items-center gap-2 mb-1.5">
-                                                                <span className="inline-flex px-2 py-0.5 bg-orange-50 text-orange-700 rounded text-xs font-medium">
-                                                                    {getEventTypeLabel(
-                                                                        event.type
-                                                                    )}
-                                                                </span>
-                                                                {event.category && (
-                                                                    <span className="text-xs text-gray-500">
-                                                                        •{" "}
-                                                                        {
-                                                                            event.category
-                                                                        }
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex items-start gap-1.5 text-xs text-gray-600 mb-1">
-                                                                <MapPin
-                                                                    size={12}
-                                                                    className="text-gray-400 flex-shrink-0 mt-0.5"
-                                                                />
-                                                                <span className="line-clamp-1">
-                                                                    {event
-                                                                        .location
-                                                                        ?.location_name ||
-                                                                        "N/A"}
-                                                                </span>
-                                                            </div>
-                                                            <div className="flex items-center gap-2 text-xs">
-                                                                {event.is_unlimited_capacity ? (
-                                                                    <span className="flex items-center gap-1 text-gray-600">
-                                                                        <Infinity
+                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                {event.category}
+                                                            </p>
+                                                            {event.like_count ||
+                                                            event.click_count ? (
+                                                                <div className="flex items-center gap-3 mt-1">
+                                                                    <span className="text-xs text-gray-400 flex items-center gap-1">
+                                                                        <TrendingUp
                                                                             size={
                                                                                 12
                                                                             }
-                                                                            className="text-gray-400"
                                                                         />
-                                                                        Unlimited Slots
+                                                                        {event.click_count ||
+                                                                            0}{" "}
+                                                                        views
                                                                     </span>
-                                                                ) : (
-                                                                    <span className="flex items-center gap-1 text-gray-600">
-                                                                        <Users
-                                                                            size={
-                                                                                12
-                                                                            }
-                                                                            className="text-gray-400"
-                                                                        />
-                                                                        {
-                                                                            event.default_capacity
-                                                                        }
-                                                                    </span>
-                                                                )}
-                                                                {event.is_suitable_for_all_ages ? (
-                                                                    <span className="text-gray-500">
-                                                                        • All
-                                                                        Ages
-                                                                    </span>
-                                                                ) : (
-                                                                    event.age_groups &&
-                                                                    event
-                                                                        .age_groups
-                                                                        .length >
-                                                                        0 && (
-                                                                        <span className="text-gray-500">
-                                                                            •{" "}
-                                                                            {event.age_groups
-                                                                                .map(
-                                                                                    (
-                                                                                        g
-                                                                                    ) =>
-                                                                                        formatAgeGroup(
-                                                                                            g
-                                                                                        )
-                                                                                )
-                                                                                .join(
-                                                                                    ", "
-                                                                                )}
-                                                                        </span>
-                                                                    )
-                                                                )}
-                                                            </div>
+                                                                </div>
+                                                            ) : null}
                                                         </div>
                                                     </div>
                                                 </td>
 
-                                                {/* Schedule Column */}
+                                                {/* Type Column */}
                                                 <td className="px-6 py-4">
-                                                    {scheduleInfo ? (
-                                                        scheduleInfo.type ===
-                                                        "frequency" ? (
-                                                            <div className="space-y-1">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <Repeat
-                                                                        size={
-                                                                            14
+                                                    <span className="inline-flex items-center px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
+                                                        {getEventTypeLabel(
+                                                            event.type
+                                                        )}
+                                                    </span>
+                                                </td>
+
+                                                {/* Location Column */}
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-start gap-2 text-sm text-gray-600 max-w-xs">
+                                                        <MapPin
+                                                            size={14}
+                                                            className="text-orange-500 flex-shrink-0 mt-0.5"
+                                                        />
+                                                        <div className="truncate">
+                                                            <p className="font-medium truncate">
+                                                                {event.location
+                                                                    ?.location_name ||
+                                                                    "N/A"}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+
+                                                {/* Age Groups Column */}
+                                                <td className="px-6 py-4">
+                                                    <div className="flex flex-wrap gap-1 max-w-xs">
+                                                        {event.is_suitable_for_all_ages ? (
+                                                            <span className="inline-block px-2 py-1 bg-orange-50 text-orange-700 rounded text-xs font-medium">
+                                                                All Ages
+                                                            </span>
+                                                        ) : event.age_groups &&
+                                                          event.age_groups
+                                                              .length > 0 ? (
+                                                            event.age_groups.map(
+                                                                (
+                                                                    group,
+                                                                    idx
+                                                                ) => (
+                                                                    <span
+                                                                        key={
+                                                                            idx
                                                                         }
-                                                                        className="text-purple-500"
-                                                                    />
-                                                                    <span className="text-sm font-medium text-gray-900">
-                                                                        {
-                                                                            scheduleInfo.label
-                                                                        }
+                                                                        className="inline-block px-2 py-1 bg-orange-50 text-orange-700 rounded text-xs font-medium"
+                                                                    >
+                                                                        {group.label &&
+                                                                            `${group.label}`}
+                                                                        {group.min_age !=
+                                                                            null &&
+                                                                            group.max_age !=
+                                                                                null &&
+                                                                            ` (${group.min_age}-${group.max_age})`}
                                                                     </span>
-                                                                </div>
-                                                                <p className="text-xs text-gray-500">
-                                                                    {
-                                                                        scheduleInfo.details
-                                                                    }
-                                                                </p>
-                                                            </div>
+                                                                )
+                                                            )
                                                         ) : (
-                                                            <div className="space-y-1.5">
-                                                                {scheduleInfo.slots?.map(
-                                                                    (
-                                                                        slot,
-                                                                        idx
-                                                                    ) => (
+                                                            <span className="text-xs text-gray-400">
+                                                                No age groups
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
+
+                                                {/* Upcoming Dates Column */}
+                                                <td className="px-6 py-4">
+                                                    <div className="space-y-1">
+                                                        {upcomingDates.length >
+                                                        0 ? (
+                                                            upcomingDates.map(
+                                                                (slot, idx) => {
+                                                                    return (
                                                                         <div
                                                                             key={
                                                                                 idx
                                                                             }
+                                                                            className="flex items-center gap-2"
                                                                         >
-                                                                            <div className="flex items-center gap-1.5">
-                                                                                {slot.is_all_day && (
-                                                                                    <Sun
-                                                                                        size={
-                                                                                            12
-                                                                                        }
-                                                                                        className="text-amber-500"
-                                                                                    />
+                                                                            <span className="text-xs font-medium text-gray-700">
+                                                                                {formatDate(
+                                                                                    slot.date
                                                                                 )}
-                                                                                <span className="text-sm font-medium text-gray-900">
-                                                                                    {formatFullDate(
-                                                                                        slot.date
-                                                                                    )}
-                                                                                </span>
-                                                                            </div>
-                                                                            <span className="text-xs text-gray-500">
-                                                                                {formatTimeRange(
-                                                                                    slot
+                                                                            </span>
+                                                                            <span className="text-xs text-gray-400">
+                                                                                {formatTime(
+                                                                                    slot.start_time
+                                                                                )}{" "}
+                                                                                -{" "}
+                                                                                {formatTime(
+                                                                                    slot.end_time
                                                                                 )}
                                                                             </span>
                                                                         </div>
-                                                                    )
-                                                                )}
-                                                            </div>
-                                                        )
-                                                    ) : (
-                                                        <span className="text-sm text-gray-400">
-                                                            No schedule
-                                                        </span>
-                                                    )}
+                                                                    );
+                                                                }
+                                                            )
+                                                        ) : (
+                                                            <span className="text-xs text-gray-400">
+                                                                No upcoming
+                                                                dates
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </td>
 
-                                                {/* Price Column */}
+                                                {/* Capacity Column */}
                                                 <td className="px-6 py-4">
-                                                    <div className="text-sm font-semibold text-gray-900">
-                                                        {formatPrice(
-                                                            event.prices
-                                                        )}
+                                                    <div className="flex items-center gap-2">
+                                                        <Users
+                                                            size={14}
+                                                            className="text-orange-500"
+                                                        />
+                                                        <span className="text-sm font-semibold text-gray-800">
+                                                            {event.default_capacity ||
+                                                                "∞"}
+                                                        </span>
                                                     </div>
                                                 </td>
 
                                                 {/* Status Column */}
                                                 <td className="px-6 py-4">
                                                     <span
-                                                        className={`inline-flex items-center gap-1 ${statusStyle.bg} ${statusStyle.text} px-3 py-1.5 rounded-md text-xs font-medium`}
+                                                        className={`inline-flex items-center gap-1 ${statusStyle.bg} ${statusStyle.text} px-3 py-1 rounded-full text-xs font-bold`}
                                                     >
-                                                        <StatusIcon size={14} />
+                                                        <StatusIcon size={12} />
                                                         {event.status
                                                             .charAt(0)
                                                             .toUpperCase() +
@@ -649,21 +572,34 @@ export default function EventsIndexPage() {
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center justify-center gap-2">
                                                         <button
+                                                            onClick={() =>
+                                                                router.visit(
+                                                                    userRole ===
+                                                                        "admin"
+                                                                        ? `/admin/events/${event.id}`
+                                                                        : `/merchant/events/${event.id}`
+                                                                )
+                                                            }
                                                             className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-all"
                                                             title="View"
                                                         >
-                                                            <Eye size={18} />
+                                                            <Eye size={16} />
                                                         </button>
                                                         {userRole ===
                                                             "merchant" && (
                                                             <>
                                                                 <button
+                                                                    onClick={() =>
+                                                                        router.visit(
+                                                                            `/merchant/events/${event.id}/edit`
+                                                                        )
+                                                                    }
                                                                     className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
                                                                     title="Edit"
                                                                 >
                                                                     <Edit
                                                                         size={
-                                                                            18
+                                                                            16
                                                                         }
                                                                     />
                                                                 </button>
@@ -680,7 +616,7 @@ export default function EventsIndexPage() {
                                                                     >
                                                                         <BadgeX
                                                                             size={
-                                                                                18
+                                                                                16
                                                                             }
                                                                         />
                                                                     </button>
@@ -697,22 +633,23 @@ export default function EventsIndexPage() {
                         </div>
                     </div>
                 ) : (
-                    /* Grid View */
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    /* Grid View - Compact Cards */
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {filteredEvents.map((event) => {
                             const statusKey =
                                 event.status as keyof typeof statusColors;
                             const StatusIcon = statusColors[statusKey]?.icon;
                             const statusStyle =
                                 statusColors[statusKey] || statusColors.draft;
-                            const scheduleInfo = getScheduleInfo(event);
+                            const upcomingDates = getUpcomingDates(event.slots);
 
                             return (
                                 <div
                                     key={event.id}
-                                    className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-all"
+                                    className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all transform hover:scale-105"
                                 >
-                                    <div className="relative h-40 bg-gradient-to-br from-orange-400 to-orange-500">
+                                    {/* Image */}
+                                    <div className="relative h-48 bg-gradient-to-br from-orange-400 to-red-400">
                                         {event.media?.[0] ? (
                                             <img
                                                 src={event.media[0].file_path}
@@ -721,11 +658,16 @@ export default function EventsIndexPage() {
                                             />
                                         ) : (
                                             <div className="flex items-center justify-center h-full">
-                                                <Calendar className="h-16 w-16 text-white opacity-50" />
+                                                <Calendar className="h-20 w-20 text-white opacity-50" />
+                                            </div>
+                                        )}
+                                        {event.featured && (
+                                            <div className="absolute top-3 right-3 bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                                                ⭐ Featured
                                             </div>
                                         )}
                                         <div
-                                            className={`absolute top-2 left-2 ${statusStyle.bg} ${statusStyle.text} px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1`}
+                                            className={`absolute top-3 left-3 ${statusStyle.bg} ${statusStyle.text} px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1`}
                                         >
                                             <StatusIcon size={12} />
                                             {event.status
@@ -734,22 +676,26 @@ export default function EventsIndexPage() {
                                                 event.status.slice(1)}
                                         </div>
                                     </div>
-                                    <div className="p-5">
-                                        <div className="mb-3">
-                                            <span className="inline-block px-2.5 py-1 bg-orange-50 text-orange-700 rounded-md text-xs font-medium">
+
+                                    {/* Content */}
+                                    <div className="p-6">
+                                        <div className="flex items-start justify-between mb-3">
+                                            <span className="inline-block px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
                                                 {getEventTypeLabel(event.type)}
                                             </span>
                                         </div>
-                                        <h3 className="text-lg font-semibold text-gray-900 mb-3 line-clamp-2">
+
+                                        <h3 className="text-xl font-bold text-gray-900 mb-3 line-clamp-2">
                                             {event.title}
                                         </h3>
+
                                         <div className="space-y-2 mb-4">
-                                            <div className="flex items-start gap-2 text-sm text-gray-600">
+                                            <div className="flex items-center gap-2 text-sm text-gray-600">
                                                 <MapPin
-                                                    size={14}
-                                                    className="text-orange-500 flex-shrink-0 mt-0.5"
+                                                    size={16}
+                                                    className="text-orange-500 flex-shrink-0"
                                                 />
-                                                <span className="text-xs line-clamp-1">
+                                                <span className="truncate">
                                                     {
                                                         event.location
                                                             ?.location_name
@@ -758,137 +704,103 @@ export default function EventsIndexPage() {
                                             </div>
                                             <div className="flex items-center gap-2 text-sm text-gray-600">
                                                 <DollarSign
-                                                    size={14}
+                                                    size={16}
                                                     className="text-orange-500 flex-shrink-0"
                                                 />
-                                                <span className="text-xs">
-                                                    {formatPrice(event.prices)}
+                                                <span>
+                                                    {formatPrice(
+                                                        event.prices?.[0]
+                                                    )}
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-2 text-sm text-gray-600">
-                                                {event.is_unlimited_capacity ? (
-                                                    <>
-                                                        <Infinity
-                                                            size={14}
-                                                            className="text-orange-500 flex-shrink-0"
-                                                        />
-                                                        <span className="text-xs">
-                                                            Unlimited
-                                                        </span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Users
-                                                            size={14}
-                                                            className="text-orange-500 flex-shrink-0"
-                                                        />
-                                                        <span className="text-xs">
-                                                            Capacity:{" "}
-                                                            {
-                                                                event.default_capacity
-                                                            }
-                                                        </span>
-                                                    </>
-                                                )}
+                                                <Users
+                                                    size={16}
+                                                    className="text-orange-500 flex-shrink-0"
+                                                />
+                                                <span>
+                                                    Capacity:{" "}
+                                                    {event.default_capacity ||
+                                                        "Unlimited"}
+                                                </span>
                                             </div>
                                         </div>
-                                        {scheduleInfo && (
-                                            <div className="mb-4 p-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                                                {scheduleInfo.type ===
-                                                "frequency" ? (
-                                                    <div>
-                                                        <div className="flex items-center gap-1.5 mb-1">
-                                                            <Repeat
-                                                                size={12}
-                                                                className="text-purple-500"
-                                                            />
-                                                            <p className="text-xs font-semibold text-gray-800">
+
+                                        {/* Upcoming Dates */}
+                                        {upcomingDates.length > 0 && (
+                                            <div className="mb-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                                                <p className="text-xs font-semibold text-orange-800 mb-2">
+                                                    Upcoming:
+                                                </p>
+                                                <div className="space-y-1">
+                                                    {upcomingDates.map(
+                                                        (slot, idx) => (
+                                                            <p
+                                                                key={idx}
+                                                                className="text-xs text-gray-700"
+                                                            >
+                                                                {formatDate(
+                                                                    slot.date
+                                                                )}{" "}
+                                                                •{" "}
                                                                 {
-                                                                    scheduleInfo.label
+                                                                    slot.start_time
                                                                 }
                                                             </p>
-                                                        </div>
-                                                        <p className="text-xs text-gray-600">
-                                                            {
-                                                                scheduleInfo.details
-                                                            }
-                                                        </p>
-                                                    </div>
-                                                ) : (
-                                                    <div>
-                                                        <p className="text-xs font-semibold text-gray-800 mb-1.5">
-                                                            Upcoming:
-                                                        </p>
-                                                        <div className="space-y-1">
-                                                            {scheduleInfo.slots?.map(
-                                                                (slot, idx) => (
-                                                                    <div
-                                                                        key={
-                                                                            idx
-                                                                        }
-                                                                    >
-                                                                        <div className="flex items-center gap-1.5">
-                                                                            {slot.is_all_day && (
-                                                                                <Sun
-                                                                                    size={
-                                                                                        12
-                                                                                    }
-                                                                                    className="text-amber-500"
-                                                                                />
-                                                                            )}
-                                                                            <p className="text-xs font-medium text-gray-700">
-                                                                                {formatFullDate(
-                                                                                    slot.date
-                                                                                )}
-                                                                            </p>
-                                                                        </div>
-                                                                        <p className="text-xs text-gray-500 ml-5">
-                                                                            {formatTimeRange(
-                                                                                slot
-                                                                            )}
-                                                                        </p>
-                                                                    </div>
-                                                                )
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                )}
+                                                        )
+                                                    )}
+                                                </div>
                                             </div>
                                         )}
+
+                                        {/* Age Groups */}
                                         {event.age_groups &&
                                             event.age_groups.length > 0 && (
-                                                <div className="flex flex-wrap gap-1.5 mb-4">
+                                                <div className="flex flex-wrap gap-2 mb-4">
                                                     {event.age_groups
                                                         .slice(0, 2)
                                                         .map((group, idx) => (
                                                             <span
                                                                 key={idx}
-                                                                className="px-2 py-0.5 bg-orange-50 text-orange-700 rounded text-xs font-medium"
+                                                                className="px-2 py-1 bg-orange-50 text-orange-700 rounded-lg text-xs font-medium"
                                                             >
-                                                                {formatAgeGroup(
-                                                                    group
-                                                                )}
+                                                                {group.label}
+                                                                {group.min_age !=
+                                                                    null &&
+                                                                    group.max_age !=
+                                                                        null &&
+                                                                    ` (${group.min_age}-${group.max_age})`}
                                                             </span>
                                                         ))}
-                                                    {event.age_groups.length >
-                                                        2 && (
-                                                        <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs font-medium">
-                                                            +
-                                                            {event.age_groups
-                                                                .length - 2}
-                                                        </span>
-                                                    )}
                                                 </div>
                                             )}
+
+                                        {/* Actions */}
                                         <div className="flex gap-2 pt-4 border-t border-gray-100">
-                                            <button className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-all text-sm font-medium">
-                                                <Eye size={14} />
+                                            <button
+                                                onClick={() =>
+                                                    router.visit(
+                                                        userRole === "admin"
+                                                            ? `/admin/events/${event.id}`
+                                                            : `/merchant/events/${event.id}`
+                                                    )
+                                                }
+                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-all font-medium"
+                                            >
+                                                <Eye size={16} />
                                                 View
                                             </button>
                                             {userRole === "merchant" && (
                                                 <>
-                                                    <button className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all text-sm font-medium">
-                                                        <Edit size={14} />
+                                                    <button
+                                                        onClick={() =>
+                                                            router.visit(
+                                                                `/merchant/events/${event.id}/edit`
+                                                            )
+                                                        }
+                                                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all font-medium"
+                                                    >
+                                                        <Edit size={16} />
                                                         Edit
                                                     </button>
                                                     {event.status ===
@@ -899,10 +811,10 @@ export default function EventsIndexPage() {
                                                                     event.id
                                                                 )
                                                             }
-                                                            className="px-3 py-2 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-all"
+                                                            className="px-4 py-2 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-all"
                                                             title="Deactivate"
                                                         >
-                                                            <BadgeX size={14} />
+                                                            <BadgeX size={16} />
                                                         </button>
                                                     )}
                                                 </>
@@ -914,6 +826,7 @@ export default function EventsIndexPage() {
                         })}
                     </div>
                 )}
+
                 {/* Pagination */}
                 {events.links.length > 3 && (
                     <div className="flex justify-center items-center gap-2 mt-8">

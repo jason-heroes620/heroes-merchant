@@ -23,4 +23,16 @@ class NotificationController extends Controller
 
         return back()->with('success', 'Notification marked as read');
     }
+
+    public function saveToken(Request $request)
+    {
+        $request->validate([
+            'token' => 'required|string',
+        ]);
+
+        $user = Auth::user();
+        $user->update(['expo_push_token' => $request->token]);
+
+        return response()->json(['message' => 'Expo token saved successfully']);
+    }
 }

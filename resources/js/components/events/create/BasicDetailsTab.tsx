@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import EventDetailsSection from "./EventDetailsSection";
 import CategorySection from "./CategorySection";
-import CapacitySection from "./CapacitySection";
 
 interface BasicDetailsTabProps {
     data: any;
@@ -50,18 +49,16 @@ export default function BasicDetailsTab({
                     </div>
                     <div>
                         <h3 className="text-xl font-bold text-gray-800">
-                            Category & Capacity
+                            Category
                         </h3>
                         <p className="text-sm text-gray-600">
-                            Classify your event and set attendance limits
+                            Classify your event to reach the right audience
                         </p>
                     </div>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6">
-                    <CategorySection data={data} setData={setData} />
-
-                    <CapacitySection data={data} setData={setData} errors={errors} />                    
+                    <CategorySection data={data} setData={setData} />                    
                 </div>
             </div>
 

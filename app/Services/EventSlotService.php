@@ -3,204 +3,216 @@
 namespace App\Services;
 
 use App\Models\Event;
-use App\Models\EventSlot;
-use App\Models\EventPrice;
 use App\Models\EventFrequency;
+use App\Models\EventDate;
+use App\Models\EventSlot;
+use App\Models\EventSlotPrice;
 use App\Models\EventAgeGroup;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class EventSlotService
 {
-    protected ConversionService $conversionService;
-
-    public function __construct(ConversionService $conversionService)
+    /**
+     * Generate all slots for an event.
+     */
+    public function generateSlotsForEvent(Event $event): void
     {
-        $this->conversionService = $conversionService;
+        // 1️⃣ Recurring events: generate slots per frequency
+        foreach ($event->frequencies as $frequency) {
+            $this->generateSlotsForFrequency($event, $frequency);
+        }
+
+        // 2️⃣ One-time events: generate slots from event_dates not linked to any frequency
+        foreach ($event->dates()->whereNull('event_frequency_id')->get() as $eventDate) {
+            $this->generateSlotsForDate($event, $eventDate);
+        }
     }
 
     /**
-     * Generate slots for a given event and frequency.
+     * Generate slots for a single frequency.
      */
-    public function generateSlots(Event $event, EventFrequency $frequency, array $data = []): void
+    public function generateSlotsForFrequency(Event $event, EventFrequency $frequency): void
     {
-        DB::transaction(function () use ($event, $frequency, $data) {
-            // Cleanup old slots for that frequency
-            $frequency->slots()->delete();
+        DB::transaction(function () use ($event, $frequency) {
 
-            // Generate dates based on frequency type
-            $dates = $this->generateDatesFromFrequency($frequency);
+            Log::info('🔍 Generating slots for frequency', [
+                'frequency_id' => $frequency->id,
+                'type' => $frequency->type,
+            ]);
 
-            if (empty($dates)) {
-                return; 
-            }
+            $eventDates = $frequency->dates()->with('slots')->get();
 
-            $isWeekendMap = [];
+            foreach ($eventDates as $eventDate) {
 
-            foreach ($dates as $date) {
-                $carbonDate = Carbon::parse($date);
-                $isWeekend = in_array($carbonDate->dayOfWeek, [Carbon::SATURDAY, Carbon::SUNDAY]);
-                $slotType = $isWeekend ? 'weekend' : 'weekday';
+                Log::info('📅 Processing EventDate', [
+                    'event_date_id' => $eventDate->id,
+                    'start_date' => $eventDate->start_date,
+                    'end_date' => $eventDate->end_date
+                ]);
 
-                $isWeekendMap[$date] = $isWeekend;
+                $templateSlots = $eventDate->slots->toArray();
 
-                $startTime = isset($data['start_time']) ? date('H:i:s', strtotime($data['start_time'])) : null;
-                $endTime = isset($data['end_time']) ? date('H:i:s', strtotime($data['end_time'])) : null;
-                $duration = abs(Carbon::parse($endTime)->diffInMinutes(Carbon::parse($startTime)));
+                $dates = $frequency->generateDates($eventDate);
 
-                // 4️⃣ Handle pricing type
-                $pricingType = $event->prices()->first()?->pricing_type ?? 'fixed';
+                Log::info('🗓 Generated Dates', [
+                    'event_date_id' => $eventDate->id,
+                    'dates' => $dates
+                ]);
 
-                $ageGroups = $event->ageGroups()->get();
-                
-                if (in_array($pricingType, ['age_based', 'mixed']) && $ageGroups->count() > 0) {
-                    foreach ($ageGroups as $ageGroup) {
-                        $priceInCents = $this->resolvePrice($event, $date, $ageGroup);
+                foreach ($dates as $dateStr) {
 
-                        EventSlot::create([
-                            'event_id' => $event->id,
-                            'frequency_id' => $frequency->id,
-                            'date' => $date,
-                            'is_all_day' => $this->extractBool($data, 'is_all_day', false),
-                            'start_time' => $startTime,
-                            'end_time' => $endTime,
-                            'duration' => $duration,
-                            'capacity' => $data['capacity'] ?? null,
-                            'is_unlimited' => $this->extractBool($data, 'is_unlimited', false),
-                            'booked' => 0,
-                            'slot_type' => $slotType,
-                            'price_in_cents' => $priceInCents,
-                            'price_in_credits' => $data['price_in_credits'] ?? null,
+                    if (EventSlot::where('event_date_id', $eventDate->id)->where('date', $dateStr)->exists()) {
+                        Log::info('⏭️ Skipping slot creation because it already exists', [
+                            'event_date_id' => $eventDate->id,
+                            'date' => $dateStr,
                         ]);
+                        continue;
                     }
-                } else {
-                    // Single slot for fixed/day_type
-                    $priceInCents = $this->resolvePrice($event, $date);
 
-                    EventSlot::create([
-                        'event_id' => $event->id,
-                        'frequency_id' => $frequency->id,
-                        'date' => $date,
-                        'is_all_day' => $this->extractBool($data, 'is_all_day', false),
-                        'start_time' => $startTime,
-                        'end_time' => $endTime,
-                        'duration' => $duration,
-                        'capacity' => $data['capacity'] ?? null,
-                        'is_unlimited' => $this->extractBool($data, 'is_unlimited', false),
-                        'booked' => 0,
-                        'slot_type' => $slotType,
-                        'price_in_cents' => $priceInCents,
-                        'price_in_credits' => $data['price_in_credits'] ?? null,
+                    Log::info('➡️ Creating slots for date', [
+                        'date' => $dateStr,
+                        'using_event_date_id' => $eventDate->id,
                     ]);
+
+                    if (count($templateSlots)) {
+                        foreach ($templateSlots as $slotTemplate) {
+                            $this->createSlotForDate($event, $eventDate, $dateStr, $slotTemplate);
+                        }
+                    } else {
+                        $this->createSlotForDate($event, $eventDate, $dateStr);
+                    }
                 }
             }
         });
     }
 
-    /**
-     * Generate slots for a given event and frequency.
-     */
-    protected function generateDatesFromFrequency(EventFrequency $frequency): array
+    public function generateSlotsForEventDate(Event $event, EventDate $eventDate, string $date, array $slots = [])
     {
-        $type = $frequency->type;
-        $start = $frequency->start_date ? Carbon::parse($frequency->start_date) : null;
-        $end = $frequency->end_date ? Carbon::parse($frequency->end_date) : $start;
-
-        if (!$start) {
-            return [];
+        if (empty($slots)) {
+            Log::warning("No slots provided for custom date $date of event {$event->id}");
+            return;
         }
 
-        switch ($type) {
-            case 'one_time':
-                return [$start->toDateString()];
-
-            case 'daily':
-                return collect(CarbonPeriod::create($start, '1 day', $end))
-                    ->map(fn($d) => $d->toDateString())
-                    ->toArray();
-
-            case 'weekly':
-                return collect(CarbonPeriod::create($start, '1 week', $end))
-                    ->map(fn($d) => $d->toDateString())
-                    ->toArray();
-
-            case 'biweekly':
-                return collect(CarbonPeriod::create($start, '2 weeks', $end))
-                    ->map(fn($d) => $d->toDateString())
-                    ->toArray();
-
-            case 'monthly':
-                return collect(CarbonPeriod::create($start, '1 month', $end))
-                    ->map(fn($d) => $d->toDateString())
-                    ->toArray();
-
-            case 'annually':
-                return collect(CarbonPeriod::create($start, '1 year', $end))
-                    ->map(fn($d) => $d->toDateString())
-                    ->toArray();
-
-            case 'custom':
-                return is_array($frequency->selected_dates)
-                    ? array_map(fn($d) => Carbon::parse($d)->toDateString(), $frequency->selected_dates)
-                    : [];
-
-            default:
-                return [$start->toDateString()];
+        foreach ($slots as $slotPayload) {
+            $this->createSlotForDate($event, $eventDate, $date, $slotPayload);
         }
     }
 
     /**
-     * Resolve the correct price for the event based on pricing_type.
+     * Generate slots for a one-time event_date.
      */
-    protected function resolvePrice(Event $event, bool $isWeekend): int
+    public function generateSlotsForDate(Event $event, EventDate $eventDate): void
     {
-        $price = $event->prices()->first();
+        DB::transaction(function () use ($event, $eventDate) {
+            $start = Carbon::parse($eventDate->start_date);
+            $end = Carbon::parse($eventDate->end_date);
 
-        if (!$price) {
-            return 0;
+            foreach (CarbonPeriod::create($start, $end) as $date) {
+                $this->createSlotForDate($event, $eventDate, $date->toDateString());
+            }
+        });
+    }
+
+    /**
+     * Create a slot row and price rows for a single date.
+     */
+    public function createSlotForDate(Event $event, EventDate $eventDate, string $dateStr, array $slotTemplate = []): void
+    {
+        $isWeekend = in_array(Carbon::parse($dateStr)->dayOfWeek, [Carbon::SATURDAY, Carbon::SUNDAY]);
+
+        $startTime   = isset($slotTemplate['start_time']) ? date('H:i:s', strtotime($slotTemplate['start_time'])) : null;
+        $endTime     = isset($slotTemplate['end_time']) ? date('H:i:s', strtotime($slotTemplate['end_time'])) : null;
+        $capacity    = isset($slotTemplate['capacity']) ? (int)$slotTemplate['capacity'] : null;
+        $isUnlimited = isset($slotTemplate['is_unlimited']) ? (bool)$slotTemplate['is_unlimited'] : false;
+
+        $duration = null;
+        if ($startTime && $endTime) {
+            $startDT = Carbon::createFromFormat('H:i:s', $startTime);
+            $endDT   = Carbon::createFromFormat('H:i:s', $endTime);
+
+            $duration = $startDT->diffInMinutes($endDT);
+
+            // Overnight (e.g. 23:00 → 01:00)
+            if ($duration < 0) {
+                $duration = (24 * 60) + $duration;
+            }
         }
 
-        switch ($price->pricing_type) {
-            case 'fixed':
-                return $price->fixed_price_in_cents ?? 0;
+        $slot = EventSlot::create([
+            'event_id'      => $event->id,
+            'event_date_id' => $eventDate->id,
+            'date'          => $event->is_recurring ? $dateStr : null,
+            'start_time'    => $startTime,
+            'end_time'      => $endTime,
+            'duration'      => $duration,
+            'capacity'      => $capacity,
+            'is_unlimited'  => $isUnlimited,
+        ]);
 
-            case 'day_type':
-                return $isWeekend
-                    ? ($price->weekend_price_in_cents ?? 0)
-                    : ($price->weekday_price_in_cents ?? 0);
+        $this->createSlotPrices($event, $slot, $isWeekend);
+    }
 
-            case 'age_based':
-                if ($ageGroup) {
-                    $groupPrice = $event->prices()->where('event_age_group_id', $ageGroup->id)->first();
-                    return $groupPrice->fixed_price_in_cents ?? 0;
-                }
-                return 0;
+    /**
+     * Create EventSlotPrice rows for a slot based on pricing type.
+     */
+    protected function createSlotPrices(Event $event, EventSlot $slot, bool $isWeekend): void
+    {
+        $pricingType = $event->prices()->first()?->pricing_type ?? 'fixed';
+        $ageGroups = $event->ageGroups;
 
-            case 'mixed':
-                if ($ageGroup) {
-                    $groupPrice = $event->prices()->where('event_age_group_id', $ageGroup->id)->first();
-                    return $isWeekend
-                        ? ($groupPrice->weekend_price_in_cents ?? 0)
-                        : ($groupPrice->weekday_price_in_cents ?? 0);
-                }
-                return $isWeekend
-                    ? ($price->weekend_price_in_cents ?? 0)
-                    : ($price->weekday_price_in_cents ?? 0);
+        if (in_array($pricingType, ['age_based', 'mixed']) && $ageGroups->count()) {
+            foreach ($ageGroups as $ageGroup) {
+            $weekday = $event->prices()
+                ->where('event_age_group_id', $ageGroup->id)
+                ->value('weekday_price_in_rm') ?? 0;
 
-            default:
-                return 0;
+            $weekend = $event->prices()
+                ->where('event_age_group_id', $ageGroup->id)
+                ->value('weekend_price_in_rm') ?? 0;
+
+            // 1️⃣ Weekday price row
+            EventSlotPrice::create([
+                'event_slot_id' => $slot->id,
+                'event_age_group_id' => $ageGroup->id,
+                'price_in_rm' => $weekday,
+            ]);
+
+            // 2️⃣ Weekend price row
+            EventSlotPrice::create([
+                'event_slot_id' => $slot->id,
+                'event_age_group_id' => $ageGroup->id,
+                'price_in_rm' => $weekend,
+            ]);
+        }
+
+        } else {
+            $price = $this->resolvePrice($event, $isWeekend, null);
+            EventSlotPrice::create([
+                'event_slot_id' => $slot->id,
+                'event_age_group_id' => null,
+                'price_in_rm' => $price,
+            ]);
         }
     }
 
-     /**
-     * Safely extract a boolean value, respecting explicit false/null values.
+    /**
+     * Resolve price for a slot (based on pricing type, weekend, and optional ageGroup)
      */
-    protected function extractBool(array $data, string $key, bool $default = false): bool
+    protected function resolvePrice(Event $event, bool $isWeekend, ?EventAgeGroup $ageGroup = null): ?float
     {
-        if (array_key_exists($key, $data)) {
-            return (bool) $data[$key];
-        }
-        return $default;
+        $priceQuery = $event->prices();
+        $priceQuery = $ageGroup ? $priceQuery->where('event_age_group_id', $ageGroup->id) : $priceQuery->whereNull('event_age_group_id');
+
+        $price = $priceQuery->first();
+        if (!$price) return null;
+
+        return match($price->pricing_type) {
+            'fixed', 'age_based' => $price->fixed_price_in_rm !== null ? (float)$price->fixed_price_in_rm : null,
+            'day_type', 'mixed' => $isWeekend ? ($price->weekend_price_in_rm !== null ? (float)$price->weekend_price_in_rm : null) : ($price->weekday_price_in_rm !== null ? (float)$price->weekday_price_in_rm : null),
+            default => null,
+        };
     }
 }

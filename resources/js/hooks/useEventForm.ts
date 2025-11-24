@@ -4,25 +4,24 @@ import type {
     AgeGroup,
     Price,
     Frequency,
+    EventDate,
+    EventSlot,
     EventFormShape,
 } from "../types/events";
 
-/* -------------------- HOOK -------------------- */
-export default function useEventForm(initialProps?: {
+interface UseEventFormProps {
     userRole?: string;
     merchant_id?: string | null;
-    initialData?: EventFormShape;
-}) {
-    /* -------------------- DEFAULTS -------------------- */
-    const defaultInitial: EventFormShape = {
+    initialData?: Partial<EventFormShape>;
+}
+
+export default function useEventForm(initialProps?: UseEventFormProps) {
+    const defaultData: EventFormShape = {
         merchant_id: initialProps?.merchant_id ?? null,
         type: "event",
         title: "",
         description: "",
         category: "",
-        default_capacity: null,
-        featured: false,
-        status: "draft",
         location: {
             place_id: "",
             location_name: "",
@@ -32,57 +31,63 @@ export default function useEventForm(initialProps?: {
             raw_place: null,
             how_to_get_there: "",
         },
-        age_groups: [],
-        frequencies: [],
-        slots: [],
         media: [],
         removed_media: [],
-        is_recurring: false,
-        pricing_type: "fixed",
-        is_unlimited_capacity: false,
         is_suitable_for_all_ages: false,
-        is_all_day: false,
+        age_groups: [],
+        pricing_type: "fixed",
+        prices: [],
+        is_recurring: false,
+        frequencies: [],
+        event_dates: [],
+        status: "pending",
+        featured: false,
     };
 
-    /* -------------------- DEEP MERGE INITIAL DATA -------------------- */
-    const initial: EventFormShape = {
-        ...defaultInitial,
+    // Merge with initial data if editing
+    const initialFormData: EventFormShape = {
+        ...defaultData,
         ...initialProps?.initialData,
         location: {
-            ...defaultInitial.location,
+            ...defaultData.location,
             ...(initialProps?.initialData?.location || {}),
         },
         age_groups: initialProps?.initialData?.age_groups
-            ? initialProps.initialData.age_groups.map((g) => ({
-                  ...g,
-                  fixed_price_in_cents: g.fixed_price_in_cents ?? null,
-                  weekday_price_in_cents: g.weekday_price_in_cents ?? null,
-                  weekend_price_in_cents: g.weekend_price_in_cents ?? null,
-              }))
+            ? [...initialProps.initialData.age_groups]
             : [],
         frequencies: initialProps?.initialData?.frequencies
             ? [...initialProps.initialData.frequencies]
+            : [],
+        event_dates: initialProps?.initialData?.event_dates
+            ? initialProps.initialData.event_dates.map((ed) => ({
+                  ...ed,
+                  slots: ed.slots || [],
+              }))
             : [],
         media: initialProps?.initialData?.media
             ? [...initialProps.initialData.media]
             : [],
     };
 
-    /* -------------------- FORM STATE -------------------- */
-    const form = useForm<EventFormShape>(initial);
-    const { data, setData, processing, errors, reset } = form;
+    // Inertia form
+    const form = useForm<EventFormShape>(initialFormData);
+    const { data, setData, errors, processing } = form;
 
+    // Local state for complex fields
     const [mediaPreviews, setMediaPreviews] = useState<string[]>(
         data.media?.map((file: any) => file.url || "") || []
     );
     const [ageGroups, setAgeGroups] = useState<AgeGroup[]>(
-        data.age_groups || []
+        initialFormData.age_groups || []
     );
     const [frequencies, setFrequencies] = useState<Frequency[]>(
-        data.frequencies || []
+        initialFormData.frequencies || []
+    );
+    const [eventDates, setEventDates] = useState<EventDate[]>(
+        initialFormData.event_dates || []
     );
 
-    /* -------------------- MEDIA HANDLING -------------------- */
+    // ==================== MEDIA HANDLERS ====================
     const handleMediaInput = (files?: FileList | null) => {
         if (!files) return;
         const newFiles = Array.from(files).slice(
@@ -114,18 +119,11 @@ export default function useEventForm(initialProps?: {
         setMediaPreviews((prev) => prev.filter((_, i) => i !== index));
     };
 
-    /* -------------------- AGE GROUPS -------------------- */
+    // ==================== AGE GROUP HANDLERS ====================
     const addAgeGroup = () => {
-        setAgeGroups((prev) => [
-            ...prev,
-            {
-                label: "",
-                min_age: null,
-                max_age: null,
-                fixed_price_in_cents: null,
-                weekday_price_in_cents: null,
-                weekend_price_in_cents: null,
-            },
+        setAgeGroups([
+            ...ageGroups,
+            { label: "", min_age: null, max_age: null },
         ]);
     };
 
@@ -134,191 +132,271 @@ export default function useEventForm(initialProps?: {
         field: keyof AgeGroup,
         value: any
     ) => {
-        setAgeGroups((prev) => {
-            const copy = [...prev];
-            copy[index] = { ...copy[index], [field]: value };
-            return copy;
-        });
+        const updated = [...ageGroups];
+        updated[index] = { ...updated[index], [field]: value };
+        setAgeGroups(updated);
     };
 
     const removeAgeGroup = (index: number) => {
-        setAgeGroups((prev) => prev.filter((_, i) => i !== index));
+        setAgeGroups(ageGroups.filter((_, i) => i !== index));
     };
 
-    /* -------------------- FREQUENCIES -------------------- */
+    // ==================== FREQUENCY HANDLERS ====================
     const addFrequency = () => {
         const newFreq: Frequency = {
             type: "weekly",
+            days_of_week: [],
+            selected_dates: [],
+        };
+        setFrequencies([...frequencies, newFreq]);
+
+        // Add corresponding event date with empty slots array
+        const newDate: EventDate = {
             start_date: "",
             end_date: "",
-            start_time: "",
-            end_time: "",
-            capacity: null,
-            selected_dates: [],
-            days_of_week: [],
-            is_unlimited_capacity: false,
-            is_all_day: false,
+            slots: [], // Initialize with empty slots
         };
-        setFrequencies((prev) => [...prev, newFreq]);
+        setEventDates([...eventDates, newDate]);
     };
 
     const updateFrequency = (index: number, field: string, value: any) => {
-        setFrequencies((prev) => {
-            const copy = [...prev];
-            copy[index] = { ...copy[index], [field]: value };
-            return copy;
-        });
+        const updated = [...frequencies];
+        updated[index] = { ...updated[index], [field]: value };
+        setFrequencies(updated);
     };
 
     const removeFrequency = (index: number) => {
-        setFrequencies((prev) => prev.filter((_, i) => i !== index));
+        setFrequencies(frequencies.filter((_, i) => i !== index));
+        setEventDates(eventDates.filter((_, i) => i !== index));
     };
 
-    /* -------------------- SYNC STATE -------------------- */
+    // ==================== EVENT DATE HANDLERS ====================
+    const updateEventDate = (index: number, field: string, value: any) => {
+        const updated = [...eventDates];
+
+        // Ensure slots array exists
+        if (!updated[index]) {
+            updated[index] = {
+                start_date: "",
+                end_date: "",
+                slots: [],
+            };
+        }
+
+        updated[index] = {
+            ...updated[index],
+            [field]: value,
+            // Preserve slots if they exist
+            slots: updated[index].slots || [],
+        };
+        setEventDates(updated);
+    };
+
+    // ==================== SLOT HANDLERS ====================
+    const addSlot = (dateIndex: number) => {
+        const updated = [...eventDates];
+
+        if (!updated[dateIndex]) {
+            updated[dateIndex] = {
+                start_date: "",
+                end_date: "",
+                slots: [],
+            };
+        }
+
+        const newSlot: EventSlot = {
+            start_time: "",
+            end_time: "",
+            capacity: null,
+            is_unlimited: false,
+        };
+
+        updated[dateIndex] = {
+            ...updated[dateIndex],
+            slots: [...(updated[dateIndex].slots || []), newSlot],
+        };
+
+        setEventDates(updated);
+    };
+
+    const removeSlot = (dateIndex: number, slotIndex: number) => {
+        const updated = [...eventDates];
+
+        if (updated[dateIndex]) {
+            updated[dateIndex] = {
+                ...updated[dateIndex],
+                slots: (updated[dateIndex].slots || []).filter(
+                    (_, i) => i !== slotIndex
+                ),
+            };
+        }
+
+        setEventDates(updated);
+    };
+
+    const updateSlot = (
+        dateIndex: number,
+        slotIndex: number,
+        field: keyof EventSlot,
+        value: any
+    ) => {
+        const updated = [...eventDates];
+
+        if (updated[dateIndex] && updated[dateIndex].slots) {
+            const updatedSlots = [...updated[dateIndex].slots];
+            updatedSlots[slotIndex] = {
+                ...updatedSlots[slotIndex],
+                [field]: value,
+            };
+
+            updated[dateIndex] = {
+                ...updated[dateIndex],
+                slots: updatedSlots,
+            };
+        }
+
+        setEventDates(updated);
+    };
+
+    const getSlots = (dateIndex: number): EventSlot[] => {
+        return eventDates[dateIndex]?.slots || [];
+    };
+
+    // ==================== PRICE BUILDERS ====================
+    const buildPrices = (): Price[] => {
+        const pricingType = data.pricing_type || "fixed";
+
+        // For age_based or mixed, create one price per age group
+        if (
+            (pricingType === "age_based" || pricingType === "mixed") &&
+            !data.is_suitable_for_all_ages &&
+            ageGroups.length > 0
+        ) {
+            return ageGroups.map((ag) => ({
+                event_age_group_id: ag.id || null,
+                pricing_type: pricingType,
+                fixed_price_in_rm:
+                    pricingType === "age_based"
+                        ? ag.fixed_price_in_rm || null
+                        : null,
+                weekday_price_in_rm:
+                    pricingType === "mixed"
+                        ? ag.weekday_price_in_rm || null
+                        : null,
+                weekend_price_in_rm:
+                    pricingType === "mixed"
+                        ? ag.weekend_price_in_rm || null
+                        : null,
+            }));
+        }
+
+        // For fixed or day_type, single price entry
+        const existingPrice = data.prices?.[0] || {};
+        return [
+            {
+                pricing_type: pricingType,
+                event_age_group_id: null,
+                fixed_price_in_rm:
+                    pricingType === "fixed"
+                        ? existingPrice.fixed_price_in_rm || null
+                        : null,
+                weekday_price_in_rm:
+                    pricingType === "day_type"
+                        ? existingPrice.weekday_price_in_rm || null
+                        : null,
+                weekend_price_in_rm:
+                    pricingType === "day_type"
+                        ? existingPrice.weekend_price_in_rm || null
+                        : null,
+            },
+        ];
+    };
+
+    // ==================== SYNC TO FORM DATA ====================
     useEffect(() => {
-        setData("age_groups", ageGroups);
-    }, [ageGroups]);
+        setData("age_groups", data.is_suitable_for_all_ages ? [] : ageGroups);
+    }, [ageGroups, data.is_suitable_for_all_ages]);
 
     useEffect(() => {
         setData("frequencies", frequencies);
     }, [frequencies]);
 
     useEffect(() => {
-        if (data.media?.length) {
-            setMediaPreviews(data.media.map((file: any) => file.url || ""));
-        }
-    }, [data.media]);
+        setData("event_dates", eventDates);
+    }, [eventDates]);
 
-    /* -------------------- SUBMIT -------------------- */
+    // ==================== FORM SUBMISSION ====================
     const handleSubmit = (e?: React.FormEvent) => {
         e?.preventDefault();
 
-        // -------------------- 1️⃣ Build Frequencies --------------------
-        const finalFrequencies: Frequency[] = (
-            frequencies.length
-                ? frequencies
-                : [
-                      {
-                          type: "one_time" as const,
-                          start_date: data.start_date || "",
-                          end_date: data.end_date || data.start_date || "",
-                          start_time: data.start_time || "",
-                          end_time: data.end_time || "",
-                          capacity: data.default_capacity ?? null,
-                          is_unlimited_capacity:
-                              data.is_unlimited_capacity ?? false,
-                          is_all_day: data.is_all_day ?? false,
-                          selected_dates: data.start_date
-                              ? [data.start_date]
-                              : [],
-                          days_of_week: [],
-                          slots: [],
-                      },
-                  ]
-        ).map((freq) => ({
-            ...freq,
-            type: freq.type as Frequency["type"],
-            capacity: freq.capacity ?? data.default_capacity ?? null,
-            is_unlimited_capacity:
-                freq.is_unlimited_capacity ??
-                data.is_unlimited_capacity ??
-                false,
-            is_all_day: freq.is_all_day ?? data.is_all_day ?? false,
-            slots: [],
-            selected_dates: freq.selected_dates ?? [],
-            days_of_week: freq.days_of_week ?? [],
-        }));
+        // Determine is_recurring
+        const isRecurring =
+            frequencies.length > 0 && frequencies[0].type !== "one_time";
 
-        // -------------------- 2️⃣ Build Age Groups --------------------
-        const finalAgeGroups: AgeGroup[] = data.is_suitable_for_all_ages
-            ? []
-            : ageGroups.length
-            ? ageGroups.map((g) => ({
-                  id: g.id,
-                  label: g.label,
-                  min_age: g.min_age ?? null,
-                  max_age: g.max_age ?? null,
-                  fixed_price_in_cents: g.fixed_price_in_cents ?? null,
-                  weekday_price_in_cents: g.weekday_price_in_cents ?? null,
-                  weekend_price_in_cents: g.weekend_price_in_cents ?? null,
-              }))
-            : [{ label: "No age group selected" }];
+        // Build final prices
+        const finalPrices = buildPrices();
 
-        // -------------------- 3️⃣ Build Prices --------------------
-        const finalPrices: Price[] = (() => {
-            switch (data.pricing_type) {
-                case "fixed":
-                    return [
-                        {
-                            pricing_type: "fixed",
-                            fixed_price_in_cents:
-                                finalAgeGroups[0]?.fixed_price_in_cents ?? 0,
-                        },
-                    ];
-                case "day_type":
-                    return [
-                        {
-                            pricing_type: "day_type",
-                            weekday_price_in_cents:
-                                finalAgeGroups[0]?.weekday_price_in_cents ?? 0,
-                            weekend_price_in_cents:
-                                finalAgeGroups[0]?.weekend_price_in_cents ?? 0,
-                        },
-                    ];
-                case "age_based":
-                    return finalAgeGroups.map((g) => ({
-                        age_group_id: g.id,
-                        age_group_label: g.label,
-                        pricing_type: "age_based",
-                        fixed_price_in_cents: g.fixed_price_in_cents ?? 0,
-                    }));
-                case "mixed":
-                    return finalAgeGroups.map((g) => ({
-                        age_group_id: g.id,
-                        age_group_label: g.label,
-                        pricing_type: "mixed",
-                        weekday_price_in_cents: g.weekday_price_in_cents ?? 0,
-                        weekend_price_in_cents: g.weekend_price_in_cents ?? 0,
-                    }));
-                default:
-                    return [];
-            }
-        })();
-
-        // -------------------- 4️⃣ Construct Submission Payload --------------------
-        const submissionPayload: Omit<
-            EventFormShape,
-            | "pricing_type"
-            | "fixed_price_in_cents"
-            | "weekday_price_in_cents"
-            | "weekend_price_in_cents"
-        > & { prices: Price[] } = {
+        // Prepare submission data
+        const submissionData: EventFormShape = {
             ...data,
-            age_groups: finalAgeGroups,
-            frequencies: finalFrequencies,
+            is_recurring: isRecurring,
+            age_groups: data.is_suitable_for_all_ages ? [] : ageGroups,
             prices: finalPrices,
-            slots: [], // backend generates slots
+            frequencies: isRecurring ? frequencies : [],
+            event_dates: eventDates, // Already contains nested slots
         };
 
-        console.log("🚀 Submission Payload:", submissionPayload);
+        // Convert to FormData for file uploads
+        const formData = new FormData();
 
+        Object.entries(submissionData).forEach(([key, value]) => {
+            if (key === "media") {
+                (value as any[])?.forEach((file) => {
+                    if (file instanceof File) {
+                        formData.append("media[]", file);
+                    }
+                });
+            } else if (key === "removed_media") {
+                (value as string[])?.forEach((id) => {
+                    formData.append("removed_media[]", id);
+                });
+            } else if (
+                [
+                    "age_groups",
+                    "prices",
+                    "frequencies",
+                    "event_dates",
+                    "location",
+                ].includes(key)
+            ) {
+                formData.append(key, JSON.stringify(value));
+            } else if (value !== undefined && value !== null) {
+                formData.append(key, String(value));
+            }
+        });
+
+        console.log("🚀 Submission Payload:", submissionData);
+
+        // Submit
         if (data.id) {
-            form.put(route("merchant.events.update", data.id), {
+            form.post(route("merchant.events.update", data.id), {
                 preserveScroll: true,
+                forceFormData: true,
             });
         } else {
             form.post(route("merchant.events.store"), {
                 preserveScroll: true,
+                forceFormData: true,
             });
         }
     };
 
     return {
+        form,
         data,
         setData,
         errors,
         processing,
-        reset,
         mediaPreviews,
         handleMediaInput,
         removeMedia,
@@ -330,6 +408,12 @@ export default function useEventForm(initialProps?: {
         addFrequency,
         updateFrequency,
         removeFrequency,
+        eventDates,
+        updateEventDate,
+        addSlot,
+        removeSlot,
+        updateSlot,
+        getSlots,
         handleSubmit,
     };
 }

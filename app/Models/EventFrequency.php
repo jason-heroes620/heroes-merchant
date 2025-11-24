@@ -36,6 +36,20 @@ class EventFrequency extends Model
 
     public function generateDates(EventDate $eventDate): array
     {
+        if ($this->type === 'custom') {
+            return collect($this->selected_dates ?? [])
+                ->map(fn($d) => is_array($d) ? ($d['date'] ?? null) : $d)
+                ->filter()
+                ->unique()
+                ->sort()
+                ->values()
+                ->toArray();
+        }
+
+        if (!$eventDate) {
+            return [];
+        }
+
         $start = Carbon::parse($eventDate->start_date);
         $end = Carbon::parse($eventDate->end_date);
 
@@ -48,7 +62,7 @@ class EventFrequency extends Model
             case 'weekly':
             case 'biweekly':
                 $interval = $this->type === 'weekly' ? 1 : 2;
-                $daysOfWeek = $this->days_of_week ?? [0]; // 0 = Sunday
+                $daysOfWeek = $this->days_of_week ?? []; 
 
                 $dates = [];
                 $current = $start->copy();
@@ -78,8 +92,16 @@ class EventFrequency extends Model
 
                 return $dates;
 
-            case 'custom':
-                return $this->selected_dates ?? [];
+            case 'annually':
+                $dates = [];
+                $current = $start->copy();
+
+                while ($current->lte($end)) {
+                    $dates[] = $current->toDateString();
+                    $current->addYear();
+                }
+
+                return $dates;
 
             default:
                 return [$start->toDateString()];

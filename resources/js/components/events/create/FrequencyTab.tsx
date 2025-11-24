@@ -4,22 +4,32 @@ import {
     Plus,
     Trash2,
     Clock,
-    Users,
     AlertCircle,
     Check,
     X,
     Infinity,
-    Sun,
 } from "lucide-react";
+import type { Frequency, EventDate, EventSlot } from "../../../types/events";
 
 interface FrequencyTabProps {
     data: any;
     setData: (k: string, v: any) => void;
     errors: Record<string, any>;
-    frequencies: any[];
+    frequencies: Frequency[];
     addFrequency: () => void;
     removeFrequency: (index: number) => void;
     updateFrequency: (index: number, field: string, value: any) => void;
+    eventDates: EventDate[];
+    updateEventDate: (index: number, field: string, value: any) => void;
+    addSlot: (dateIndex: number) => void;
+    removeSlot: (dateIndex: number, slotIndex: number) => void;
+    updateSlot: (
+        dateIndex: number,
+        slotIndex: number,
+        field: keyof EventSlot,
+        value: any
+    ) => void;
+    getSlots: (dateIndex: number) => EventSlot[];
 }
 
 export default function FrequencyTab({
@@ -30,14 +40,21 @@ export default function FrequencyTab({
     addFrequency,
     removeFrequency,
     updateFrequency,
+    eventDates,
+    updateEventDate,
+    addSlot,
+    removeSlot,
+    updateSlot,
+    getSlots,
 }: FrequencyTabProps) {
     const [customDateInput, setCustomDateInput] = useState<{
         index: number | null;
         value: string;
-    }>({
-        index: null,
-        value: "",
-    });
+    }>({ index: null, value: "" });
+
+    const [singleDayMode, setSingleDayMode] = useState<Record<number, boolean>>(
+        {}
+    );
 
     const daysOfWeek = [
         { value: 0, label: "Sun" },
@@ -83,52 +100,6 @@ export default function FrequencyTab({
         updateFrequency(freqIndex, "selected_dates", updated);
     };
 
-    // Generate dates based on recurrence pattern
-    const generateDates = (freq: any): string[] => {
-        if (!freq.start_date || !freq.end_date) return [];
-
-        const start = new Date(freq.start_date);
-        const end = new Date(freq.end_date);
-        const dates: string[] = [];
-
-        if (freq.type === "daily") {
-            let current = new Date(start);
-            while (current <= end) {
-                dates.push(current.toISOString().split("T")[0]);
-                current.setDate(current.getDate() + 1);
-            }
-        } else if (freq.type === "weekly" || freq.type === "biweekly") {
-            const daysOfWeek = freq.days_of_week || [];
-            const increment = freq.type === "biweekly" ? 14 : 7;
-
-            if (daysOfWeek.length > 0) {
-                let current = new Date(start);
-                while (current <= end) {
-                    if (daysOfWeek.includes(current.getDay())) {
-                        dates.push(current.toISOString().split("T")[0]);
-                    }
-                    current.setDate(current.getDate() + 1);
-                }
-                current.setDate(current.getDate() + (increment - 7));
-            }
-        } else if (freq.type === "monthly") {
-            let current = new Date(start);
-            while (current <= end) {
-                dates.push(current.toISOString().split("T")[0]);
-                current.setMonth(current.getMonth() + 1);
-            }
-        } else if (freq.type === "annually") {
-            let current = new Date(start);
-            while (current <= end) {
-                dates.push(current.toISOString().split("T")[0]);
-                current.setFullYear(current.getFullYear() + 1);
-            }
-        }
-
-        return dates;
-    };
-
-    // Calculate duration between times
     const calculateDuration = (startTime: string, endTime: string): string => {
         if (!startTime || !endTime) return "";
 
@@ -143,62 +114,45 @@ export default function FrequencyTab({
             minutes += 60;
         }
 
-        if (hours < 0) {
-            hours += 24;
-        }
+        if (hours < 0) hours += 24;
 
-        if (hours === 0) {
-            return `${minutes} min`;
-        } else if (minutes === 0) {
-            return `${hours} hr${hours !== 1 ? "s" : ""}`;
-        } else {
-            return `${hours} hr${hours !== 1 ? "s" : ""} ${minutes} min`;
+        if (hours === 0) return `${minutes} min`;
+        if (minutes === 0) return `${hours} hr${hours !== 1 ? "s" : ""}`;
+        return `${hours} hr${hours !== 1 ? "s" : ""} ${minutes} min`;
+    };
+
+    const getEventDate = (index: number): EventDate => {
+        if (!eventDates || eventDates.length <= index) {
+            return {
+                start_date: "",
+                end_date: "",
+                slots: [],
+            };
+        }
+        return eventDates[index];
+    };
+
+    const toggleSingleDayMode = (index: number, checked: boolean) => {
+        setSingleDayMode({ ...singleDayMode, [index]: checked });
+
+        if (checked) {
+            const eventDate = getEventDate(index);
+            if (eventDate.start_date) {
+                updateEventDate(index, "end_date", eventDate.start_date);
+            }
         }
     };
 
-    // Validate dates and times
-    const validateDateTime = (freq: any) => {
-        const errors: any = {};
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+    const handleStartDateChange = (index: number, value: string) => {
+        updateEventDate(index, "start_date", value);
 
-        if (freq.start_date) {
-            const startDate = new Date(freq.start_date);
-            if (startDate < today) {
-                errors.start_date = "Start date must be today or later";
-            }
+        // If in single day mode, sync end_date
+        if (singleDayMode[index]) {
+            updateEventDate(index, "end_date", value);
         }
-
-        if (freq.end_date && freq.start_date) {
-            const startDate = new Date(freq.start_date);
-            const endDate = new Date(freq.end_date);
-            if (endDate < startDate) {
-                errors.end_date = "End date must be after start date";
-            }
-            if (endDate < today) {
-                errors.end_date = "End date must be today or later";
-            }
-        }
-
-        if (freq.start_time && freq.end_time && !freq.is_all_day) {
-            const [startHour, startMin] = freq.start_time
-                .split(":")
-                .map(Number);
-            const [endHour, endMin] = freq.end_time.split(":").map(Number);
-            const startMinutes = startHour * 60 + startMin;
-            const endMinutes = endHour * 60 + endMin;
-
-            if (endMinutes <= startMinutes) {
-                errors.end_time = "End time must be later than start time";
-            }
-        }
-
-        if (freq.capacity != null && freq.capacity < 0) {
-            errors.capacity = "Capacity cannot be negative";
-        }
-
-        return errors;
     };
+
+    const firstEventDate = getEventDate(0);
 
     return (
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
@@ -237,7 +191,7 @@ export default function FrequencyTab({
                     </label>
                 </div>
 
-                {/* One-Time Event */}
+                {/* ONE-TIME EVENT */}
                 {!data.is_recurring && (
                     <section className="border-2 border-orange-300 rounded-xl p-8 space-y-6 shadow-md">
                         <div className="flex items-center gap-3 pb-4 border-b-2 border-orange-200">
@@ -249,206 +203,292 @@ export default function FrequencyTab({
                                     One-Time Event Schedule
                                 </h3>
                                 <p className="text-sm text-gray-700">
-                                    Set the date and time for your single event
+                                    Set the date and time slots for your event
                                 </p>
                             </div>
                         </div>
 
-                        <div className="grid md:grid-cols-2 gap-6">
-                            <div className="md:col-span-2">
-                                <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                                    <Calendar
-                                        size={18}
-                                        className="text-orange-600"
-                                    />
-                                    Event Date *
-                                </label>
-                                <input
-                                    type="date"
-                                    value={data.start_date ?? ""}
-                                    min={new Date().toISOString().split("T")[0]}
-                                    onChange={(e) =>
-                                        setData("start_date", e.target.value)
-                                    }
-                                    className="w-full px-5 py-4 text-lg border-2 border-orange-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm"
-                                />
-                                {errors?.start_date && (
-                                    <p className="text-red-500 text-sm mt-2 flex items-center gap-1 font-medium">
-                                        <AlertCircle size={14} />
-                                        {errors.start_date}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* All Day Checkbox */}
-                            <div className="md:col-span-2">
-                                <label className="flex items-center gap-3 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={data.is_all_day || false}
-                                        onChange={(e) => {
-                                            setData(
-                                                "is_all_day",
-                                                e.target.checked
-                                            );
-                                            if (e.target.checked) {
-                                                setData("start_time", "");
-                                                setData("end_time", "");
-                                            }
-                                        }}
-                                        className="w-5 h-5 text-orange-500 rounded focus:ring-2 focus:ring-orange-500"
-                                    />
-                                    <span className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                                        <Sun
+                        {/* Date Selection */}
+                        <div className="space-y-4">
+                            <div className="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                                        <Calendar
                                             size={18}
-                                            className="text-orange-500"
+                                            className="text-orange-600"
                                         />
-                                        All Day Event
-                                    </span>
-                                </label>
+                                        Event Start Date *
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={firstEventDate.start_date}
+                                        min={
+                                            new Date()
+                                                .toISOString()
+                                                .split("T")[0]
+                                        }
+                                        onChange={(e) =>
+                                            handleStartDateChange(
+                                                0,
+                                                e.target.value
+                                            )
+                                        }
+                                        className="w-full px-5 py-4 text-lg border-2 border-orange-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm"
+                                    />
+                                    {errors?.["event_dates.0.start_date"] && (
+                                        <p className="text-red-500 text-sm mt-2 flex items-center gap-1 font-medium">
+                                            <AlertCircle size={14} />
+                                            {errors["event_dates.0.start_date"]}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                                        <Calendar
+                                            size={18}
+                                            className="text-orange-600"
+                                        />
+                                        Event End Date *
+                                    </label>
+
+                                    <label className="flex items-center gap-2 mb-3 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={singleDayMode[0] || false}
+                                            onChange={(e) =>
+                                                toggleSingleDayMode(
+                                                    0,
+                                                    e.target.checked
+                                                )
+                                            }
+                                            className="w-4 h-4 text-orange-500 rounded focus:ring-2 focus:ring-orange-500"
+                                        />
+                                        <span className="text-sm text-gray-600">
+                                            Single day event (same as start
+                                            date)
+                                        </span>
+                                    </label>
+
+                                    <input
+                                        type="date"
+                                        value={firstEventDate.end_date}
+                                        min={
+                                            firstEventDate.start_date ||
+                                            new Date()
+                                                .toISOString()
+                                                .split("T")[0]
+                                        }
+                                        onChange={(e) =>
+                                            updateEventDate(
+                                                0,
+                                                "end_date",
+                                                e.target.value
+                                            )
+                                        }
+                                        disabled={singleDayMode[0]}
+                                        className="w-full px-5 py-4 text-lg border-2 border-orange-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                    />
+                                    {errors?.["event_dates.0.end_date"] && (
+                                        <p className="text-red-500 text-sm mt-2 flex items-center gap-1 font-medium">
+                                            <AlertCircle size={14} />
+                                            {errors["event_dates.0.end_date"]}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Time Slots Section */}
+                        <div className="border-t-2 border-orange-200 pt-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <h4 className="text-lg font-bold text-gray-800">
+                                        Time Slots
+                                    </h4>
+                                    <p className="text-sm text-gray-600 mt-1">
+                                        Add multiple time slots for this event
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => addSlot(0)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all font-semibold"
+                                >
+                                    <Plus size={18} /> Add Slot
+                                </button>
                             </div>
 
-                            {!data.is_all_day && (
-                                <>
-                                    <div>
-                                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                                            <Clock
-                                                size={18}
-                                                className="text-orange-600"
-                                            />
-                                            Start Time
-                                        </label>
-                                        <input
-                                            type="time"
-                                            value={data.start_time ?? ""}
-                                            onChange={(e) =>
-                                                setData(
-                                                    "start_time",
-                                                    e.target.value
-                                                )
-                                            }
-                                            className="w-full px-5 py-4 text-lg border-2 border-orange-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm"
-                                        />
-                                    </div>
+                            {getSlots(0).length === 0 ? (
+                                <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
+                                    <Clock className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+                                    <p className="text-gray-600 font-medium mb-2">
+                                        No time slots defined
+                                    </p>
+                                    <p className="text-sm text-gray-500 mb-4">
+                                        Add at least one time slot for your
+                                        event
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() => addSlot(0)}
+                                        className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all font-semibold"
+                                    >
+                                        <Plus size={18} /> Add First Slot
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {getSlots(0).map((slot, slotIndex) => (
+                                        <div
+                                            key={slotIndex}
+                                            className="p-5 bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-200 rounded-xl"
+                                        >
+                                            <div className="flex items-center gap-4 mb-4">
+                                                <div className="flex-shrink-0 w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                                                    {slotIndex + 1}
+                                                </div>
+                                                <h5 className="font-bold text-gray-800">
+                                                    Slot {slotIndex + 1}
+                                                </h5>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        removeSlot(0, slotIndex)
+                                                    }
+                                                    className="ml-auto p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
 
-                                    <div>
-                                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                                            <Clock
-                                                size={18}
-                                                className="text-orange-600"
-                                            />
-                                            End Time
-                                        </label>
-                                        <input
-                                            type="time"
-                                            value={data.end_time ?? ""}
-                                            onChange={(e) =>
-                                                setData(
-                                                    "end_time",
-                                                    e.target.value
-                                                )
-                                            }
-                                            className="w-full px-5 py-4 text-lg border-2 border-orange-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm"
-                                        />
-                                        {data.start_time && data.end_time && (
-                                            <p className="text-sm text-gray-600 mt-2 flex items-center gap-2">
-                                                <Clock size={14} />
-                                                Duration:{" "}
-                                                {calculateDuration(
-                                                    data.start_time,
-                                                    data.end_time
-                                                )}
-                                            </p>
-                                        )}
-                                        {errors?.end_time && (
-                                            <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
-                                                <AlertCircle size={12} />{" "}
-                                                {errors.end_time}
-                                            </p>
-                                        )}
-                                    </div>
-                                </>
+                                            <div className="grid md:grid-cols-2 gap-4 mb-4">
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-gray-700 mb-2">
+                                                        Start Time *
+                                                    </label>
+                                                    <input
+                                                        type="time"
+                                                        value={slot.start_time}
+                                                        onChange={(e) =>
+                                                            updateSlot(
+                                                                0,
+                                                                slotIndex,
+                                                                "start_time",
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                        className="w-full px-4 py-3 text-base border-2 border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-gray-700 mb-2">
+                                                        End Time *
+                                                    </label>
+                                                    <input
+                                                        type="time"
+                                                        value={slot.end_time}
+                                                        onChange={(e) =>
+                                                            updateSlot(
+                                                                0,
+                                                                slotIndex,
+                                                                "end_time",
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                        className="w-full px-4 py-3 text-base border-2 border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white"
+                                                    />
+                                                    {slot.start_time &&
+                                                        slot.end_time && (
+                                                            <p className="text-xs text-gray-600 mt-2 flex items-center gap-1">
+                                                                <Clock
+                                                                    size={12}
+                                                                />
+                                                                Duration:{" "}
+                                                                {calculateDuration(
+                                                                    slot.start_time,
+                                                                    slot.end_time
+                                                                )}
+                                                            </p>
+                                                        )}
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-700 mb-2">
+                                                    Capacity
+                                                </label>
+
+                                                <label className="flex items-center gap-2 mb-3 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={
+                                                            slot.is_unlimited
+                                                        }
+                                                        onChange={(e) => {
+                                                            updateSlot(
+                                                                0,
+                                                                slotIndex,
+                                                                "is_unlimited",
+                                                                e.target.checked
+                                                            );
+                                                            if (
+                                                                e.target.checked
+                                                            ) {
+                                                                updateSlot(
+                                                                    0,
+                                                                    slotIndex,
+                                                                    "is_unlimited",
+                                                                    true
+                                                                );
+                                                            }
+                                                        }}
+                                                        className="w-4 h-4 text-orange-500 rounded focus:ring-2 focus:ring-orange-500"
+                                                    />
+                                                    <span className="text-sm text-gray-700 flex items-center gap-1">
+                                                        <Infinity
+                                                            size={16}
+                                                            className="text-orange-500"
+                                                        />
+                                                        Unlimited
+                                                    </span>
+                                                </label>
+
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    value={slot.capacity ?? ""}
+                                                    onChange={(e) =>
+                                                        updateSlot(
+                                                            0,
+                                                            slotIndex,
+                                                            "capacity",
+                                                            e.target.value ===
+                                                                ""
+                                                                ? null
+                                                                : Number(
+                                                                      e.target
+                                                                          .value
+                                                                  )
+                                                        )
+                                                    }
+                                                    disabled={slot.is_unlimited}
+                                                    placeholder="e.g., 30"
+                                                    className="w-full px-4 py-3 text-base border-2 border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             )}
-
-                            <div className="md:col-span-2">
-                                <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
-                                    <Users
-                                        size={18}
-                                        className="text-orange-600"
-                                    />
-                                    Participant Capacity
-                                </label>
-
-                                <label className="flex items-center gap-3 mb-3 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={
-                                            data.is_unlimited_capacity || false
-                                        }
-                                        onChange={(e) => {
-                                            setData(
-                                                "is_unlimited_capacity",
-                                                e.target.checked
-                                            );
-                                            if (e.target.checked) {
-                                                setData(
-                                                    "default_capacity",
-                                                    null
-                                                );
-                                            }
-                                        }}
-                                        className="w-5 h-5 text-orange-500 rounded focus:ring-2 focus:ring-orange-500"
-                                    />
-                                    <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                                        <Infinity
-                                            size={18}
-                                            className="text-orange-500"
-                                        />
-                                        Unlimited Capacity
-                                    </span>
-                                </label>
-
-                                <input
-                                    type="number"
-                                    min={0}
-                                    value={data.default_capacity ?? ""}
-                                    onChange={(e) => {
-                                        const value = e.target.value;
-                                        if (
-                                            value === "" ||
-                                            Number(value) >= 0
-                                        ) {
-                                            setData(
-                                                "default_capacity",
-                                                value === ""
-                                                    ? null
-                                                    : Number(value)
-                                            );
-                                        }
-                                    }}
-                                    disabled={data.is_unlimited_capacity}
-                                    className="w-full px-5 py-4 text-lg border-2 border-orange-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                    placeholder={
-                                        data.is_unlimited_capacity
-                                            ? "Unlimited"
-                                            : "e.g., 30"
-                                    }
-                                />
-                                {errors?.default_capacity && (
-                                    <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
-                                        <AlertCircle size={12} />{" "}
-                                        {errors.default_capacity}
-                                    </p>
-                                )}
-                            </div>
                         </div>
                     </section>
                 )}
 
-                {/* Recurring Event */}
+                {/* RECURRING EVENTS */}
                 {data.is_recurring && (
                     <div className="space-y-6">
-                        {/* Header & Add Schedule */}
                         <div className="flex items-center justify-between pb-4 border-b-2 border-gray-200">
                             <div>
                                 <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
@@ -459,8 +499,7 @@ export default function FrequencyTab({
                                     Recurring Schedules
                                 </h3>
                                 <p className="text-sm text-gray-600 mt-1">
-                                    Configure one or more recurring patterns for
-                                    your event
+                                    Configure recurring patterns with time slots
                                 </p>
                             </div>
                             <button
@@ -472,16 +511,11 @@ export default function FrequencyTab({
                             </button>
                         </div>
 
-                        {/* Empty State */}
-                        {(frequencies ?? []).length === 0 ? (
+                        {frequencies.length === 0 ? (
                             <div className="text-center py-20 border-2 border-dashed border-gray-300 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100">
                                 <Calendar className="mx-auto h-20 w-20 text-gray-300 mb-4" />
                                 <p className="text-gray-600 font-bold text-lg mb-2">
                                     No recurring schedules defined
-                                </p>
-                                <p className="text-sm text-gray-500 mb-6">
-                                    Click "Add Schedule" to create your first
-                                    recurring pattern
                                 </p>
                                 <button
                                     type="button"
@@ -494,21 +528,15 @@ export default function FrequencyTab({
                             </div>
                         ) : (
                             <div className="space-y-6">
-                                {frequencies.map((freq: any, index: number) => {
-                                    const generatedDates =
-                                        freq.type !== "custom"
-                                            ? generateDates(freq)
-                                            : [];
-                                    const validationErrors =
-                                        validateDateTime(freq);
-
+                                {frequencies.map((freq, index) => {
+                                    const eventDate = getEventDate(index);
                                     return (
                                         <div
                                             key={index}
                                             className="p-8 border-2 border-gray-200 rounded-2xl bg-gradient-to-br from-white to-gray-50 hover:border-orange-300 hover:shadow-xl transition-all"
                                         >
                                             <div className="space-y-6">
-                                                {/* Schedule Header */}
+                                                {/* Header */}
                                                 <div className="flex items-center justify-between pb-4 border-b-2 border-gray-200">
                                                     <div className="flex items-center gap-3">
                                                         <div className="p-2 bg-orange-100 rounded-lg">
@@ -542,7 +570,7 @@ export default function FrequencyTab({
                                                     </label>
                                                     <select
                                                         value={
-                                                            freq.type ??
+                                                            freq.type ||
                                                             "weekly"
                                                         }
                                                         onChange={(e) =>
@@ -619,25 +647,12 @@ export default function FrequencyTab({
                                                                 }
                                                             )}
                                                         </div>
-                                                        {(
-                                                            freq.days_of_week ||
-                                                            []
-                                                        ).length === 0 && (
-                                                            <p className="text-orange-600 text-sm mt-2 flex items-center gap-1 font-medium">
-                                                                <AlertCircle
-                                                                    size={14}
-                                                                />
-                                                                Please select at
-                                                                least one day
-                                                            </p>
-                                                        )}
                                                     </div>
                                                 )}
 
                                                 {/* Date Range */}
                                                 {freq.type !== "custom" && (
                                                     <div className="grid md:grid-cols-2 gap-6">
-                                                        {/* Start Date */}
                                                         <div>
                                                             <label className="block text-xs font-bold text-gray-600 mb-3 uppercase tracking-wide">
                                                                 Start Date *
@@ -645,15 +660,8 @@ export default function FrequencyTab({
                                                             <input
                                                                 type="date"
                                                                 value={
-                                                                    freq.start_date
-                                                                        ? new Date(
-                                                                              freq.start_date
-                                                                          )
-                                                                              .toISOString()
-                                                                              .split(
-                                                                                  "T"
-                                                                              )[0]
-                                                                        : ""
+                                                                    eventDate?.start_date ||
+                                                                    ""
                                                                 }
                                                                 min={
                                                                     new Date()
@@ -663,354 +671,331 @@ export default function FrequencyTab({
                                                                         )[0]
                                                                 }
                                                                 onChange={(e) =>
-                                                                    updateFrequency(
+                                                                    handleStartDateChange(
                                                                         index,
-                                                                        "start_date",
                                                                         e.target
                                                                             .value
                                                                     )
                                                                 }
                                                                 className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm"
                                                             />
-                                                            {validationErrors.start_date && (
-                                                                <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
-                                                                    <AlertCircle
-                                                                        size={
-                                                                            12
-                                                                        }
-                                                                    />{" "}
-                                                                    {
-                                                                        validationErrors.start_date
-                                                                    }
-                                                                </p>
-                                                            )}
                                                         </div>
 
-                                                        {/* End Date */}
                                                         <div>
                                                             <label className="block text-xs font-bold text-gray-600 mb-3 uppercase tracking-wide">
                                                                 End Date *
                                                             </label>
+
+                                                            <label className="flex items-center gap-2 mb-2 cursor-pointer">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={
+                                                                        singleDayMode[
+                                                                            index
+                                                                        ] ||
+                                                                        false
+                                                                    }
+                                                                    onChange={(
+                                                                        e
+                                                                    ) =>
+                                                                        toggleSingleDayMode(
+                                                                            index,
+                                                                            e
+                                                                                .target
+                                                                                .checked
+                                                                        )
+                                                                    }
+                                                                    className="w-4 h-4 text-orange-500 rounded focus:ring-2 focus:ring-orange-500"
+                                                                />
+                                                                <span className="text-xs text-gray-600">
+                                                                    Same as
+                                                                    start date
+                                                                </span>
+                                                            </label>
+
                                                             <input
                                                                 type="date"
                                                                 value={
-                                                                    freq.end_date
-                                                                        ? new Date(
-                                                                              freq.end_date
-                                                                          )
-                                                                              .toISOString()
-                                                                              .split(
-                                                                                  "T"
-                                                                              )[0]
-                                                                        : ""
+                                                                    eventDate?.end_date ||
+                                                                    ""
                                                                 }
                                                                 min={
-                                                                    freq.start_date
-                                                                        ? new Date(
-                                                                              freq.start_date
-                                                                          )
-                                                                              .toISOString()
-                                                                              .split(
-                                                                                  "T"
-                                                                              )[0]
-                                                                        : new Date()
-                                                                              .toISOString()
-                                                                              .split(
-                                                                                  "T"
-                                                                              )[0]
+                                                                    eventDate?.start_date ||
+                                                                    new Date()
+                                                                        .toISOString()
+                                                                        .split(
+                                                                            "T"
+                                                                        )[0]
                                                                 }
                                                                 onChange={(e) =>
-                                                                    updateFrequency(
+                                                                    updateEventDate(
                                                                         index,
                                                                         "end_date",
                                                                         e.target
                                                                             .value
                                                                     )
                                                                 }
-                                                                className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm"
+                                                                disabled={
+                                                                    singleDayMode[
+                                                                        index
+                                                                    ]
+                                                                }
+                                                                className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                                                             />
-                                                            {validationErrors.end_date && (
-                                                                <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
-                                                                    <AlertCircle
-                                                                        size={
-                                                                            12
-                                                                        }
-                                                                    />{" "}
-                                                                    {
-                                                                        validationErrors.end_date
-                                                                    }
-                                                                </p>
-                                                            )}
                                                         </div>
                                                     </div>
                                                 )}
 
-                                                {/* All Day Checkbox */}
-                                                <div>
-                                                    <label className="flex items-center gap-3 cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={
-                                                                freq.is_all_day ||
-                                                                false
-                                                            }
-                                                            onChange={(e) => {
-                                                                updateFrequency(
-                                                                    index,
-                                                                    "is_all_day",
-                                                                    e.target
-                                                                        .checked
-                                                                );
-                                                                if (
-                                                                    e.target
-                                                                        .checked
-                                                                ) {
-                                                                    updateFrequency(
-                                                                        index,
-                                                                        "start_time",
-                                                                        ""
-                                                                    );
-                                                                    updateFrequency(
-                                                                        index,
-                                                                        "end_time",
-                                                                        ""
-                                                                    );
-                                                                }
-                                                            }}
-                                                            className="w-5 h-5 text-orange-500 rounded focus:ring-2 focus:ring-orange-500"
-                                                        />
-                                                        <span className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                                                            <Sun
-                                                                size={18}
-                                                                className="text-orange-500"
-                                                            />
-                                                            All Day Event
-                                                        </span>
-                                                    </label>
-                                                </div>
-
-                                                {/* Time Range */}
-                                                {!freq.is_all_day && (
-                                                    <div className="grid md:grid-cols-2 gap-6">
+                                                {/* Time Slots for Recurring */}
+                                                <div className="border-t-2 border-gray-200 pt-6">
+                                                    <div className="flex items-center justify-between mb-4">
                                                         <div>
-                                                            <label className="block text-xs font-bold text-gray-600 mb-3 uppercase tracking-wide">
-                                                                Start Time
-                                                            </label>
-                                                            <input
-                                                                type="time"
-                                                                value={
-                                                                    freq.start_time ??
-                                                                    ""
-                                                                }
-                                                                onChange={(e) =>
-                                                                    updateFrequency(
-                                                                        index,
-                                                                        "start_time",
-                                                                        e.target
-                                                                            .value
-                                                                    )
-                                                                }
-                                                                className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-xs font-bold text-gray-600 mb-3 uppercase tracking-wide">
-                                                                End Time
-                                                            </label>
-                                                            <input
-                                                                type="time"
-                                                                value={
-                                                                    freq.end_time ??
-                                                                    ""
-                                                                }
-                                                                onChange={(e) =>
-                                                                    updateFrequency(
-                                                                        index,
-                                                                        "end_time",
-                                                                        e.target
-                                                                            .value
-                                                                    )
-                                                                }
-                                                                className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm"
-                                                            />
-                                                            {freq.start_time &&
-                                                                freq.end_time && (
-                                                                    <p className="text-sm text-gray-600 mt-2 flex items-center gap-2">
-                                                                        <Clock
-                                                                            size={
-                                                                                14
-                                                                            }
-                                                                        />
-                                                                        Duration:{" "}
-                                                                        {calculateDuration(
-                                                                            freq.start_time,
-                                                                            freq.end_time
-                                                                        )}
-                                                                    </p>
-                                                                )}
-                                                            {validationErrors.end_time && (
-                                                                <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
-                                                                    <AlertCircle
-                                                                        size={
-                                                                            12
-                                                                        }
-                                                                    />{" "}
-                                                                    {
-                                                                        validationErrors.end_time
-                                                                    }
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {/* Capacity */}
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-600 mb-3 uppercase tracking-wide">
-                                                        Capacity
-                                                    </label>
-
-                                                    <label className="flex items-center gap-3 mb-3 cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={
-                                                                freq.is_unlimited_capacity ||
-                                                                false
-                                                            }
-                                                            onChange={(e) => {
-                                                                updateFrequency(
-                                                                    index,
-                                                                    "is_unlimited_capacity",
-                                                                    e.target
-                                                                        .checked
-                                                                );
-                                                                if (
-                                                                    e.target
-                                                                        .checked
-                                                                ) {
-                                                                    updateFrequency(
-                                                                        index,
-                                                                        "capacity",
-                                                                        null
-                                                                    );
-                                                                }
-                                                            }}
-                                                            className="w-5 h-5 text-orange-500 rounded focus:ring-2 focus:ring-orange-500"
-                                                        />
-                                                        <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                                                            <Infinity
-                                                                size={18}
-                                                                className="text-orange-500"
-                                                            />
-                                                            Unlimited Capacity
-                                                        </span>
-                                                    </label>
-
-                                                    <input
-                                                        type="number"
-                                                        min={0}
-                                                        value={
-                                                            freq.capacity ?? ""
-                                                        }
-                                                        onChange={(e) => {
-                                                            const value =
-                                                                e.target.value;
-                                                            if (
-                                                                value === "" ||
-                                                                Number(value) >=
-                                                                    0
-                                                            ) {
-                                                                updateFrequency(
-                                                                    index,
-                                                                    "capacity",
-                                                                    value === ""
-                                                                        ? null
-                                                                        : Number(
-                                                                              value
-                                                                          )
-                                                                );
-                                                            }
-                                                        }}
-                                                        disabled={
-                                                            freq.is_unlimited_capacity
-                                                        }
-                                                        placeholder={
-                                                            freq.is_unlimited_capacity
-                                                                ? "Unlimited"
-                                                                : "e.g., 30"
-                                                        }
-                                                        className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                                    />
-                                                    {validationErrors.capacity && (
-                                                        <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
-                                                            <AlertCircle
-                                                                size={12}
-                                                            />{" "}
-                                                            {
-                                                                validationErrors.capacity
-                                                            }
-                                                        </p>
-                                                    )}
-                                                </div>
-
-                                                {/* Generated Dates Preview */}
-                                                {freq.type !== "custom" &&
-                                                    generatedDates.length >
-                                                        0 && (
-                                                        <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
-                                                            <p className="text-sm font-bold text-blue-900 mb-2 flex items-center gap-2">
-                                                                <Calendar
-                                                                    size={16}
-                                                                />
-                                                                Generated Dates
-                                                                (
-                                                                {
-                                                                    generatedDates.length
-                                                                }{" "}
-                                                                sessions)
+                                                            <h5 className="text-base font-bold text-gray-800">
+                                                                Time Slots
+                                                            </h5>
+                                                            <p className="text-xs text-gray-600 mt-1">
+                                                                These slots will
+                                                                apply to each
+                                                                occurrence
                                                             </p>
-                                                            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                                                                {generatedDates
-                                                                    .slice(
-                                                                        0,
-                                                                        20
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                addSlot(index)
+                                                            }
+                                                            className="flex items-center gap-2 px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all font-semibold text-sm"
+                                                        >
+                                                            <Plus size={16} />{" "}
+                                                            Add Slot
+                                                        </button>
+                                                    </div>
+
+                                                    {getSlots(index).length ===
+                                                    0 ? (
+                                                        <div className="text-center py-6 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
+                                                            <Clock className="mx-auto h-10 w-10 text-gray-300 mb-2" />
+                                                            <p className="text-gray-600 text-sm font-medium mb-2">
+                                                                No time slots
+                                                                defined
+                                                            </p>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    addSlot(
+                                                                        index
                                                                     )
-                                                                    .map(
-                                                                        (
-                                                                            date,
-                                                                            i
-                                                                        ) => (
-                                                                            <span
-                                                                                key={
-                                                                                    i
+                                                                }
+                                                                className="inline-flex items-center gap-2 px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all font-semibold text-sm"
+                                                            >
+                                                                <Plus
+                                                                    size={16}
+                                                                />{" "}
+                                                                Add Slot
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="space-y-3">
+                                                            {getSlots(
+                                                                index
+                                                            ).map(
+                                                                (
+                                                                    slot,
+                                                                    slotIndex
+                                                                ) => (
+                                                                    <div
+                                                                        key={
+                                                                            slotIndex
+                                                                        }
+                                                                        className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-200 rounded-lg"
+                                                                    >
+                                                                        <div className="flex items-center gap-3 mb-3">
+                                                                            <div className="flex-shrink-0 w-7 h-7 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold text-xs">
+                                                                                {slotIndex +
+                                                                                    1}
+                                                                            </div>
+                                                                            <h6 className="font-bold text-gray-800 text-sm">
+                                                                                Slot{" "}
+                                                                                {slotIndex +
+                                                                                    1}
+                                                                            </h6>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() =>
+                                                                                    removeSlot(
+                                                                                        index,
+                                                                                        slotIndex
+                                                                                    )
                                                                                 }
-                                                                                className="px-3 py-1 bg-white text-xs font-medium text-blue-800 rounded-full border border-blue-300"
+                                                                                className="ml-auto p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-all"
                                                                             >
-                                                                                {new Date(
-                                                                                    date
-                                                                                ).toLocaleDateString(
-                                                                                    "en-MY",
-                                                                                    {
-                                                                                        day: "2-digit",
-                                                                                        month: "short",
-                                                                                        year: "numeric",
+                                                                                <Trash2
+                                                                                    size={
+                                                                                        16
                                                                                     }
-                                                                                )}
-                                                                            </span>
-                                                                        )
-                                                                    )}
-                                                                {generatedDates.length >
-                                                                    20 && (
-                                                                    <span className="px-3 py-1 bg-blue-100 text-xs font-bold text-blue-800 rounded-full">
-                                                                        +
-                                                                        {generatedDates.length -
-                                                                            20}{" "}
-                                                                        more
-                                                                    </span>
-                                                                )}
-                                                            </div>
+                                                                                />
+                                                                            </button>
+                                                                        </div>
+
+                                                                        <div className="grid md:grid-cols-2 gap-3 mb-3">
+                                                                            <div>
+                                                                                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                                                                                    Start
+                                                                                    Time
+                                                                                    *
+                                                                                </label>
+                                                                                <input
+                                                                                    type="time"
+                                                                                    value={
+                                                                                        slot.start_time
+                                                                                    }
+                                                                                    onChange={(
+                                                                                        e
+                                                                                    ) =>
+                                                                                        updateSlot(
+                                                                                            index,
+                                                                                            slotIndex,
+                                                                                            "start_time",
+                                                                                            e
+                                                                                                .target
+                                                                                                .value
+                                                                                        )
+                                                                                    }
+                                                                                    className="w-full px-3 py-2 text-sm border-2 border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white"
+                                                                                />
+                                                                            </div>
+
+                                                                            <div>
+                                                                                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                                                                                    End
+                                                                                    Time
+                                                                                    *
+                                                                                </label>
+                                                                                <input
+                                                                                    type="time"
+                                                                                    value={
+                                                                                        slot.end_time
+                                                                                    }
+                                                                                    onChange={(
+                                                                                        e
+                                                                                    ) =>
+                                                                                        updateSlot(
+                                                                                            index,
+                                                                                            slotIndex,
+                                                                                            "end_time",
+                                                                                            e
+                                                                                                .target
+                                                                                                .value
+                                                                                        )
+                                                                                    }
+                                                                                    className="w-full px-3 py-2 text-sm border-2 border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white"
+                                                                                />
+                                                                                {slot.start_time &&
+                                                                                    slot.end_time && (
+                                                                                        <p className="text-xs text-gray-600 mt-1 flex items-center gap-1">
+                                                                                            <Clock
+                                                                                                size={
+                                                                                                    10
+                                                                                                }
+                                                                                            />
+                                                                                            {calculateDuration(
+                                                                                                slot.start_time,
+                                                                                                slot.end_time
+                                                                                            )}
+                                                                                        </p>
+                                                                                    )}
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div>
+                                                                            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                                                                                Capacity
+                                                                            </label>
+
+                                                                            <label className="flex items-center gap-2 mb-2 cursor-pointer">
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    checked={
+                                                                                        slot.is_unlimited
+                                                                                    }
+                                                                                    onChange={(
+                                                                                        e
+                                                                                    ) => {
+                                                                                        updateSlot(
+                                                                                            index,
+                                                                                            slotIndex,
+                                                                                            "is_unlimited",
+                                                                                            e
+                                                                                                .target
+                                                                                                .checked
+                                                                                        );
+                                                                                        if (
+                                                                                            e
+                                                                                                .target
+                                                                                                .checked
+                                                                                        ) {
+                                                                                            updateSlot(
+                                                                                                index,
+                                                                                                slotIndex,
+                                                                                                "is_unlimited",
+                                                                                                true
+                                                                                            );
+                                                                                        }
+                                                                                    }}
+                                                                                    className="w-3.5 h-3.5 text-orange-500 rounded focus:ring-2 focus:ring-orange-500"
+                                                                                />
+                                                                                <span className="text-xs text-gray-700 flex items-center gap-1">
+                                                                                    <Infinity
+                                                                                        size={
+                                                                                            14
+                                                                                        }
+                                                                                        className="text-orange-500"
+                                                                                    />
+                                                                                    Unlimited
+                                                                                </span>
+                                                                            </label>
+
+                                                                            <input
+                                                                                type="number"
+                                                                                min={
+                                                                                    0
+                                                                                }
+                                                                                value={
+                                                                                    slot.capacity ??
+                                                                                    ""
+                                                                                }
+                                                                                onChange={(
+                                                                                    e
+                                                                                ) =>
+                                                                                    updateSlot(
+                                                                                        index,
+                                                                                        slotIndex,
+                                                                                        "capacity",
+                                                                                        e
+                                                                                            .target
+                                                                                            .value ===
+                                                                                            ""
+                                                                                            ? null
+                                                                                            : Number(
+                                                                                                  e
+                                                                                                      .target
+                                                                                                      .value
+                                                                                              )
+                                                                                    )
+                                                                                }
+                                                                                disabled={
+                                                                                    slot.is_unlimited
+                                                                                }
+                                                                                placeholder="e.g., 30"
+                                                                                className="w-full px-3 py-2 text-sm border-2 border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                )
+                                                            )}
                                                         </div>
                                                     )}
+                                                </div>
 
                                                 {/* Custom Dates */}
                                                 {freq.type === "custom" && (
@@ -1018,8 +1003,6 @@ export default function FrequencyTab({
                                                         <label className="block text-sm font-bold text-orange-800 mb-3">
                                                             Custom Dates
                                                         </label>
-
-                                                        {/* Date Input */}
                                                         <div className="flex gap-2 mb-4">
                                                             <input
                                                                 type="date"
@@ -1047,7 +1030,6 @@ export default function FrequencyTab({
                                                                     )
                                                                 }
                                                                 className="flex-1 px-4 py-3 border-2 border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
-                                                                placeholder="Select a date"
                                                             />
                                                             <button
                                                                 type="button"
@@ -1066,11 +1048,10 @@ export default function FrequencyTab({
                                                                 <Plus
                                                                     size={18}
                                                                 />
-                                                                Add Date
+                                                                Add
                                                             </button>
                                                         </div>
 
-                                                        {/* Selected Dates */}
                                                         {freq.selected_dates &&
                                                             freq.selected_dates
                                                                 .length > 0 && (

@@ -13,25 +13,19 @@ class EventSlot extends Model
     protected $fillable = [
         'event_date_id',
         'event_id',
+        'date',
         'start_time',
         'end_time',
         'duration',
         'capacity',
         'is_unlimited',
-        'price_in_rm',
-        'total_credits',
-        'free_credits',
-        'paid_credits',
     ];
 
     protected $casts = [
         'duration' => 'integer',
         'capacity' => 'integer',
         'is_unlimited' => 'boolean',
-        'price_in_rm' => 'decimal:2',
-        'total_credits' => 'integer',
-        'free_credits' => 'integer',
-        'paid_credits' => 'integer',
+        'date' => 'date',
         'start_time' => 'datetime:H:i',
         'end_time' => 'datetime:H:i',
     ];

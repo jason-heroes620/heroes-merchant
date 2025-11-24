@@ -85,9 +85,15 @@ export default function EventFormWrapper({
                     addFrequency={form.addFrequency}
                     removeFrequency={form.removeFrequency}
                     updateFrequency={form.updateFrequency}
+                    eventDates={form.eventDates}
+                    updateEventDate={form.updateEventDate}
+                    addSlot={form.addSlot}
+                    removeSlot={form.removeSlot}
+                    updateSlot={form.updateSlot}
+                    getSlots={form.getSlots}
                 />
             )}
-
+            
             {/* Form Navigation */}
             <FormNavigation
                 tabs={tabs}

@@ -50,14 +50,7 @@ class Event extends Model
 
     public function slots()
     {
-        return $this->hasManyThrough(
-            EventSlot::class,
-            EventDate::class,
-            'event_id',
-            'event_date_id',
-            'id',
-            'id'
-        );
+        return $this->hasMany(EventSlot::class);
     }
 
     public function likedBy()
