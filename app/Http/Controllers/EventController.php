@@ -109,7 +109,7 @@ class EventController extends Controller
         Log::info('🧾 Raw Request Data:', $request->all());
 
         // 1️⃣ Normalize FormData JSON → arrays
-        foreach (['age_groups', 'prices', 'frequencies', 'event_dates'] as $field) {
+        foreach (['age_groups', 'prices', 'frequencies', 'event_dates', 'location'] as $field) {
             if ($request->has($field) && is_string($request->$field)) {
                 $request->merge([
                     $field => json_decode($request->$field, true)
@@ -143,7 +143,13 @@ class EventController extends Controller
             'age_groups.*.weekend_price_in_rm' => 'nullable|numeric',
 
             'location' => 'required|array',
-            'location.location_name' => 'required|string',
+            'location.location_name' => 'required|string|max:255',
+            'location.latitude' => 'nullable|numeric|between:-90,90',
+            'location.longitude' => 'nullable|numeric|between:-180,180',
+            'location.viewport' => 'nullable|array', 
+            'location.raw_place' => 'nullable|array',
+
+            'location.how_to_get_there' => 'nullable|string',
 
             'media' => 'nullable|array',
             'media.*' => 'file|mimes:jpeg,jpg,png,gif,mp4,mov|max:10240',
@@ -242,7 +248,12 @@ class EventController extends Controller
             }
 
             // Location
-            EventLocation::create(array_merge($validated['location'], ['event_id' => $event->id]));
+            $locationData = $validated['location'] ?? [];
+            if (isset($locationData['raw_place'])) {
+                $locationData['raw_place'] = json_encode($locationData['raw_place']);
+            }
+            $locationData['event_id'] = $event->id;
+            EventLocation::create($locationData);
 
             // Media
             if ($request->hasFile('media')) {
@@ -381,23 +392,26 @@ class EventController extends Controller
         }
     }
 
-    public function update(Request $request, Event $event, EventSlotService $slotService, $id)
+    public function update(Request $request, EventSlotService $slotService, $id)
     {
         $user = Auth::user();
         $merchant = Merchant::where('user_id', $user->id)->firstOrFail();
 
-        $event = Event::with(['location', 'ageGroups', 'prices', 'frequencies', 'eventDates'])
+        $event = Event::with(['location', 'ageGroups', 'prices', 'frequencies', 'dates'])
             ->where('merchant_id', $merchant->id)
             ->findOrFail($id);
 
-        Log::info('🧾 Raw Request Data:', $request->all());
+        $fields = ['age_groups', 'prices', 'frequencies', 'event_dates', 'location'];
 
-        // 1️⃣ Normalize JSON fields
-        foreach (['age_groups', 'prices', 'frequencies', 'event_dates'] as $field) {
+        foreach (['age_groups', 'prices', 'frequencies', 'event_dates', 'location'] as $field) {
             if ($request->has($field) && is_string($request->$field)) {
-                $request->merge([$field => json_decode($request->$field, true)]);
+                $request->merge([
+                    $field => json_decode($request->$field, true)
+                ]);
             }
         }
+
+        Log::info('🧾 Normalized Request Data:', $request->all());
 
         $hasCustomFreq = collect($request->input('frequencies', []))
             ->contains(fn($f) => ($f['type'] ?? '') === 'custom');
@@ -409,6 +423,7 @@ class EventController extends Controller
             'description' => 'nullable|string',
             'category' => 'nullable|string',
             'is_suitable_for_all_ages' => 'required|boolean',
+
             'age_groups' => 'nullable|array',
             'age_groups.*.label' => 'required_with:age_groups|string',
             'age_groups.*.min_age' => 'required_with:age_groups|integer|min:0',
@@ -416,24 +431,65 @@ class EventController extends Controller
             'age_groups.*.fixed_price_in_rm' => 'nullable|numeric',
             'age_groups.*.weekday_price_in_rm' => 'nullable|numeric',
             'age_groups.*.weekend_price_in_rm' => 'nullable|numeric',
+
             'location' => 'required|array',
-            'location.location_name' => 'required|string',
+            'location.location_name' => 'required|string|max:255',
+            'location.latitude' => 'nullable|numeric|between:-90,90',
+            'location.longitude' => 'nullable|numeric|between:-180,180',
+            'location.viewport' => 'nullable|array', 
+            'location.raw_place' => 'nullable|array',
+            'location.how_to_get_there' => 'nullable|string',
+
             'media' => 'nullable|array',
             'media.*' => 'file|mimes:jpeg,jpg,png,gif,mp4,mov|max:10240',
+
             'pricing_type' => 'required|string|in:fixed,day_type,age_based,mixed',
-            'prices' => ['nullable','array','min:1'],
+            'prices' => [
+                function ($attribute, $value, $fail) use ($request) {
+                    $pricingType = $request->input('pricing_type');
+                    if (in_array($pricingType, ['fixed', 'day_type']) && empty($value)) {
+                        $fail('The prices field is required for fixed or day_type pricing.');
+                    }
+                },
+                'nullable',
+                'array',
+                'min:1',
+            ],
             'prices.*.pricing_type' => 'required|string|in:fixed,day_type,age_based,mixed',
             'prices.*.event_age_group_id' => 'nullable|uuid',
             'prices.*.fixed_price_in_rm' => 'nullable|numeric',
             'prices.*.weekday_price_in_rm' => 'nullable|numeric',
             'prices.*.weekend_price_in_rm' => 'nullable|numeric',
+
             'frequencies' => 'nullable|array|min:1',
             'frequencies.*.type' => 'required|string|in:one_time,daily,weekly,biweekly,monthly,annually,custom',
             'frequencies.*.days_of_week' => 'nullable|array',
             'frequencies.*.selected_dates' => 'nullable|array',
-            'event_dates' => [$hasCustomFreq ? 'nullable' : 'required','array','min:1'],
-            'event_dates.*.start_date' => [$hasCustomFreq ? 'nullable' : 'required','date'],
-            'event_dates.*.end_date' => [$hasCustomFreq ? 'nullable' : 'required','date'],
+
+            'event_dates' => [
+                $hasCustomFreq ? 'nullable' : 'required',
+                'array',
+                'min:1',
+            ],
+            'event_dates.*.start_date' => [
+                $hasCustomFreq ? 'nullable' : 'required',
+                'date',
+            ],
+            'event_dates.*.end_date' => [
+                $hasCustomFreq ? 'nullable' : 'required',
+                'date',
+                function ($attribute, $value, $fail) use ($request, $hasCustomFreq) {
+                    if ($hasCustomFreq) return;
+
+                    $index = explode('.', $attribute)[1];
+                    $start = $request->input("event_dates.$index.start_date");
+
+                    if ($start && $value < $start) {
+                        $fail("The end date must be after or equal to the start date.");
+                    }
+                }
+            ],
+
             'event_dates.*.slots' => 'nullable|array',
             'event_dates.*.slots.*.start_time' => 'required_with:event_dates.*.slots|string',
             'event_dates.*.slots.*.end_time' => 'required_with:event_dates.*.slots|string',
@@ -462,10 +518,15 @@ class EventController extends Controller
             $event->media()->delete();
             $event->location()->delete();
 
-            // Re-create location
-            EventLocation::create(array_merge($validated['location'], ['event_id' => $event->id]));
+            // 1️⃣ Location
+            $locationData = $validated['location'] ?? [];
+            if (isset($locationData['raw_place'])) {
+                $locationData['raw_place'] = json_encode($locationData['raw_place']);
+            }
+            $locationData['event_id'] = $event->id;
+            EventLocation::create($locationData);
 
-            // Re-upload media
+            // 2️⃣ Media
             if ($request->hasFile('media')) {
                 foreach ($request->file('media') as $file) {
                     $filename = Str::uuid() . '_' . $file->getClientOriginalName();
@@ -479,10 +540,10 @@ class EventController extends Controller
                 }
             }
 
-            // Age groups + prices
+            // 3️⃣ Age Groups + Prices
             $ageGroupModels = [];
             if (!empty($validated['age_groups'])) {
-                foreach ($validated['age_groups'] as $g) {
+                foreach ($validated['age_groups'] as $i => $g) {
                     $ag = EventAgeGroup::create([
                         'event_id' => $event->id,
                         'label' => $g['label'],
@@ -504,8 +565,8 @@ class EventController extends Controller
                 }
             }
 
-            // Fixed/day_type prices
-            if (in_array($validated['pricing_type'], ['fixed','day_type'])) {
+            // Fixed / Day Type prices
+            if (in_array($validated['pricing_type'], ['fixed', 'day_type'])) {
                 foreach ($validated['prices'] as $p) {
                     EventPrice::create([
                         'event_id' => $event->id,
@@ -518,7 +579,7 @@ class EventController extends Controller
                 }
             }
 
-            // Frequencies + Event Dates
+            // 4️⃣ Frequencies + Event Dates
             $frequencyModels = [];
             if (!empty($validated['frequencies'])) {
                 foreach ($validated['frequencies'] as $freq) {
@@ -532,11 +593,13 @@ class EventController extends Controller
                 }
             }
 
+            // Custom frequency handling
             if ($hasCustomFreq) {
                 foreach ($frequencyModels as $freqModel) {
                     if ($freqModel->type !== 'custom') continue;
 
-                    foreach ($freqModel->selected_dates ?? [] as $dateEntry) {
+                    $selectedDates = $freqModel->selected_dates ?? [];
+                    foreach ($selectedDates as $dateEntry) {
                         $dateStr = is_array($dateEntry) ? ($dateEntry['date'] ?? null) : $dateEntry;
                         if (!$dateStr) continue;
 
@@ -547,11 +610,16 @@ class EventController extends Controller
                             'end_date' => $dateStr,
                         ]);
 
-                        $templateSlots = $validated['event_dates'][0]['slots'] ?? [];
+                        $templateSlots = $eventDate->slots()->get()->toArray();
+                        if (empty($templateSlots) && !empty($validated['event_dates'][0]['slots'] ?? [])) {
+                            $templateSlots = $validated['event_dates'][0]['slots'];
+                        }
+
                         $slotService->generateSlotsForEventDate($event, $eventDate, $dateStr, $templateSlots);
                     }
                 }
             } else {
+                // Regular event dates
                 foreach ($validated['event_dates'] as $date) {
                     $eventDate = EventDate::create([
                         'event_id' => $event->id,
@@ -574,7 +642,6 @@ class EventController extends Controller
 
             return redirect()->route('merchant.events.index')
                 ->with('success', 'Event updated successfully!');
-
         } catch (\Throwable $e) {
             DB::rollBack();
             Log::error('Event update failed', ['error' => $e->getMessage()]);
@@ -621,7 +688,6 @@ class EventController extends Controller
             ];
         })->toArray();
 
-        // All prices (fixed, day_type, age_based, mixed)
         $prices = $event->prices->map(function ($p) {
             return [
                 'id' => $p->id,
@@ -633,7 +699,6 @@ class EventController extends Controller
             ];
         })->toArray();
 
-        // Frequencies
         $frequencies = $event->frequencies->map(function ($freq) {
             return [
                 'id' => $freq->id,
@@ -643,7 +708,6 @@ class EventController extends Controller
             ];
         })->toArray();
 
-        // Event dates with slots
         $eventDates = $event->dates->map(function ($date) {
             return [
                 'id' => $date->id,

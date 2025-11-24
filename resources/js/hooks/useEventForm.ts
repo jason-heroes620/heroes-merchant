@@ -379,7 +379,7 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
 
         // Submit
         if (data.id) {
-            form.post(route("merchant.events.update", data.id), {
+            form.put(route("merchant.events.update", data.id), {
                 preserveScroll: true,
                 forceFormData: true,
             });
