@@ -1,7 +1,13 @@
 import { useState, useMemo } from "react";
 import { router } from "@inertiajs/react";
 import { toast } from "react-hot-toast";
-import { Clock, AlertCircle, Info, Calendar, Copy } from "lucide-react";
+import {
+    Clock,
+    AlertCircle,
+    Info,
+    Calendar,
+    Copy,
+} from "lucide-react";
 import type {
     Event,
     Conversion,
@@ -59,6 +65,14 @@ const StatusToggleModal: React.FC<Props> = ({
 
         return { paid, free };
     };
+
+    const recommended_paid_credits = conversion?.credits_per_rm ?? 0;
+    const recommended_free_credits = conversion
+        ? Math.ceil(
+              (recommended_paid_credits / conversion.paid_credit_percentage) *
+                  conversion.free_credit_percentage
+          )
+        : 0;
 
     // Initialize credits with recommended values
     const [credits, setCredits] = useState(
@@ -454,25 +468,44 @@ const StatusToggleModal: React.FC<Props> = ({
                                             </div>
                                         </div>
                                         <div className="bg-white rounded-lg p-3 border border-orange-200">
-                                            <div className="text-gray-600 text-xs">
-                                                Paid %
-                                            </div>
-                                            <div className="font-bold text-orange-700">
-                                                {
-                                                    conversion.paid_credit_percentage
-                                                }
-                                                %
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex flex-col">
+                                                    <div className="flex gap-1 text-gray-600 text-xs">
+                                                        <span>
+                                                            Paid Credits
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-orange-700 font-bold">
+                                                        {
+                                                            conversion.paid_credit_percentage
+                                                        }
+                                                        %
+                                                    </span>
+                                                </div>
+                                                <span className="text-orange-700 font-bold text-2xl">
+                                                    {recommended_paid_credits}
+                                                </span>
                                             </div>
                                         </div>
+
                                         <div className="bg-white rounded-lg p-3 border border-orange-200">
-                                            <div className="text-gray-600 text-xs">
-                                                Free %
-                                            </div>
-                                            <div className="font-bold text-orange-700">
-                                                {
-                                                    conversion.free_credit_percentage
-                                                }
-                                                %
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex flex-col">
+                                                    <div className="flex gap-1 text-gray-600 text-xs">
+                                                        <span>
+                                                            Free Credits
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-orange-700 font-bold">
+                                                        {
+                                                            conversion.free_credit_percentage
+                                                        }
+                                                        %
+                                                    </span>
+                                                </div>
+                                                <span className="text-orange-700 font-bold text-2xl">
+                                                    {recommended_free_credits}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>

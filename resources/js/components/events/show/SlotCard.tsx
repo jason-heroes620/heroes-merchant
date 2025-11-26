@@ -6,7 +6,7 @@ import type {
     Booking,
     Event,
 } from "../../../types/events";
-import { Clock, Users } from "lucide-react";
+import { Clock, DollarSign, Users, Gift } from "lucide-react";
 
 const SlotCard: React.FC<{
     slot: EventSlot;
@@ -60,17 +60,31 @@ const SlotCard: React.FC<{
                                 <span className="font-bold text-gray-900">
                                     RM {Number(sp.price_in_rm)?.toFixed(2)}
                                 </span>
-                                {userRole === "admin" && event.status === "active" && (
-                                    <div className="flex gap-2 text-xs">
-                                        <span className="text-green-600 font-bold">
-                                            {sp.free_credits} FREE
-                                        </span>
-                                        <span className="text-gray-400">•</span>
-                                        <span className="text-blue-600 font-bold">
-                                            {sp.paid_credits} PAID
-                                        </span>
-                                    </div>
-                                )}
+                                {userRole === "admin" &&
+                                    event.status === "active" && (
+                                        <div className="flex gap-2 text-xs">
+                                            <div className="flex items-center gap-2 text-xs">
+                                                <span className="text-gray-400">
+                                                    •
+                                                </span>
+                                                <div className="flex items-center gap-1 text-green-700 font-bold">
+                                                    <Gift className="w-4 h-4" />
+                                                    <span>
+                                                        {sp.free_credits} FREE
+                                                    </span>
+                                                </div>
+                                                <span className="text-gray-400">
+                                                    •
+                                                </span>
+                                                <div className="flex items-center gap-1 text-blue-700 font-bold">
+                                                    <DollarSign className="w-4 h-4" />
+                                                    <span>
+                                                        {sp.paid_credits} PAID
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                             </div>
                         </div>
                     );

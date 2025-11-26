@@ -212,7 +212,7 @@ const ConversionsIndex: React.FC<Props> = ({ conversions }) => {
                                                     </div>
                                                     <div className="flex justify-between items-center bg-green-50 px-4 py-3 rounded-lg">
                                                         <div className="flex items-center gap-2">
-                                                            <Gift className="w-4 h-4 text-green-600" />
+                                                            <Gift className="w-5 h-5 text-green-600" />
                                                             <span className="text-sm font-medium text-gray-700">
                                                                 Free Credits
                                                             </span>
