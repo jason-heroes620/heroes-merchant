@@ -12,9 +12,12 @@ use App\Models\{
     EventFrequency,
     EventDate,
     EventSlot,
-    EventLocation
+    EventSlotPrice,
+    EventLocation,
+    Conversion
 };
 use App\Services\EventSlotService;
+use App\Services\ConversionService;
 use App\Notifications\EventStatusNotification;
 use Illuminate\Validation\Rule;
 use Illuminate\Http\Request;
@@ -28,9 +31,12 @@ class EventController extends Controller
 {
     protected EventSlotService $slotService;
 
-    public function __construct(EventSlotService $slotService)
-    {
+    public function __construct(
+        EventSlotService $slotService,
+        ConversionService $conversionService
+    ) {
         $this->slotService = $slotService;
+        $this->conversionService = $conversionService;
     }
 
     /** Display a listing of events */
@@ -38,7 +44,7 @@ class EventController extends Controller
     {
         $user = Auth::user();
 
-        $query = Event::with(['location', 'ageGroups', 'prices', 'frequencies', 'slots', 'media'])
+        $query = Event::with(['location', 'ageGroups', 'slots.prices', 'frequencies', 'dates', 'slots', 'media'])
             ->orderByDesc('created_at');
 
         if ($user->role === 'merchant') {
@@ -53,6 +59,8 @@ class EventController extends Controller
                 $media->file_path = $media->url; 
                 return $media;
             });
+            $event->frequency = $event->frequencies->first(); 
+            $event->slotPrices = $event->slots->flatMap(fn($slot) => $slot->prices)->values();
             return $event;
         });
 
@@ -75,15 +83,53 @@ class EventController extends Controller
             }
         }
 
-        $event->load(['location', 'ageGroups', 'prices', 'frequencies', 'slots', 'media']);
+        $event->load(['location', 'ageGroups', 'slots.prices', 'frequencies', 'dates', 'media']);
 
         $event->media->transform(function ($media) {
             $media->file_path = $media->url;
             return $media;
         });
 
-        return Inertia::render('Events/Show', [
+        $dates = collect();
+
+        if ($event->is_recurring) {
+            // Use slot dates for recurring events
+            $dates = $event->slots->map(function ($slot) {
+                return [
+                    'start_date' => $slot->date,
+                    'end_date'   => $slot->date,
+                ];
+            })->unique();
+        } else {
+            // Use event_dates for one-time events
+            $dates = $event->dates->map(function ($date) {
+                return [
+                    'start_date' => $date->start_date,
+                    'end_date'   => $date->end_date,
+                ];
+            });
+        }
+
+        $frequency = $event->frequencies->first() ?? null;
+
+        $activeConversion = app(\App\Services\ConversionService::class)->getActiveConversion();
+
+        $eventData = [
             'event' => $event,
+            'media' => $event->media,
+            'ageGroups' => $event->ageGroups,
+            'prices' => $event->prices,
+            'frequency' => $frequency,
+            'dates' => $dates,
+            'slots' => $event->slots,
+            'slotPrices' => $event->slots->flatMap(fn($slot) => $slot->prices)->values(),
+            'bookings' => [], 
+            'conversion' => $activeConversion, 
+            'location' => $event->location,
+        ];
+
+        return Inertia::render('Events/Show', [
+            'eventData' => $eventData,
             'auth' => [
                 'user' => $user, 
         ],
@@ -394,6 +440,7 @@ class EventController extends Controller
 
     public function update(Request $request, EventSlotService $slotService, $id)
     {
+        Log::info('🔴 DEBUG: Raw Content', ['raw' => $request->getContent()]);
         $user = Auth::user();
         $merchant = Merchant::where('user_id', $user->id)->firstOrFail();
 
@@ -401,19 +448,20 @@ class EventController extends Controller
             ->where('merchant_id', $merchant->id)
             ->findOrFail($id);
 
-        $fields = ['age_groups', 'prices', 'frequencies', 'event_dates', 'location'];
+        $decoded = [
+            'location'     => json_decode($request->input('location', '[]'), true),
+            'prices'       => json_decode($request->input('prices', '[]'), true),
+            'frequencies'  => json_decode($request->input('frequencies', '[]'), true),
+            'event_dates'  => json_decode($request->input('event_dates', '[]'), true),
+            'age_groups'   => json_decode($request->input('age_groups', '[]'), true),
+        ];
 
-        foreach (['age_groups', 'prices', 'frequencies', 'event_dates', 'location'] as $field) {
-            if ($request->has($field) && is_string($request->$field)) {
-                $request->merge([
-                    $field => json_decode($request->$field, true)
-                ]);
-            }
-        }
+        $request->merge($decoded);
 
-        Log::info('🧾 Normalized Request Data:', $request->all());
+        Log::info('🧾 Normalized After Decode:', $decoded);
 
-        $hasCustomFreq = collect($request->input('frequencies', []))
+        $frequencies = $decoded['frequencies'] ?? [];
+        $hasCustomFreq = collect($frequencies)
             ->contains(fn($f) => ($f['type'] ?? '') === 'custom');
 
         // 2️⃣ Validate
@@ -441,7 +489,10 @@ class EventController extends Controller
             'location.how_to_get_there' => 'nullable|string',
 
             'media' => 'nullable|array',
-            'media.*' => 'file|mimes:jpeg,jpg,png,gif,mp4,mov|max:10240',
+            'media.*.id' => 'nullable|string',
+            'media.*.file_path' => 'nullable|string',
+            'media.*.file_type' => 'nullable|string',
+            'media_files.*' => 'file|mimes:jpeg,jpg,png,gif,mp4,mov|max:10240',
 
             'pricing_type' => 'required|string|in:fixed,day_type,age_based,mixed',
             'prices' => [
@@ -720,8 +771,7 @@ class EventController extends Controller
                         'start_time' => $slot->start_time,
                         'end_time' => $slot->end_time,
                         'capacity' => $slot->capacity,
-                        'is_unlimited' => $slot->is_unlimited_capacity,
-                        'is_all_day' => $slot->is_all_day,
+                        'is_unlimited' => $slot->is_unlimited,
                     ];
                 })->toArray(),
             ];
@@ -745,8 +795,6 @@ class EventController extends Controller
                 'description' => $event->description,
                 'type' => $event->type,
                 'category' => $event->category,
-                'default_capacity' => $event->default_capacity,
-                'is_unlimited_capacity' => $event->is_unlimited_capacity,
                 'is_suitable_for_all_ages' => $event->is_suitable_for_all_ages,
                 'status' => $event->status,
                 'location' => $location,
@@ -764,34 +812,76 @@ class EventController extends Controller
     public function updateStatus(Request $request, Event $event)
     {
         $user = Auth::user();
+        Log::info('updateStatus called', [
+        'user_id' => $user->id,
+        'user_role' => $user->role,
+        'event_id' => $event->id,
+        'current_status' => $event->status,
+        'request' => $request->all()
+    ]);
 
         $validated = $request->validate([
             'status' => 'required|in:draft,pending,active,inactive,rejected',
             'rejected_reason' => 'nullable|string',
+            'slot_prices' => 'nullable|array',
+            'slot_prices.*.id' => 'nullable|string|exists:event_slot_prices,id',
+            'slot_prices.*.paid_credits' => 'nullable|integer|min:0',
+            'slot_prices.*.free_credits' => 'nullable|integer|min:0',
         ]);
+
+        Log::info('Validated request', ['validated' => $validated]);
 
         if ($user->role === 'merchant') {
             $merchant = Merchant::where('user_id', $user->id)->firstOrFail();
             if ($event->merchant_id !== $merchant->id) {
+                Log::warning('Merchant unauthorized', ['merchant_id' => $merchant->id, 'event_merchant_id' => $event->merchant_id]);
                 abort(403, 'Unauthorized action.');
             }
 
             if ($validated['status'] !== 'pending' && !($event->status === 'active' && $validated['status'] === 'inactive')) {
+                Log::warning('Merchant cannot change this status', ['current_status' => $event->status, 'requested_status' => $validated['status']]);
                 abort(403, 'Merchants cannot change this status.');
             }
         } elseif ($user->role !== 'admin') {
+            Log::warning('Unauthorized user role', ['role' => $user->role]);
             abort(403, 'Unauthorized action.');
         }
 
         DB::beginTransaction();
         try {
-            $event->update([
+            Log::info('Updating event status', ['status' => $validated['status']]);
+            $updated = $event->update([
                 'status' => $validated['status'],
                 'rejected_reason' => $validated['rejected_reason'] ?? null,
             ]);
+            Log::info('Event update result', ['updated' => $updated, 'event' => $event->fresh()->toArray()]);
 
-            if ($validated['status'] === 'active') {
-                $this->conversionService->convertEventSlots($event);
+            if ($validated['status'] === 'active' && isset($validated['slot_prices'])) {
+                $conversion = app(ConversionService::class)->getActiveConversion();
+                Log::info('Active conversion', ['conversion' => $conversion]);
+
+                if (!$conversion) {
+                    throw new \Exception('No active conversion found.');
+                }
+
+                foreach ($validated['slot_prices'] as $sp) {
+                    $slot = EventSlotPrice::find($sp['id']);
+                    Log::info('Processing slot price', ['slot' => $slot->toArray(), 'submitted' => $sp]);
+
+                    $recommended = app(ConversionService::class)->calculateCredits($slot->price_in_rm, $conversion);
+
+                    if ($sp['paid_credits'] < $recommended['paid_credits']) {
+                        throw new \Exception("Paid credits for slot #{$sp['id']} cannot be lower than minimum ({$recommended['paid_credits']}) to prevent loss.");
+                    }
+
+                    EventSlotPrice::where('id', $sp['id'])->update([
+                        'paid_credits' => $sp['paid_credits'],
+                        'free_credits' => $sp['free_credits'] ?? $recommended['free_credits'],
+                    ]);
+
+                    $updatedSlot = EventSlotPrice::find($sp['id']);
+                    Log::info('Slot price updated', ['slot' => $updatedSlot->toArray()]);
+                }
             }
 
             if ($event->merchant) {
@@ -799,11 +889,14 @@ class EventController extends Controller
             }
 
             DB::commit();
-
+            Log::info('Transaction committed');
             return redirect()->back()->with('success', "Event status updated to '{$validated['status']}'");
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Event status update failed', ['error' => $e->getMessage()]);
+            Log::error('Event status update failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return redirect()->back()->withErrors([
                 'error' => 'Event status update failed: ' . $e->getMessage()
             ]);

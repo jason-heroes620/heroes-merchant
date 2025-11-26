@@ -11,24 +11,19 @@ class Conversion extends Model
     use HasFactory, HasUuids;
 
     protected $fillable = [
-        'conversion_rate',
+        'credits_per_rm',
+        'paid_credit_percentage',
+        'free_credit_percentage',
         'effective_from',
         'valid_until',
         'status',
     ];
 
     protected $casts = [
+        'credits_per_rm' => 'float',
+        'paid_credit_percentage' => 'float',
+        'free_credit_percentage' => 'float',
         'effective_from' => 'datetime',
         'valid_until' => 'datetime',
-        'conversion_rate' => 'float',
-
     ];
-
-    /** Check if conversion is currently active */
-    public function isActive(): bool
-    {
-        $now = now();
-        return $this->effective_from <= $now &&
-               ($this->valid_until === null || $this->valid_until >= $now);
-    }
 }

@@ -9,6 +9,8 @@ return new class extends Migration {
         Schema::create('conversions', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->decimal('credits_per_rm', 14, 6);
+            $table->decimal('paid_credit_percentage', 5, 2)->default(80);
+            $table->decimal('free_credit_percentage', 5, 2)->default(20);
             $table->datetime('effective_from');
             $table->datetime('valid_until')->nullable();
             $table->enum('status',['active','inactive'])->default('inactive');

@@ -16,14 +16,12 @@ class EventSlotPrice extends Model
         'event_slot_id',
         'event_age_group_id',
         'price_in_rm',
-        'total_credits',
         'free_credits',
         'paid_credits',
     ];
 
     protected $casts = [
         'price_in_rm' => 'decimal:2',
-        'total_credits' => 'integer',
         'free_credits' => 'integer',
         'paid_credits' => 'integer',
     ];

@@ -4,7 +4,6 @@ import { usePage, router } from "@inertiajs/react";
 import {
     Calendar,
     MapPin,
-    Users,
     DollarSign,
     Eye,
     Edit,
@@ -22,11 +21,14 @@ import {
     List,
 } from "lucide-react";
 import type {
-    Location,
     AgeGroup,
     Price,
-    Slot,
-    Media,
+    EventSlot,
+    EventMedia,
+    EventLocation,
+    EventSlotPrice,
+    EventDate,
+    Frequency,
 } from "../../types/events";
 
 interface EventType {
@@ -36,17 +38,19 @@ interface EventType {
     category?: string;
     status: string;
     featured: boolean;
-    location?: Location;
-    default_capacity?: number;
-    is_unlimited_capacity: boolean;
-    media?: Media[];
+    location?: EventLocation;
+    media?: EventMedia[];
     is_suitable_for_all_ages: boolean;
+    is_recurring: boolean;
     age_groups?: AgeGroup[];
     prices?: Price[];
-    slots?: Slot[];
+    slots?: EventSlot[];
     created_at: string;
     like_count?: number;
     click_count?: number;
+    slotPrices?: EventSlotPrice[];
+    dates?: EventDate[];
+    frequency?: Frequency[];
 }
 
 interface EventsProps extends PageProps {
@@ -97,53 +101,80 @@ export default function EventsIndexPage() {
         return labels[type] || type;
     };
 
-    const formatPrice = (price?: Price) => {
-        if (!price) return "Free";
+    const getPriceRange = (
+        slots?: EventSlotPrice[],
+        userRole?: "admin" | "merchant",
+        eventStatus?: string
+    ) => {
+        if (!slots?.length) return "Free";
 
-        const format = (value?: number | null) =>
-            value != null ? `RM ${(value / 100).toFixed(2)}` : "Free";
+        const prices = slots
+            .map((s) => s.price_in_rm)
+            .filter((v): v is number => v != null);
+        const minPrice = prices.length ? Math.min(...prices) : 0;
+        const maxPrice = prices.length ? Math.max(...prices) : 0;
+        const priceText =
+            minPrice === maxPrice
+                ? `RM ${minPrice.toFixed(2)}`
+                : `RM ${minPrice.toFixed(2)} - RM ${maxPrice.toFixed(2)}`;
 
-        switch (price.pricing_type) {
-            case "fixed":
-                return `RM ${(price.fixed_price_in_cents ?? 0) / 100}`;
+        if (userRole === "admin" && eventStatus === "active") {
+            // Free credits
+            const freeCredits = slots
+                .map((s) => s.free_credits ?? 0)
+                .filter((v) => v != null);
+            const minFree = freeCredits.length ? Math.min(...freeCredits) : 0;
+            const maxFree = freeCredits.length ? Math.max(...freeCredits) : 0;
+            const freeText =
+                minFree === maxFree
+                    ? `${minFree} FREE`
+                    : `${minFree}-${maxFree} FREE`;
 
-            case "age_based":
-                return `Children RM ${
-                    (price.weekday_price_in_cents ?? 0) / 100
-                } / Adult RM ${(price.fixed_price_in_cents ?? 0) / 100}`;
+            // Paid credits
+            const paidCredits = slots
+                .map((s) => s.paid_credits ?? 0)
+                .filter((v) => v != null);
+            const minPaid = paidCredits.length ? Math.min(...paidCredits) : 0;
+            const maxPaid = paidCredits.length ? Math.max(...paidCredits) : 0;
+            const paidText =
+                minPaid === maxPaid
+                    ? `${minPaid} PAID`
+                    : `${minPaid}-${maxPaid} PAID`;
 
-            case "day_type":
-                const weekdayPrice = format(price.weekday_price_in_cents);
-                const weekendPrice = format(price.weekend_price_in_cents);
-                return `Weekday ${weekdayPrice} / Weekend ${weekendPrice}`;
-
-            case "mixed":
-                return `Children RM ${
-                    (price.weekday_price_in_cents ?? 0) / 100
-                } (Weekday) / RM ${
-                    (price.weekend_price_in_cents ?? 0) / 100
-                } (Weekend)
-Adult RM ${(price.fixed_price_in_cents ?? 0) / 100} (Weekday) / RM ${
-                    (price.weekend_price_in_cents ?? 0) / 100
-                } (Weekend)`;
-            default:
-                return "Free";
+            return (
+                <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">
+                        {priceText}
+                    </span>
+                    <div className="flex gap-2 text-xs">
+                        <span className="text-green-600 font-medium">
+                            {freeText}
+                        </span>
+                        <span className="text-gray-400">•</span>
+                        <span className="text-blue-600 font-medium">
+                            {paidText}
+                        </span>
+                    </div>
+                </div>
+            );
         }
+
+        return <span className="font-medium truncate">{priceText}</span>;
     };
 
-    const getUpcomingDates = (slots?: Slot[]) => {
-        if (!slots || slots.length === 0) return [];
+    const getFrequencyLabel = (frequency?: Frequency) => {
+        if (!frequency) return "One-Time Event";
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const labels: Record<string, string> = {
+            daily: "Daily",
+            weekly: "Weekly",
+            biweekly: "Bi-weekly",
+            monthly: "Monthly",
+            annually: "Annually",
+            custom: "Custom Dates",
+        };
 
-        return slots
-            .filter((slot) => new Date(slot.date) >= today)
-            .sort(
-                (a, b) =>
-                    new Date(a.date).getTime() - new Date(b.date).getTime()
-            )
-            .slice(0, 3);
+        return labels[frequency.type] || frequency.type;
     };
 
     const formatDate = (dateString: string) => {
@@ -344,9 +375,7 @@ Adult RM ${(price.fixed_price_in_cents ?? 0) / 100} (Weekday) / RM ${
                                         <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                                             Upcoming Dates
                                         </th>
-                                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                            Capacity
-                                        </th>
+
                                         <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                                             Status
                                         </th>
@@ -364,9 +393,6 @@ Adult RM ${(price.fixed_price_in_cents ?? 0) / 100} (Weekday) / RM ${
                                         const statusStyle =
                                             statusColors[statusKey] ||
                                             statusColors.draft;
-                                        const upcomingDates = getUpcomingDates(
-                                            event.slots
-                                        );
 
                                         return (
                                             <tr
@@ -499,12 +525,66 @@ Adult RM ${(price.fixed_price_in_cents ?? 0) / 100} (Weekday) / RM ${
                                                 </td>
 
                                                 {/* Upcoming Dates Column */}
+                                                {/* Upcoming Dates Column */}
                                                 <td className="px-6 py-4">
                                                     <div className="space-y-1">
-                                                        {upcomingDates.length >
-                                                        0 ? (
-                                                            upcomingDates.map(
-                                                                (slot, idx) => {
+                                                        {(
+                                                            (event.is_recurring
+                                                                ? event.slots
+                                                                : event.dates) ??
+                                                            []
+                                                        ).length > 0 ? (
+                                                            (
+                                                                (event.is_recurring
+                                                                    ? event.slots
+                                                                    : event.dates) ??
+                                                                []
+                                                            ).map(
+                                                                (
+                                                                    slot:
+                                                                        | EventSlot
+                                                                        | EventDate,
+                                                                    idx: number
+                                                                ) => {
+                                                                    // Date display
+                                                                    const dateDisplay =
+                                                                        "start_date" in
+                                                                            slot &&
+                                                                        slot.start_date
+                                                                            ? slot.start_date ===
+                                                                              slot.end_date
+                                                                                ? formatDate(
+                                                                                      slot.start_date
+                                                                                  )
+                                                                                : `${formatDate(
+                                                                                      slot.start_date
+                                                                                  )} - ${formatDate(
+                                                                                      slot.end_date
+                                                                                  )}`
+                                                                            : "date" in
+                                                                                  slot &&
+                                                                              slot.date
+                                                                            ? formatDate(
+                                                                                  slot.date
+                                                                              )
+                                                                            : "Date TBD";
+
+                                                                    // Time display (works for both EventSlot and EventDate)
+                                                                    const timeDisplay =
+                                                                        "start_time" in
+                                                                            slot &&
+                                                                        slot.start_time
+                                                                            ? ` • ${formatTime(
+                                                                                  slot.start_time
+                                                                              )}${
+                                                                                  slot.end_time
+                                                                                      ? ` - ${formatTime(
+                                                                                            slot.end_time
+                                                                                        )}`
+                                                                                      : ""
+                                                                              }`
+                                                                            : "";
+
                                                                     return (
                                                                         <div
                                                                             key={
@@ -513,19 +593,17 @@ Adult RM ${(price.fixed_price_in_cents ?? 0) / 100} (Weekday) / RM ${
                                                                             className="flex items-center gap-2"
                                                                         >
                                                                             <span className="text-xs font-medium text-gray-700">
-                                                                                {formatDate(
-                                                                                    slot.date
-                                                                                )}
+                                                                                {
+                                                                                    dateDisplay
+                                                                                }
                                                                             </span>
-                                                                            <span className="text-xs text-gray-400">
-                                                                                {formatTime(
-                                                                                    slot.start_time
-                                                                                )}{" "}
-                                                                                -{" "}
-                                                                                {formatTime(
-                                                                                    slot.end_time
-                                                                                )}
-                                                                            </span>
+                                                                            {timeDisplay && (
+                                                                                <span className="text-xs text-gray-400">
+                                                                                    {
+                                                                                        timeDisplay
+                                                                                    }
+                                                                                </span>
+                                                                            )}
                                                                         </div>
                                                                     );
                                                                 }
@@ -536,20 +614,6 @@ Adult RM ${(price.fixed_price_in_cents ?? 0) / 100} (Weekday) / RM ${
                                                                 dates
                                                             </span>
                                                         )}
-                                                    </div>
-                                                </td>
-
-                                                {/* Capacity Column */}
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <Users
-                                                            size={14}
-                                                            className="text-orange-500"
-                                                        />
-                                                        <span className="text-sm font-semibold text-gray-800">
-                                                            {event.default_capacity ||
-                                                                "∞"}
-                                                        </span>
                                                     </div>
                                                 </td>
 
@@ -641,7 +705,6 @@ Adult RM ${(price.fixed_price_in_cents ?? 0) / 100} (Weekday) / RM ${
                             const StatusIcon = statusColors[statusKey]?.icon;
                             const statusStyle =
                                 statusColors[statusKey] || statusColors.draft;
-                            const upcomingDates = getUpcomingDates(event.slots);
 
                             return (
                                 <div
@@ -685,9 +748,40 @@ Adult RM ${(price.fixed_price_in_cents ?? 0) / 100} (Weekday) / RM ${
                                             </span>
                                         </div>
 
-                                        <h3 className="text-xl font-bold text-gray-900 mb-3 line-clamp-2">
+                                        <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2">
                                             {event.title}
                                         </h3>
+
+                                        {/* Age Groups */}
+                                        <div className="space-y-2 mb-4">
+                                            {event.is_suitable_for_all_ages ? (
+                                                <span className="inline-block px-2 py-1 bg-orange-50 text-orange-700 rounded text-xs font-medium">
+                                                    All Ages
+                                                </span>
+                                            ) : event.age_groups &&
+                                              event.age_groups.length > 0 ? (
+                                                event.age_groups.map(
+                                                    (group, idx) => (
+                                                        <span
+                                                            key={idx}
+                                                            className="inline-block px-2 py-1 bg-orange-50 text-orange-700 rounded text-xs font-medium"
+                                                        >
+                                                            {group.label &&
+                                                                `${group.label}`}
+                                                            {group.min_age !=
+                                                                null &&
+                                                                group.max_age !=
+                                                                    null &&
+                                                                ` (${group.min_age}-${group.max_age})`}
+                                                        </span>
+                                                    )
+                                                )
+                                            ) : (
+                                                <span className="text-xs text-gray-400">
+                                                    No age groups
+                                                </span>
+                                            )}
+                                        </div>
 
                                         <div className="space-y-2 mb-4">
                                             <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -708,72 +802,102 @@ Adult RM ${(price.fixed_price_in_cents ?? 0) / 100} (Weekday) / RM ${
                                                     className="text-orange-500 flex-shrink-0"
                                                 />
                                                 <span>
-                                                    {formatPrice(
-                                                        event.prices?.[0]
+                                                    {getPriceRange(
+                                                        event.slotPrices,
+                                                        userRole as
+                                                            | "admin"
+                                                            | "merchant",
+                                                        event.status
                                                     )}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                                                <Users
-                                                    size={16}
-                                                    className="text-orange-500 flex-shrink-0"
-                                                />
-                                                <span>
-                                                    Capacity:{" "}
-                                                    {event.default_capacity ||
-                                                        "Unlimited"}
                                                 </span>
                                             </div>
                                         </div>
 
                                         {/* Upcoming Dates */}
-                                        {upcomingDates.length > 0 && (
-                                            <div className="mb-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                                        {(
+                                            (event.is_recurring
+                                                ? event.slots
+                                                : event.dates) ?? []
+                                        ).length > 0 && (
+                                            <div className="mb-4 p-3 bg-orange-50 rounded-lg border border-orange-200 text-sm text-gray-600">
+                                                {/* Frequency label */}
                                                 <p className="text-xs font-semibold text-orange-800 mb-2">
-                                                    Upcoming:
-                                                </p>
-                                                <div className="space-y-1">
-                                                    {upcomingDates.map(
-                                                        (slot, idx) => (
-                                                            <p
-                                                                key={idx}
-                                                                className="text-xs text-gray-700"
-                                                            >
-                                                                {formatDate(
-                                                                    slot.date
-                                                                )}{" "}
-                                                                •{" "}
-                                                                {
-                                                                    slot.start_time
-                                                                }
-                                                            </p>
-                                                        )
+                                                    {getFrequencyLabel(
+                                                        event.frequency?.[0]
                                                     )}
+                                                </p>
+
+                                                <div className="space-y-1">
+                                                    {(
+                                                        (event.is_recurring
+                                                            ? event.slots
+                                                            : event.dates) ?? []
+                                                    )
+                                                        .slice(0, 3)
+                                                        .map(
+                                                            (
+                                                                slot:
+                                                                    | EventSlot
+                                                                    | EventDate,
+                                                                idx: number
+                                                            ) => {
+                                                                const dateDisplay =
+                                                                    "start_date" in
+                                                                        slot &&
+                                                                    slot.start_date
+                                                                        ? slot.start_date ===
+                                                                          slot.end_date
+                                                                            ? formatDate(
+                                                                                  slot.start_date
+                                                                              )
+                                                                            : `${formatDate(
+                                                                                  slot.start_date
+                                                                              )} - ${formatDate(
+                                                                                  slot.end_date
+                                                                              )}`
+                                                                        : "date" in
+                                                                              slot &&
+                                                                          slot.date
+                                                                        ? formatDate(
+                                                                              slot.date
+                                                                          )
+                                                                        : "Date TBD";
+
+                                                                const timeDisplay =
+                                                                    "start_time" in
+                                                                        slot &&
+                                                                    slot.start_time
+                                                                        ? ` • ${formatTime(
+                                                                              slot.start_time
+                                                                          )}${
+                                                                              slot.end_time
+                                                                                  ? ` - ${formatTime(
+                                                                                        slot.end_time
+                                                                                    )}`
+                                                                                  : ""
+                                                                          }`
+                                                                        : "";
+
+                                                                return (
+                                                                    <p
+                                                                        key={
+                                                                            idx
+                                                                        }
+                                                                        className="text-xs text-gray-700"
+                                                                    >
+                                                                        {
+                                                                            dateDisplay
+                                                                        }
+                                                                        {
+                                                                            timeDisplay
+                                                                        }
+                                                                    </p>
+                                                                );
+                                                            }
+                                                        )}
                                                 </div>
                                             </div>
                                         )}
-
-                                        {/* Age Groups */}
-                                        {event.age_groups &&
-                                            event.age_groups.length > 0 && (
-                                                <div className="flex flex-wrap gap-2 mb-4">
-                                                    {event.age_groups
-                                                        .slice(0, 2)
-                                                        .map((group, idx) => (
-                                                            <span
-                                                                key={idx}
-                                                                className="px-2 py-1 bg-orange-50 text-orange-700 rounded-lg text-xs font-medium"
-                                                            >
-                                                                {group.label}
-                                                                {group.min_age !=
-                                                                    null &&
-                                                                    group.max_age !=
-                                                                        null &&
-                                                                    ` (${group.min_age}-${group.max_age})`}
-                                                            </span>
-                                                        ))}
-                                                </div>
-                                            )}
 
                                         {/* Actions */}
                                         <div className="flex gap-2 pt-4 border-t border-gray-100">

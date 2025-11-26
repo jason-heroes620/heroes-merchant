@@ -17,9 +17,9 @@ return new class extends Migration
 
             $table->decimal('price_in_rm', 10, 2)->nullable();
 
-            $table->unsignedInteger('total_credits')->nullable();
             $table->unsignedInteger('free_credits')->nullable();
             $table->unsignedInteger('paid_credits')->nullable();
+            $table->foreignUuid('conversion_id')->nullable();
 
             $table->timestamps();
 

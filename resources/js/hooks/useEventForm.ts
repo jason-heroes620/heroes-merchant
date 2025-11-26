@@ -331,7 +331,7 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
 
         // Determine is_recurring
         const isRecurring =
-            frequencies.length > 0 && frequencies[0].type !== "one_time";
+            frequencies.length > 0;
 
         // Build final prices
         const finalPrices = buildPrices();

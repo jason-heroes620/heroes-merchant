@@ -2,11 +2,7 @@ import EventTypeSection from "./EventTypeSection";
 import LocationSection from "./LocationSection";
 import MediaUploader from "./MediaUploader";
 import type { AgeGroup } from "../../../types/events";
-import {
-    FileText,
-    Tag,
-    User,
-} from "lucide-react";
+import { FileText, Tag, User } from "lucide-react";
 import EventDetailsSection from "./EventDetailsSection";
 import CategorySection from "./CategorySection";
 
@@ -36,12 +32,16 @@ export default function BasicDetailsTab({
     return (
         <div className="space-y-6">
             {/* Event Type Section */}
-            <EventTypeSection data={data} setData={setData}/>
+            <EventTypeSection data={data} setData={setData} />
 
             {/* Title & Description */}
-            <EventDetailsSection data={data} setData={setData} errors={errors}/>
+            <EventDetailsSection
+                data={data}
+                setData={setData}
+                errors={errors}
+            />
 
-            {/* Category & Capacity */}
+            {/* Category */}
             <div className="bg-white rounded-2xl shadow-lg p-8 border-2 border-orange-100">
                 <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-orange-100">
                     <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
@@ -58,7 +58,7 @@ export default function BasicDetailsTab({
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6">
-                    <CategorySection data={data} setData={setData} />                    
+                    <CategorySection data={data} setData={setData} />
                 </div>
             </div>
 

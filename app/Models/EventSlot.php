@@ -39,4 +39,9 @@ class EventSlot extends Model
     {
         return $this->belongsTo(EventDate::class, 'event_date_id');
     }
+
+    public function prices()
+    {
+        return $this->hasMany(EventSlotPrice::class, 'event_slot_id');
+    }
 }

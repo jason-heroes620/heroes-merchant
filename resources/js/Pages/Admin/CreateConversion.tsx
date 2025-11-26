@@ -1,9 +1,31 @@
 import React, { useState, useEffect } from "react";
 import { Inertia } from "@inertiajs/inertia";
 import { usePage } from "@inertiajs/react";
+import {
+    TrendingUp,
+    DollarSign,
+    Gift,
+    Calendar,
+    Lock,
+    Info,
+} from "lucide-react";
+
+interface FormState {
+    credits: string;
+    rm: string;
+    credits_per_rm: string;
+    paid_credit_percentage: number;
+    free_credit_percentage: number;
+    paid_credits_preview: number | null;
+    free_credits_preview: number | null;
+    effective_from: string;
+    valid_until: string;
+}
 
 interface Errors {
-    conversion_rate?: string;
+    credits_per_rm?: string;
+    paid_credit_percentage?: string;
+    free_credit_percentage?: string;
     effective_from?: string;
     valid_until?: string;
 }
@@ -12,15 +34,19 @@ const ConversionsCreate: React.FC = () => {
     const { props } = usePage<any>();
     const errors = props.errors as Errors;
 
-    const [form, setForm] = useState({
+    const [form, setForm] = useState<FormState>({
         credits: "",
         rm: "",
-        conversion_rate: "",
+        credits_per_rm: "",
+        paid_credit_percentage: 80,
+        free_credit_percentage: 20,
+        paid_credits_preview: null,
+        free_credits_preview: null,
         effective_from: "",
         valid_until: "",
     });
 
-    // Auto-calculate conversion_rate whenever credits or RM changes
+    // Auto-calculate credits_per_rm when credits or rm changes
     useEffect(() => {
         const credits = parseFloat(form.credits);
         const rm = parseFloat(form.rm);
@@ -28,128 +54,449 @@ const ConversionsCreate: React.FC = () => {
         if (!isNaN(credits) && !isNaN(rm) && rm > 0) {
             setForm((prev) => ({
                 ...prev,
-                conversion_rate: (credits / rm).toFixed(2),
+                credits_per_rm: (credits / rm).toFixed(2),
             }));
         } else {
-            setForm((prev) => ({ ...prev, conversion_rate: "" }));
+            setForm((prev) => ({ ...prev, credits_per_rm: "" }));
         }
     }, [form.credits, form.rm]);
 
+    // Calculate preview credits
+    useEffect(() => {
+        const creditsPerRM = parseFloat(form.credits_per_rm);
+        if (!isNaN(creditsPerRM) && creditsPerRM > 0) {
+            // Minimum paid credits must be at least credits_per_rm (rounded up)
+            const minPaidCredits = Math.ceil(creditsPerRM);
+            const calculatedPaid = Math.ceil(
+                creditsPerRM * (form.paid_credit_percentage / 100)
+            );
+            const paidCredits = Math.max(calculatedPaid, minPaidCredits);
+
+            // Free credits calculated from paid credits
+            const freeCredits = Math.ceil(
+                (paidCredits / form.paid_credit_percentage) *
+                    form.free_credit_percentage
+            );
+
+            setForm((prev) => ({
+                ...prev,
+                paid_credits_preview: paidCredits,
+                free_credits_preview: freeCredits,
+            }));
+        } else {
+            setForm((prev) => ({
+                ...prev,
+                paid_credits_preview: null,
+                free_credits_preview: null,
+            }));
+        }
+    }, [
+        form.credits_per_rm,
+        form.paid_credit_percentage,
+        form.free_credit_percentage,
+    ]);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setForm({ ...form, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+
+        if (name === "paid_credit_percentage") {
+            const numValue = Math.max(0, Math.min(100, Number(value) || 0));
+            setForm((prev) => ({
+                ...prev,
+                paid_credit_percentage: numValue,
+                free_credit_percentage: 100 - numValue,
+            }));
+        } else if (name === "free_credit_percentage") {
+            const numValue = Math.max(0, Math.min(100, Number(value) || 0));
+            setForm((prev) => ({
+                ...prev,
+                free_credit_percentage: numValue,
+                paid_credit_percentage: 100 - numValue,
+            }));
+        } else {
+            setForm((prev) => ({
+                ...prev,
+                [name]: value,
+            }));
+        }
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        Inertia.post("/admin/conversions", form);
+        Inertia.post("/admin/conversions", {
+            ...form,
+            credits_per_rm: parseFloat(form.credits_per_rm),
+            paid_credit_percentage: form.paid_credit_percentage,
+            free_credit_percentage: form.free_credit_percentage,
+        });
     };
 
+    const totalCredits =
+        (form.paid_credits_preview || 0) + (form.free_credits_preview || 0);
+
     return (
-        <div className="p-8 max-w-lg mx-auto bg-white shadow-lg rounded-lg">
-            <h1 className="text-3xl font-bold mb-6 text-gray-800">
-                Add Conversion Rate
-            </h1>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Credits input */}
-                <div>
-                    <label className="block mb-1 font-medium text-gray-700">
-                        Credits
-                    </label>
-                    <input
-                        type="number"
-                        name="credits"
-                        value={form.credits}
-                        placeholder="1"
-                        onChange={handleChange}
-                        className="w-full border px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-                        step="1"
-                        min="0"
-                    />
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
+            <div className="max-w-[1600px] mx-auto">
+                {/* Header */}
+                <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                    <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 px-8 py-8">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h1 className="text-4xl font-bold text-white mb-2">
+                                    Add Conversion Rate
+                                </h1>
+                                <p className="text-orange-100 text-sm">
+                                    Configure credit conversion rates and
+                                    distribution percentages
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                {/* RM input */}
-                <div>
-                    <label className="block mb-1 font-medium text-gray-700">
-                        RM
-                    </label>
-                    <input
-                        type="number"
-                        name="rm"
-                        value={form.rm}
-                        placeholder="1.80"
-                        onChange={handleChange}
-                        className="w-full border px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-                        step="0.01"
-                        min="0"
-                    />
-                </div>
+                {/* Form Content */}
+                <div className="w-full mx-auto px-6 py-8">
+                    <div className="grid lg:grid-cols-5 gap-6">
+                        {/* Form Section */}
+                        <div className="lg:col-span-3">
+                            <div className="bg-white rounded-xl shadow-md p-6 space-y-6">
+                                {/* Conversion Rate Calculator */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 text-orange-600">
+                                        <TrendingUp className="w-5 h-5" />
+                                        <h2 className="text-lg font-semibold text-gray-800">
+                                            Conversion Rate Calculator
+                                        </h2>
+                                    </div>
 
-                {/* Auto-calculated conversion rate */}
-                <div>
-                    <label className="block mb-1 font-medium text-gray-700">
-                        Conversion Rate (credits / RM)
-                    </label>
-                    <input
-                        type="number"
-                        name="conversion_rate"
-                        value={form.conversion_rate}
-                        readOnly
-                        className="w-full border px-4 py-2 rounded-lg bg-gray-100 cursor-not-allowed"
-                    />
-                    {errors.conversion_rate && (
-                        <p className="text-red-500 text-sm mt-1">
-                            {errors.conversion_rate}
-                        </p>
-                    )}
-                </div>
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Credits
+                                            </label>
+                                            <input
+                                                type="number"
+                                                name="credits"
+                                                value={form.credits}
+                                                placeholder="e.g., 1"
+                                                onChange={handleChange}
+                                                className="w-full border-2 border-gray-200 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all"
+                                                step="1"
+                                                min="0"
+                                            />
+                                        </div>
 
-                {/* Effective From */}
-                <div>
-                    <label className="block mb-1 font-medium text-gray-700">
-                        Effective From
-                    </label>
-                    <input
-                        type="date"
-                        name="effective_from"
-                        value={form.effective_from}
-                        onChange={handleChange}
-                        className="w-full border px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    />
-                    {errors.effective_from && (
-                        <p className="text-red-500 text-sm mt-1">
-                            {errors.effective_from}
-                        </p>
-                    )}
-                </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                RM (Price)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                name="rm"
+                                                value={form.rm}
+                                                placeholder="e.g., 1.80"
+                                                onChange={handleChange}
+                                                className="w-full border-2 border-gray-200 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all"
+                                                step="0.01"
+                                                min="0"
+                                            />
+                                        </div>
+                                    </div>
 
-                {/* Valid Until */}
-                <div>
-                    <label className="block mb-1 font-medium text-gray-700">
-                        Valid Until (optional)
-                    </label>
-                    <input
-                        type="date"
-                        name="valid_until"
-                        value={form.valid_until}
-                        onChange={handleChange}
-                        className="w-full border px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    />
-                    {errors.valid_until && (
-                        <p className="text-red-500 text-sm mt-1">
-                            {errors.valid_until}
-                        </p>
-                    )}
-                </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Credits per RM (Auto-calculated)
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                name="credits_per_rm"
+                                                value={
+                                                    form.credits_per_rm || "—"
+                                                }
+                                                readOnly
+                                                className="w-full border-2 border-orange-200 bg-orange-50 px-4 py-3 rounded-lg font-semibold text-orange-700 cursor-not-allowed pr-10"
+                                            />
+                                            <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-orange-500" />
+                                        </div>
+                                        {errors.credits_per_rm && (
+                                            <p className="text-red-500 text-sm mt-1">
+                                                {errors.credits_per_rm}
+                                            </p>
+                                        )}
+                                        <p className="text-xs text-gray-500 mt-2 flex items-start gap-1">
+                                            <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                            <span>
+                                                This is the minimum paid credits
+                                                per RM to prevent admin loss
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
 
-                {/* Submit button */}
-                <button
-                    type="submit"
-                    className="w-full bg-green-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-600 transition"
-                >
-                    Save Conversion
-                </button>
-            </form>
+                                <div className="border-t border-gray-200"></div>
+
+                                {/* Credit Distribution */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 text-orange-600">
+                                        <DollarSign className="w-5 h-5" />
+                                        <h2 className="text-lg font-semibold text-gray-800">
+                                            Credit Distribution
+                                        </h2>
+                                    </div>
+
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Paid Credit %
+                                            </label>
+                                            <input
+                                                type="number"
+                                                name="paid_credit_percentage"
+                                                value={
+                                                    form.paid_credit_percentage
+                                                }
+                                                onChange={handleChange}
+                                                min={0}
+                                                max={100}
+                                                className="w-full border-2 border-gray-200 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Free Credit %
+                                            </label>
+                                            <input
+                                                type="number"
+                                                name="free_credit_percentage"
+                                                value={
+                                                    form.free_credit_percentage
+                                                }
+                                                onChange={handleChange}
+                                                min={0}
+                                                max={100}
+                                                className="w-full border-2 border-gray-200 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Visual percentage bar */}
+                                    <div className="space-y-2">
+                                        <div className="flex h-3 rounded-full overflow-hidden">
+                                            <div
+                                                className="bg-blue-500 transition-all duration-300"
+                                                style={{
+                                                    width: `${form.paid_credit_percentage}%`,
+                                                }}
+                                            />
+                                            <div
+                                                className="bg-green-500 transition-all duration-300"
+                                                style={{
+                                                    width: `${form.free_credit_percentage}%`,
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="flex justify-between text-xs text-gray-600">
+                                            <span>
+                                                Paid:{" "}
+                                                {form.paid_credit_percentage}%
+                                            </span>
+                                            <span>
+                                                Free:{" "}
+                                                {form.free_credit_percentage}%
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="border-t border-gray-200"></div>
+
+                                {/* Validity Period */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 text-orange-600">
+                                        <Calendar className="w-5 h-5" />
+                                        <h2 className="text-lg font-semibold text-gray-800">
+                                            Validity Period
+                                        </h2>
+                                    </div>
+
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Effective From
+                                            </label>
+                                            <input
+                                                type="date"
+                                                name="effective_from"
+                                                value={form.effective_from}
+                                                onChange={handleChange}
+                                                className="w-full border-2 border-gray-200 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all"
+                                            />
+                                            {errors.effective_from && (
+                                                <p className="text-red-500 text-sm mt-1">
+                                                    {errors.effective_from}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Valid Until (Optional)
+                                            </label>
+                                            <input
+                                                type="date"
+                                                name="valid_until"
+                                                value={form.valid_until}
+                                                onChange={handleChange}
+                                                className="w-full border-2 border-gray-200 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all"
+                                            />
+                                            {errors.valid_until && (
+                                                <p className="text-red-500 text-sm mt-1">
+                                                    {errors.valid_until}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Submit Button */}
+                                <button
+                                    onClick={handleSubmit}
+                                    className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-4 rounded-lg font-semibold hover:shadow-xl transition-all text-lg"
+                                >
+                                    Save Conversion Rate
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Preview Card */}
+                        <div className="lg:col-span-2">
+                            <div className="sticky top-6 bg-white rounded-xl shadow-md overflow-hidden">
+                                <div className="bg-gradient-to-r from-orange-500 to-red-500 px-6 py-4">
+                                    <h3 className="text-white font-semibold text-lg">
+                                        Live Preview
+                                    </h3>
+                                </div>
+
+                                <div className="p-6 space-y-6">
+                                    {/* Main Rate Display */}
+                                    {form.credits_per_rm ? (
+                                        <>
+                                            <div className="text-center pb-6 border-b border-gray-100">
+                                                <div className="text-5xl font-bold text-gray-800 mb-2">
+                                                    {form.credits_per_rm}
+                                                </div>
+                                                <div className="text-sm text-gray-500 font-medium">
+                                                    Credits per RM
+                                                </div>
+                                            </div>
+
+                                            {/* Credit Breakdown */}
+                                            {form.paid_credits_preview !==
+                                                null &&
+                                                form.free_credits_preview !==
+                                                    null && (
+                                                    <div className="space-y-3">
+                                                        <div className="bg-blue-50 px-4 py-4 rounded-lg border border-blue-100">
+                                                            <div className="flex justify-between items-center mb-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <DollarSign className="w-4 h-4 text-blue-600" />
+                                                                    <span className="text-sm font-medium text-gray-700">
+                                                                        Paid
+                                                                        Credits
+                                                                    </span>
+                                                                </div>
+                                                                <span className="text-2xl font-bold text-blue-600">
+                                                                    {
+                                                                        form.paid_credits_preview
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-xs text-gray-500 ml-6">
+                                                                {
+                                                                    form.paid_credit_percentage
+                                                                }
+                                                                % of total
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="bg-green-50 px-4 py-4 rounded-lg border border-green-100">
+                                                            <div className="flex justify-between items-center mb-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <Gift className="w-4 h-4 text-green-600" />
+                                                                    <span className="text-sm font-medium text-gray-700">
+                                                                        Free
+                                                                        Credits
+                                                                    </span>
+                                                                </div>
+                                                                <span className="text-2xl font-bold text-green-600">
+                                                                    {
+                                                                        form.free_credits_preview
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-xs text-gray-500 ml-6">
+                                                                {
+                                                                    form.free_credit_percentage
+                                                                }
+                                                                % of total
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="bg-gradient-to-r from-orange-500 to-red-500 px-4 py-4 rounded-lg">
+                                                            <div className="flex justify-between items-center text-white">
+                                                                <span className="text-sm font-medium">
+                                                                    Total
+                                                                    Credits
+                                                                </span>
+                                                                <span className="text-2xl font-bold">
+                                                                    {
+                                                                        totalCredits
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                        </>
+                                    ) : (
+                                        <div className="text-center py-12 text-gray-400">
+                                            <TrendingUp className="w-16 h-16 mx-auto mb-3 text-gray-300" />
+                                            <p className="text-sm font-medium">
+                                                Enter credits and RM to see
+                                                preview
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Info Box */}
+                                    <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+                                        <div className="flex gap-3">
+                                            <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                                            <div className="text-xs text-blue-800 leading-relaxed">
+                                                <strong className="block mb-1">
+                                                    How it works:
+                                                </strong>
+                                                <p>
+                                                    Customers pay for credits
+                                                    based on the conversion
+                                                    rate. Paid credits must
+                                                    never be below
+                                                    credits_per_rm to prevent
+                                                    admin loss. Free credits are
+                                                    marketing bonuses calculated
+                                                    from paid credits.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };
