@@ -75,9 +75,15 @@ class AuthController extends Controller
 
         // Create customer profile if API customer
         if ($isApi && $role === 'customer') {
-            \App\Models\Customer::create([
+            $customer = \App\Models\Customer::create([
                 'user_id' => $user->id,
                 'device_id' => $validated['device_id'],
+            ]);
+
+            \App\Models\CustomerWallet::create([
+                'customer_id' => $customer->id,
+                'free_credits' => 0,
+                'paid_credits' => 0,
             ]);
         }
 

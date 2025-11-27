@@ -42,7 +42,7 @@ export interface EventSlot {
     prices?: EventSlotPrice[];
 }
 
-interface EventSlotPrice {
+export interface EventSlotPrice {
     id: string;
     event_slot_id: string;
     event_age_group_id: string | null;

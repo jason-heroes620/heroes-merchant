@@ -36,22 +36,13 @@ class MobileEventController extends Controller
             'frequencies',
             'slots' => fn($q) => $q->whereDate('date', '>=', now())->orderBy('date'),
             'media',
-        ])
-        ->where('status', 'active')
+        ])->where('status', 'active')
         ->orderByDesc('featured')
         ->orderBy('created_at', 'desc')
         ->get();
 
         $events->transform(function ($event) {
-            $event->prices->transform(function($price) {
-                $price->credit_amount = $this->conversionService->convertToCredits($price->fixed_price_in_cents ?? 0);
-                return $price;
-            });
-
-            $event->slots->transform(function($slot) {
-                $slot->price_in_credits = $this->conversionService->convertToCredits($slot->price_in_cents ?? 0);
-                return $slot;
-            });
+            $event->slotPrices = $event->slots->flatMap(fn($slot) => $slot->prices)->values();
 
             $event->media->transform(function ($media) {
                 $media->file_path = $media->url; 
@@ -77,32 +68,50 @@ class MobileEventController extends Controller
             'location',
             'prices',
             'ageGroups',
+            'slots.prices',
             'frequencies',
-            'slots' => fn($q) => $q->whereDate('date', '>=', now())->orderBy('date'),
             'media',
         ]);
 
-        $event->prices->transform(function ($price) {
-            $price->credit_amount = $this->conversionService->convertToCredits($price->fixed_price_in_cents ?? 0);
-            return $price;
-        });
-
-        $event->slots->transform(function ($slot) {
-            $slot->price_in_credits = $this->conversionService->convertToCredits($slot->price_in_cents ?? 0);
-            return $slot;
-        });
-
         $event->media->transform(function ($media) {
-            $media->file_path = $media->url; 
+            $media->file_path = $media->url ?? $media->file_path;
             return $media;
         });
+
+        $dates = collect();
+
+        if ($event->is_recurring) {
+            // Use slot dates for recurring events
+            $dates = $event->slots->map(function ($slot) {
+                return [
+                    'start_date' => $slot->date,
+                    'end_date'   => $slot->date,
+                ];
+            })->unique();
+        } else {
+            // Use event dates for one-time events
+            $dates = $event->dates->map(function ($date) {
+                return [
+                    'start_date' => $date->start_date,
+                    'end_date'   => $date->end_date,
+                ];
+            });
+        }
+
+        $slotPrices = $event->slots->flatMap(fn($slot) => $slot->prices)->values();
 
         return response()->json([
             'success' => true,
             'event' => $event,
+            'media' => $event->media,
+            'ageGroups' => $event->ageGroups,
+            'prices' => $event->prices,
+            'dates' => $dates,
+            'slots' => $event->slots,
+            'slotPrices' => $slotPrices,
+            'location' => $event->location,
         ]);
     }
-
 
     /**
      * Increment event click count.

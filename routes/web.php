@@ -59,6 +59,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
         Route::get('/customers/{id}', [CustomerController::class, 'showProfile'])->name('customers.showProfile');
         Route::post('/customers/{id}/update', [CustomerController::class, 'update'])->name('customers.update');
+        Route::get('/customers/{id}/wallet', [CustomerController::class, 'wallet'])->name('customers.wallet');
 
         // Admin Event Management
         Route::get('/events', [EventController::class, 'index'])->name('events.index');

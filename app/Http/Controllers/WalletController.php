@@ -17,14 +17,23 @@ class WalletController extends Controller
         $user = Auth::user();
 
         if ($user->role !== 'customer' || !$user->customer) {
-            return response()->json(['wallet_balance' => 0, 'transactions' => []]);
+            return response()->json([
+                'wallet_balance' => 0,
+                'transactions' => [],
+            ]);
         }
 
         $wallet = $user->customer->wallet;
 
         return response()->json([
-            'wallet_balance' => $wallet?->credits_balance ?? 0,
-            'transactions' => $wallet?->transactions()->latest()->take(10)->get(),
+            'wallet_balance' => [
+                'free_credits' => $wallet?->cached_free_credits ?? 0,
+                'paid_credits' => $wallet?->cached_paid_credits ?? 0,
+            ],
+            'transactions' => $wallet?->transactions()
+                ->latest()
+                ->take(10) 
+                ->get(['id', 'type', 'delta_free', 'delta_paid', 'description', 'created_at']) ?? [],
         ]);
     }
 
@@ -39,12 +48,14 @@ class WalletController extends Controller
 
         $wallet = $user->customer->wallet ?? CustomerWallet::create([
             'customer_id' => $user->customer->id,
-            'credits_balance' => 0,
+            'cached_free_credits' => 0,
+            'cached_paid_credits' => 0,
         ]);
 
         $validated = $request->validate([
             'type' => ['required', Rule::in(['purchase', 'booking', 'refund', 'bonus'])],
-            'amount_in_credits' => 'required|integer|min:1',
+            'delta_free' => 'nullable|integer',
+            'delta_paid' => 'nullable|integer',
             'description' => 'nullable|string|max:255',
             'transaction_id' => 'nullable|uuid',
         ]);
@@ -53,23 +64,27 @@ class WalletController extends Controller
             $transaction = CustomerCreditTransaction::create([
                 'wallet_id' => $wallet->id,
                 'type' => $validated['type'],
-                'amount_in_credits' => $validated['amount_in_credits'],
+                'before_free_credits' => $wallet->cached_free_credits,
+                'before_paid_credits' => $wallet->cached_paid_credits,
+                'delta_free' => $validated['delta_free'] ?? 0,
+                'delta_paid' => $validated['delta_paid'] ?? 0,
                 'description' => $validated['description'] ?? null,
                 'transaction_id' => $validated['transaction_id'] ?? null,
             ]);
 
-            if (in_array($validated['type'], ['purchase', 'booking'])) {
-                $wallet->credits_balance -= $validated['amount_in_credits'];
-            } else { // refund, bonus
-                $wallet->credits_balance += $validated['amount_in_credits'];
-            }
+            // Update wallet cached credits
+            $wallet->cached_free_credits += $validated['delta_free'] ?? 0;
+            $wallet->cached_paid_credits += $validated['delta_paid'] ?? 0;
 
             $wallet->save();
         });
 
         return response()->json([
             'message' => 'Wallet updated successfully',
-            'wallet_balance' => $wallet->credits_balance,
+            'wallet_balance' => [
+                'free_credits' => $wallet->cached_free_credits,
+                'paid_credits' => $wallet->cached_paid_credits,
+            ],
             'transaction' => $transaction,
         ]);
     }

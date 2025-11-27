@@ -33,12 +33,7 @@ interface Props {
     showRoute: string;
 }
 
-export default function EntityList({
-    type,
-    data,
-    createRoute,
-    showRoute,
-}: Props) {
+export default function EntityList({ type, data, createRoute }: Props) {
     const [searchTerm, setSearchTerm] = useState("");
     const [filterStatus, setFilterStatus] = useState<string>("all");
 
@@ -215,6 +210,9 @@ export default function EntityList({
                                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                                     Referral Code
                                                 </th>
+                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                                    Wallet & Transaction
+                                                </th>
                                             </>
                                         )}
                                         {type === "merchant" && (
@@ -275,6 +273,23 @@ export default function EntityList({
                                                         {item.referral_code ??
                                                             "-"}
                                                     </td>
+
+                                                    <td className="px-6 py-4 text-center">
+                                                        <button
+                                                            onClick={() =>
+                                                                Inertia.get(
+                                                                    route(
+                                                                        "admin.customers.wallet",
+                                                                        item.id
+                                                                    )
+                                                                )
+                                                            }
+                                                            className="inline-flex items-center gap-2 bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-all font-medium"
+                                                        >
+                                                            <Eye size={16} />
+                                                            View
+                                                        </button>
+                                                    </td>
                                                 </>
                                             )}
 
@@ -300,7 +315,7 @@ export default function EntityList({
                                                     onClick={() =>
                                                         Inertia.get(
                                                             route(
-                                                                showRoute,
+                                                                "customers.wallet",
                                                                 item.id
                                                             )
                                                         )

@@ -19,7 +19,7 @@ return new class extends Migration
             $table->integer('before_free_credits')->nullable();
             $table->integer('before_paid_credits')->nullable();
 
-             // delta shows actual change (+/-)
+            // delta shows actual change (+/-)
             $table->integer('delta_free')->default(0);
             $table->integer('delta_paid')->default(0);
 

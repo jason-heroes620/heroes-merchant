@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\User;
+use App\Models\CustomerWallet;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -40,11 +41,17 @@ class CustomerController extends Controller
         ]);
 
         // Create customer profile
-        Customer::create([
+        $customer = Customer::create([
             'user_id' => $user->id,
             'date_of_birth' => $request->date_of_birth ?? null,
             'device_id' => $request->device_id ?? null,
             'referred_by' => $request->referred_by ?? null,
+        ]);
+
+        CustomerWallet::create([
+            'customer_id' => $customer->id,
+            'free_credits' => 0,
+            'paid_credits' => 0,
         ]);
 
         return redirect()->route('admin.customers.index')->with('success', 'Customer created successfully!');
@@ -110,5 +117,26 @@ class CustomerController extends Controller
         ]);
 
         return redirect()->route('admin.customers.index')->with('success', 'Customer updated successfully!');
+    }
+
+    public function wallet($id)
+    {
+        $customer = Customer::with('user')->findOrFail($id);
+
+        $wallet = [
+            'free_credits' => $customer->wallet?->cached_free_credits ?? 0,
+            'paid_credits' => $customer->wallet?->cached_paid_credits ?? 0,
+        ];
+
+        $transactions = $customer->wallet?->transactions()
+            ->where('created_at', '>=', now()->subMonths(6))
+            ->orderBy('created_at', 'desc')
+            ->get() ?? [];
+
+        return inertia('Admin/ViewCustomerTransaction', [
+            'customer' => $customer,
+            'wallet' => $wallet,
+            'transactions' => $transactions,
+        ]);
     }
 }

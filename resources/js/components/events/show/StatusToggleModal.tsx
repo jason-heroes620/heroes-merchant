@@ -1,13 +1,7 @@
 import { useState, useMemo } from "react";
 import { router } from "@inertiajs/react";
 import { toast } from "react-hot-toast";
-import {
-    Clock,
-    AlertCircle,
-    Info,
-    Calendar,
-    Copy,
-} from "lucide-react";
+import { Clock, AlertCircle, Info, Calendar, Copy } from "lucide-react";
 import type {
     Event,
     Conversion,
@@ -66,13 +60,13 @@ const StatusToggleModal: React.FC<Props> = ({
         return { paid, free };
     };
 
-    const recommended_paid_credits = conversion?.credits_per_rm ?? 0;
-    const recommended_free_credits = conversion
-        ? Math.ceil(
-              (recommended_paid_credits / conversion.paid_credit_percentage) *
-                  conversion.free_credit_percentage
-          )
-        : 0;
+    // const recommended_paid_credits = conversion?.credits_per_rm ?? 0;
+    // const recommended_free_credits = conversion
+    //     ? Math.ceil(
+    //           (recommended_paid_credits / conversion.paid_credit_percentage) *
+    //               conversion.free_credit_percentage
+    //       )
+    //     : 0;
 
     // Initialize credits with recommended values
     const [credits, setCredits] = useState(
@@ -340,7 +334,7 @@ const StatusToggleModal: React.FC<Props> = ({
 
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                                        Free Credits (Marketing)
+                                        Free Credits
                                     </label>
                                     <div className="flex gap-2 items-start">
                                         <input
@@ -448,26 +442,28 @@ const StatusToggleModal: React.FC<Props> = ({
                     )}
 
                     {/* Credit Conversion Info */}
-                    {isAdmin && newStatus === "active" && conversion && (
-                        <div className="bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-lg p-5">
-                            <div className="flex items-start gap-3">
-                                <Info className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
-                                <div className="flex-1">
-                                    <p className="text-sm font-semibold text-orange-900 mb-2">
-                                        Credit Conversion Settings
-                                    </p>
-                                    <div className="grid grid-cols-3 gap-4 text-sm">
-                                        <div className="bg-white rounded-lg p-3 border border-orange-200">
-                                            <div className="text-gray-600 text-xs">
-                                                Rate
+                    {isAdmin &&
+                        newStatus === "active" &&
+                        conversion && (
+                            <div className="bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-lg p-5">
+                                <div className="flex items-start gap-3">
+                                    <Info className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                                    <div className="flex-1">
+                                        <p className="text-sm font-semibold text-orange-900 mb-2">
+                                            Credit Conversion Settings
+                                        </p>
+                                        <div className="grid grid-cols-3 gap-4 text-sm">
+                                            <div className="bg-white rounded-lg p-3 border border-orange-200">
+                                                <div className="text-gray-600 text-xs">
+                                                    Rate
+                                                </div>
+                                                <div className="font-bold text-orange-700">
+                                                    1 RM ={" "}
+                                                    {conversion.credits_per_rm}{" "}
+                                                    credits
+                                                </div>
                                             </div>
-                                            <div className="font-bold text-orange-700">
-                                                1 RM ={" "}
-                                                {conversion.credits_per_rm}{" "}
-                                                credits
-                                            </div>
-                                        </div>
-                                        <div className="bg-white rounded-lg p-3 border border-orange-200">
+                                            {/* <div className="bg-white rounded-lg p-3 border border-orange-200">
                                             <div className="flex justify-between items-center">
                                                 <div className="flex flex-col">
                                                     <div className="flex gap-1 text-gray-600 text-xs">
@@ -507,12 +503,12 @@ const StatusToggleModal: React.FC<Props> = ({
                                                     {recommended_free_credits}
                                                 </span>
                                             </div>
+                                        </div> */}
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
                     {/* Slot Credits */}
                     {isAdmin && newStatus === "active" && (
