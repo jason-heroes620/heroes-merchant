@@ -50,6 +50,7 @@ class ProfileController extends Controller
         ]);
     }
 
+
     /** Update profile */
     public function update(Request $request)
     {

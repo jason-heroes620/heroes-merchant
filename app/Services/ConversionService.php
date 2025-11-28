@@ -28,7 +28,7 @@ class ConversionService
             (int) ceil($conversion->credits_per_rm)
         );
 
-        // Free credits: marketing only
+        // Free credits: marketing or engagement
         $freeCredits = (int) ceil($paidCredits / ($conversion->paid_credit_percentage / 100) * ($conversion->free_credit_percentage / 100));
 
         return [

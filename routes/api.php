@@ -3,11 +3,13 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\WalletController;
 use App\Http\Controllers\MobileEventController;
 use App\Http\Controllers\EventLikeController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PurchasePackageController;
 
 // Public API routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -20,6 +22,8 @@ Route::prefix('events')->group(function () {
     Route::post('/{id}/click', [MobileEventController::class, 'incrementClickCount']);
     Route::get('/{event}', [MobileEventController::class, 'show']); 
 });
+
+Route::get('/packages', [PurchasePackageController::class, 'index']);
 
 // Authenticated routes (mobile)
 Route::middleware('auth:sanctum')->group(function () {
@@ -37,6 +41,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Wallet
     Route::get('/wallet', [WalletController::class, 'show']);
     Route::post('/wallet', [WalletController::class, 'addWalletTransaction']);
+
+    //Referrals
+    Route::get('/referrals', [CustomerController::class, 'viewReferral']);
 
     // EventController
     Route::post('/events/{id}/toggle-like', [EventLikeController::class, 'toggleLike']);

@@ -13,12 +13,14 @@ return new class extends Migration
     {
         Schema::create('purchase_packages', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('name');
-            $table->decimal('price_in_rm', 10, 2);
-            $table->integer('paid_credits'); 
-            $table->integer('free_credits')->default(0);
-            $table->integer('validity_days')->nullable(); 
+            $table->string('name'); // Free Registration
+            $table->decimal('price_in_rm', 10, 2)->nullable();
+            $table->integer('paid_credits')->nullable(); 
+            $table->integer('free_credits')->nullable();
+            $table->datetime('effective_from');
+            $table->datetime('valid_until')->nullable();
             $table->boolean('active')->default(true);
+            $table->boolean('system_locked')->default(false);
             $table->timestamps();
         });
     }

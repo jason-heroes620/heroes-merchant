@@ -1,13 +1,7 @@
 import { useState } from "react";
 import { Inertia } from "@inertiajs/inertia";
-import { Search, Eye, Users } from "lucide-react";
-
-interface User {
-    id: string;
-    full_name: string;
-    email: string;
-    profile_picture?: string | null;
-}
+import { Search, Eye, Users, Wallet } from "lucide-react";
+import type { User } from "../../types/index";
 
 interface BaseEntity {
     id: string;
@@ -33,7 +27,12 @@ interface Props {
     showRoute: string;
 }
 
-export default function EntityList({ type, data, createRoute }: Props) {
+export default function EntityList({
+    type,
+    data,
+    createRoute,
+    showRoute,
+}: Props) {
     const [searchTerm, setSearchTerm] = useState("");
     const [filterStatus, setFilterStatus] = useState<string>("all");
 
@@ -59,7 +58,6 @@ export default function EntityList({ type, data, createRoute }: Props) {
         const matchesSearch =
             nameMatch || emailMatch || companyMatch || referralMatch;
 
-        // Only filter by status for merchants
         const matchesStatus =
             type === "merchant"
                 ? filterStatus === "all" ||
@@ -272,6 +270,31 @@ export default function EntityList({ type, data, createRoute }: Props) {
                                                     <td className="px-6 py-4 text-gray-900 font-medium">
                                                         {item.referral_code ??
                                                             "-"}
+                                                        {item.referrer_name && (
+                                                            <div className="text-xs text-gray-500">
+                                                                Referred by:{" "}
+                                                                {
+                                                                    item.referrer_name
+                                                                }{" "}
+                                                                | Referees:{" "}
+                                                                {
+                                                                    item.referees_count
+                                                                }
+                                                            </div>
+                                                        )}
+                                                        <button
+                                                            onClick={() =>
+                                                                Inertia.get(
+                                                                    route(
+                                                                        "admin.customers.referrals",
+                                                                        item.id
+                                                                    )
+                                                                )
+                                                            }
+                                                            className="inline-flex items-center gap-2 bg-orange-800 text-white px-4 py-2 rounded-lg hover:bg-orange-900 transition-all font-medium"
+                                                        >
+                                                            View Referrals
+                                                        </button>
                                                     </td>
 
                                                     <td className="px-6 py-4 text-center">
@@ -284,9 +307,9 @@ export default function EntityList({ type, data, createRoute }: Props) {
                                                                     )
                                                                 )
                                                             }
-                                                            className="inline-flex items-center gap-2 bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-all font-medium"
+                                                            className="inline-flex items-center gap-2 bg-blue-800 text-white px-4 py-2 rounded-lg hover:bg-blue-900 transition-all font-medium"
                                                         >
-                                                            <Eye size={16} />
+                                                            <Wallet size={16} />
                                                             View
                                                         </button>
                                                     </td>
@@ -315,7 +338,7 @@ export default function EntityList({ type, data, createRoute }: Props) {
                                                     onClick={() =>
                                                         Inertia.get(
                                                             route(
-                                                                "customers.wallet",
+                                                                showRoute,
                                                                 item.id
                                                             )
                                                         )

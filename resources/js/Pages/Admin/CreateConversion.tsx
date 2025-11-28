@@ -139,7 +139,7 @@ const ConversionsCreate: React.FC = () => {
             <div className="max-w-[1600px] mx-auto">
                 {/* Header */}
                 <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                    <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 px-8 py-8">
+                    <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 px-8 py-10">
                         <div className="flex items-center justify-between">
                             <div>
                                 <h1 className="text-4xl font-bold text-white mb-2">
@@ -469,28 +469,6 @@ const ConversionsCreate: React.FC = () => {
                                             </p>
                                         </div>
                                     )}
-
-                                    {/* Info Box */}
-                                    <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
-                                        <div className="flex gap-3">
-                                            <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                                            <div className="text-xs text-blue-800 leading-relaxed">
-                                                <strong className="block mb-1">
-                                                    How it works:
-                                                </strong>
-                                                <p>
-                                                    Customers pay for credits
-                                                    based on the conversion
-                                                    rate. Paid credits must
-                                                    never be below
-                                                    credits_per_rm to prevent
-                                                    admin loss. Free credits are
-                                                    marketing bonuses calculated
-                                                    from paid credits.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         </div>

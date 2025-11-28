@@ -5,9 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Customer;
 use App\Models\User;
 use App\Models\CustomerWallet;
+use App\Models\WalletCreditGrant;
+use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Carbon\Carbon;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class CustomerController extends Controller
 {
@@ -18,7 +22,7 @@ class CustomerController extends Controller
     }
 
     // 🔹 Store new customer
-    public function store(Request $request)
+    public function store(Request $request, WalletService $walletService)
     {
         $request->validate([
             'full_name' => 'required|string|max:255',
@@ -45,14 +49,22 @@ class CustomerController extends Controller
             'user_id' => $user->id,
             'date_of_birth' => $request->date_of_birth ?? null,
             'device_id' => $request->device_id ?? null,
-            'referred_by' => $request->referred_by ?? null,
         ]);
+     
+        if (!empty($validated['referrer_code'])) {
+            $referrer = Customer::where('referral_code', $validated['referrer_code'])->first();
+            if ($referrer) {
+                Referral::create([
+                    'referrer_id' => $referrer->id,
+                    'referred_id' => $customer->id,
+                    'status' => 'pending',
+                ]);
+            }
+        }
+ 
+        $walletService->registrationBonus($customer);
 
-        CustomerWallet::create([
-            'customer_id' => $customer->id,
-            'free_credits' => 0,
-            'paid_credits' => 0,
-        ]);
+        $walletService->referralBonus($customer);
 
         return redirect()->route('admin.customers.index')->with('success', 'Customer created successfully!');
     }
@@ -60,16 +72,26 @@ class CustomerController extends Controller
      // 🔹 List all customers (for admin)
     public function index()
     {
-        $customers = Customer::with(['user', 'referrer'])->get();
+        $customers = Customer::with(['user', 'referrer.user'])->get();
+        
         return inertia('Admin/CustomerList', [
-            'customers' => $customers,
+            'customers' => $customers->map(function ($customer) {
+                return [
+                    'id' => $customer->id,
+                    'full_name' => $customer->user->full_name,
+                    'email' => $customer->user->email,
+                    'referral_code' => $customer->referral_code,
+                    'referrer_name' => $customer->referrer?->user->full_name,
+                    'referees_count' => $customer->referees_count, // accessor
+                ];
+            }),
         ]);
     }
 
     // 🔹 Show specific customer
     public function showProfile($id)
     {
-        $customer = Customer::with(['user', 'referrer', 'referees'])->findOrFail($id);
+        $customer = Customer::with(['user', 'referrer.user', 'referees.user'])->findOrFail($id);
         return inertia('Admin/ViewCustomerProfile', [
             'customer' => $customer,
         ]);
@@ -133,10 +155,87 @@ class CustomerController extends Controller
             ->orderBy('created_at', 'desc')
             ->get() ?? [];
 
+        $credit_grants = $customer->wallet?->creditGrants()
+            ->orderBy('created_at', 'desc')
+            ->get() ?? [];
+
         return inertia('Admin/ViewCustomerTransaction', [
             'customer' => $customer,
             'wallet' => $wallet,
             'transactions' => $transactions,
+            'credit_grants' => $credit_grants,
+        ]);
+    }
+
+    public function exportPdf(Customer $customer)
+    {
+        $wallet = $customer->wallet;
+        $credit_grants = $customer->wallet?->creditGrants()->get();
+        $transactions = $customer->wallet?->transactions()->latest()->get();
+
+        $pdf = Pdf::loadView('pdf', [
+            'customer' => $customer,
+            'wallet' => $wallet,
+            'credit_grants' => $credit_grants,
+            'transactions' => $transactions,
+        ]);
+
+        return $pdf->download("{$customer->user->full_name}_transactions.pdf");
+    }
+
+    // Show referral page for a specific customer
+    public function viewReferral($id)
+    {
+        $customer = Customer::with([
+            'user',                  
+            'referrer.user',         
+            'referees.user',       
+            'wallet.creditGrants'     
+        ])->findOrFail($id);
+
+        // Calculate total referral bonus earned
+        $referralBonuses = $customer->wallet->creditGrants
+            ->where('grant_type', 'bonus')
+            ->whereNotNull('reference_id');
+
+        $totalFreeBonus = $referralBonuses->sum('free_credits');
+
+        if (request()->wantsJson()) {
+            return response()->json([
+                'customer' => $customer,
+                'referrer' => $customer->referrer ? [
+                    'id' => $customer->referrer->id,
+                    'name' => $customer->referrer->user->full_name,
+                    'email' => $customer->referrer->user->email,
+                ] : null,
+                'referees' => $customer->referees->map(fn($r) => [
+                    'id' => $r->id,
+                    'name' => $r->user->full_name,
+                    'email' => $r->user->email,
+                    'referral_code' => $r->referral_code,
+                ]),
+                'referral_bonus' => [
+                    'free' => $totalFreeBonus,
+                ],
+            ]);
+        }
+
+        return inertia('Admin/ViewReferralPage', [
+            'customer' => $customer,
+            'referrer' => $customer->referrer ? [
+                'id' => $customer->referrer->id,
+                'name' => $customer->referrer->user->full_name,
+                'email' => $customer->referrer->user->email,
+            ] : null,
+            'referees' => $customer->referees->map(fn($r) => [
+                'id' => $r->id,
+                'name' => $r->user->full_name,
+                'email' => $r->user->email,
+                'referral_code' => $r->referral_code,
+            ]),
+            'referral_bonus' => [
+                'free' => $totalFreeBonus,
+            ],
         ]);
     }
 }

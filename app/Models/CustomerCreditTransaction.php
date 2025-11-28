@@ -17,6 +17,7 @@ class CustomerCreditTransaction extends Model
         'before_paid_credits',
         'delta_free',
         'delta_paid',
+        'amount_in_rm',
         'description',
         'booking_id',
         'purchase_package_id',
@@ -26,6 +27,7 @@ class CustomerCreditTransaction extends Model
     protected $casts = [
         'before_free_credits' => 'integer',
         'before_paid_credits' => 'integer',
+        'amount_in_rm' => 'float',
         'delta_free' => 'integer',
         'delta_paid' => 'integer',
     ];

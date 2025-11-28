@@ -20,7 +20,7 @@ interface MerchantFields {
 interface CustomerFields {
     date_of_birth: string;
     device_id: string;
-    referred_by: string;
+    referrer_code: string;
 }
 
 type UserForm = BaseForm & Partial<MerchantFields & CustomerFields>;
@@ -46,7 +46,7 @@ export default function CreateUserForm({ type }: Props) {
             : {
                   date_of_birth: "",
                   device_id: "",
-                  referred_by: "",
+                  referrer_code: "",
               }),
     });
 
@@ -244,15 +244,15 @@ export default function CreateUserForm({ type }: Props) {
                                         disabled={processing}
                                     />
                                     <FormField
-                                        label="Referred By (Customer ID)"
-                                        value={data.referred_by || ""}
+                                        label="Referred By (Referrer Code)"
+                                        value={data.referrer_code || ""}
                                         onChange={(e) =>
                                             setData(
-                                                "referred_by",
+                                                "referrer_code",
                                                 e.target.value
                                             )
                                         }
-                                        error={errors.referred_by}
+                                        error={errors.referrer_code}
                                         disabled={processing}
                                     />
                                 </div>

@@ -4,6 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Merchant;
+use App\Models\Customer;
+use App\Models\CustomerWallet;
+use App\Models\PurchasePackage;
+use App\Models\CustomerCreditTransaction;
+use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -11,6 +16,7 @@ use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Carbon\Carbon;
 
 class AuthController extends Controller
 {
@@ -22,7 +28,7 @@ class AuthController extends Controller
     }
 
     /**Register (Web = merchant only, API = any role)*/
-    public function register(Request $request)
+    public function register(Request $request, WalletService $walletService)
     {
         Log::info('Register request received', $request->all());
 
@@ -37,6 +43,7 @@ class AuthController extends Controller
         if ($isApi) {
             $rules['role'] = 'required|string|in:customer,merchant,admin';
             $rules['device_id'] = 'required|string';
+            $rules['referrer_code'] = 'nullable|string';
         } else {
             $rules['company_name'] = 'required|string|max:255';
         }
@@ -80,11 +87,17 @@ class AuthController extends Controller
                 'device_id' => $validated['device_id'],
             ]);
 
-            \App\Models\CustomerWallet::create([
-                'customer_id' => $customer->id,
-                'free_credits' => 0,
-                'paid_credits' => 0,
-            ]);
+            if (!empty($validated['referrer_code'])) {
+                $referrer = Customer::where('referral_code', $validated['referrer_code'])->first();
+                if ($referrer) {
+                    $customer->referred_by = $referrer->id;
+                    $customer->save();
+                }
+            }
+ 
+            $walletService->registrationBonus($customer);
+
+            $walletService->referralBonus($customer);
         }
 
         // Response handling
@@ -98,7 +111,7 @@ class AuthController extends Controller
         }
 
         Auth::login($user);
-        return redirect()->route('dashboard')->with('success', 'Registration successful!');
+        return redirect()->route('events')->with('success', 'Registration successful!');
     }
 
     /**Login (Web = session, API = token)*/

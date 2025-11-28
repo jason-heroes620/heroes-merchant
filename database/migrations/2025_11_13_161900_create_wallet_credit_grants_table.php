@@ -16,13 +16,16 @@ return new class extends Migration
             $table->foreignUuid('wallet_id')->constrained('customer_wallets')->onDelete('cascade');
 
             $table->enum('grant_type', ['free', 'paid', 'bonus', 'purchase']); 
-            $table->integer('credits');
-            $table->integer('credits_remaining')->nullable(); 
+            $table->integer('free_credits')->nullable();
+            $table->integer('paid_credits')->nullable();
+            $table->integer('free_credits_remaining')->nullable(); 
+            $table->integer('paid_credits_remaining')->nullable(); 
             $table->datetime('expires_at')->nullable();
             $table->uuid('purchase_package_id')->nullable(); 
             $table->uuid('reference_id')->nullable(); 
 
-            $table->decimal('credits_per_rm', 14, 6)->nullable();
+            $table->decimal('free_credits_per_rm', 14, 6)->nullable();
+            $table->decimal('paid_credits_per_rm', 14, 6)->nullable();
 
             $table->timestamps();
         });

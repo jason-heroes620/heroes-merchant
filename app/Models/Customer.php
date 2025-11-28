@@ -61,6 +61,16 @@ class Customer extends Model
     {
         return $this->hasMany(Customer::class, 'referred_by');
     }
+
+    public function getRefereesCount(): int
+    {
+        return $this->referees()->count();
+    }
+
+    public function refereesList()
+    {
+        return $this->hasMany(Customer::class, 'referred_by');
+    }
     
     public function likedEvents()
     {

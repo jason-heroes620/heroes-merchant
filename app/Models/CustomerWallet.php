@@ -28,7 +28,7 @@ class CustomerWallet extends Model
         return $this->belongsTo(Customer::class);
     }
 
-    public function grants()
+    public function creditGrants()
     {
         return $this->hasMany(WalletCreditGrant::class, 'wallet_id');
     }

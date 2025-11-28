@@ -13,19 +13,25 @@ class WalletCreditGrant extends Model
     protected $fillable = [
         'wallet_id',
         'grant_type',
-        'credits',
-        'credits_remaining',
+        'free_credits',
+        'paid_credits',
+        'free_credits_remaining',
+        'paid_credits_remaining',
         'expires_at',
         'purchase_package_id',
         'reference_id',
-        'credits_per_rm',
+        'free_credits_per_rm',
+        'paid_credits_per_rm',
     ];
 
     protected $casts = [
-        'credits' => 'integer',
-        'credits_remaining' => 'integer',
+        'free_credits' => 'integer',
+        'paid_credits' => 'integer',
+        'free_credits_remaining' => 'integer',
+        'paid_credits_remaining' => 'integer',
         'expires_at' => 'datetime',
-        'credits_per_rm' => 'decimal:6',
+        'free_credits_per_rm' => 'float',
+        'paid_credits_per_rm' => 'float',
     ];
 
     /** Relationships */

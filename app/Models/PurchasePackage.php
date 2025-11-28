@@ -15,16 +15,20 @@ class PurchasePackage extends Model
         'price_in_rm',
         'paid_credits',
         'free_credits',
-        'validity_days',
+        'effective_from',
+        'valid_until',
         'active',
+        'system_locked'
     ];
 
     protected $casts = [
-        'price_in_rm' => 'decimal:2',
+        'price_in_rm' => 'float',
         'paid_credits' => 'integer',
         'free_credits' => 'integer',
-        'validity_days' => 'integer',
+        'effective_from' => 'datetime',
+        'valid_until' => 'datetime',
         'active' => 'boolean',
+        'system_locked' => 'boolean'
     ];
 
     /** Relationships */

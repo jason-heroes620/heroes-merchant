@@ -11,6 +11,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ConversionController;
+use App\Http\Controllers\PurchasePackageController;
 
 /* Root Redirect */
 Route::get('/', function () {
@@ -59,7 +60,13 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
         Route::get('/customers/{id}', [CustomerController::class, 'showProfile'])->name('customers.showProfile');
         Route::post('/customers/{id}/update', [CustomerController::class, 'update'])->name('customers.update');
+        
+        // Wallet and transaction management
         Route::get('/customers/{id}/wallet', [CustomerController::class, 'wallet'])->name('customers.wallet');
+        Route::get('/customers/{customer}/transactions/export-pdf', [CustomerController::class, 'exportPdf'])->name('customers.transactions.exportPdf');
+
+        Route::get('/admin/customers/{id}/referees', [CustomerController::class, 'viewReferral'])->name('customers.referrals');
+
 
         // Admin Event Management
         Route::get('/events', [EventController::class, 'index'])->name('events.index');
@@ -72,6 +79,9 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/conversions', [ConversionController::class, 'store'])->name('conversions.store');
         Route::post('/conversions/{conversion}/activate', [ConversionController::class, 'activate'])->name('admin.conversions.activate');
         Route::post('/conversions/{conversion}/deactivate', [ConversionController::class, 'deactivate'])->name('admin.conversions.deactivate');
+        Route::post('/admin/conversions/check-overlap', [ConversionController::class, 'checkOverlap']);
+
+        Route::resource('packages', PurchasePackageController::class)->except(['show']);
     });
 
     /* Merchant Routes */

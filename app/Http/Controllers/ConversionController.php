@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Conversion;
+use App\Models\PurchasePackage;
 use App\Services\ConversionService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -83,13 +84,29 @@ class ConversionController extends Controller
             if ($status === 'active') {
                 Conversion::where('status', 'active')->update(['status' => 'inactive']);
                 Log::info('ℹ️ Previous active conversions deactivated');
+
+                $conversionService = new ConversionService();
+                $activeConversion = $conversionService->getActiveConversion();
+                $credits = $conversionService->getCreditsForConversion($activeConversion, 1);
+
+                PurchasePackage::updateOrCreate(
+                    ['name' => 'Standard Package'],
+                    [
+                        'price_in_rm' => 1,
+                        'paid_credits' => $credits['paid_credits'],
+                        'free_credits' => $credits['free_credits'],
+                        'effective_from' => now(),
+                        'active' => true,
+                        'system_locked' => true,
+                    ]
+                );
             }
 
             $conversion = Conversion::create(array_merge($validated, ['status' => $status]));
 
             return redirect()
                 ->route('admin.conversions.index')
-                ->with('success', 'Conversion rate created successfully.');
+                ->with('success', 'Conversion rate created successfully. Standard Package is updated.');
         } catch (\Throwable $e) {
             Log::error('❌ Conversion store failed:', [
                 'error' => $e->getMessage(),
@@ -131,6 +148,22 @@ class ConversionController extends Controller
             'status' => 'active',
             'effective_from' => now(),
         ]);
+
+        $conversionService = new ConversionService();
+        $activeConversion = $conversionService->getActiveConversion();
+        $credits = $conversionService->getCreditsForConversion($activeConversion, 1);
+
+        PurchasePackage::updateOrCreate(
+            ['name' => 'Standard Package'],
+            [
+                'price_in_rm' => 1,
+                'paid_credits' => $credits['paid_credits'],
+                'free_credits' => $credits['free_credits'],
+                'effective_from' => now(),
+                'active' => true,
+                'system_locked' => true,
+            ]
+        );
 
         return redirect()
             ->route('admin.conversions.index')

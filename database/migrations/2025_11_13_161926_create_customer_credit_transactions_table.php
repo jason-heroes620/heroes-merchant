@@ -22,6 +22,7 @@ return new class extends Migration
             // delta shows actual change (+/-)
             $table->integer('delta_free')->default(0);
             $table->integer('delta_paid')->default(0);
+            $table->decimal('amount_in_rm', 10, 2)->nullable();
 
             $table->text('description')->nullable();
             $table->uuid('booking_id')->nullable();
