@@ -7,6 +7,7 @@ import {
     Calendar,
     Filter,
     Download,
+    DollarSign,
 } from "lucide-react";
 import { usePage } from "@inertiajs/react";
 import type { PageProps as BasePageProps } from "../../types";
@@ -63,6 +64,20 @@ export default function ViewCustomerTransaction() {
 
     if (!customer) return null;
     const [filterType, setFilterType] = useState("all");
+
+    const toGMT8Date = (dateStr: string) => {
+        const d = new Date(dateStr);
+        const utc = d.getTime() + d.getTimezoneOffset() * 60000;
+        const gmt8 = new Date(utc + 8 * 3600000);
+
+        return new Date(gmt8.getFullYear(), gmt8.getMonth(), gmt8.getDate());
+    };
+
+    const isExpired = (dateStr: string) => {
+        const target = toGMT8Date(dateStr);
+        const nowGMT8 = toGMT8Date(new Date().toISOString());
+        return target.getTime() === nowGMT8.getTime();
+    };
 
     const formatDateTime = (dateStr: string) => {
         const date = new Date(dateStr);
@@ -189,7 +204,10 @@ export default function ViewCustomerTransaction() {
                     <div className="bg-white rounded-2xl shadow-xl p-6 border-t-4 border-green-500">
                         <div className="flex items-center justify-between mb-4">
                             <div className="bg-green-100 rounded-full p-3">
-                                <Wallet className="text-green-600" size={24} />
+                                <DollarSign
+                                    className="text-green-600"
+                                    size={24}
+                                />
                             </div>
                         </div>
                         <p className="text-gray-600 text-sm font-medium mb-1">
@@ -246,22 +264,35 @@ export default function ViewCustomerTransaction() {
                                                 >
                                                     {grant.grant_type.toUpperCase()}
                                                 </span>
-                                                {grant.expires_at && (
-                                                    <span className="flex items-center gap-1 text-xs text-gray-500">
-                                                        <Calendar size={12} />
-                                                        Expires:{" "}
-                                                        {formatDateTime(
-                                                            grant.expires_at
-                                                        )}
-                                                    </span>
-                                                )}
                                             </div>
-                                            <p className="text-sm text-gray-600">
-                                                Created:{" "}
-                                                {formatDateTime(
-                                                    grant.created_at
-                                                )}
-                                            </p>
+
+                                            {grant.expires_at && (
+                                                <span
+                                                    className={`flex items-center gap-1 text-xs font-medium ${
+                                                        isExpired(
+                                                            grant.expires_at
+                                                        )
+                                                            ? "text-red-600"
+                                                            : "text-gray-600"
+                                                    }`}
+                                                >
+                                                    <Calendar size={12} />
+                                                    {isExpired(grant.expires_at)
+                                                        ? "Expired"
+                                                        : "Expires"}{" "}
+                                                    on{" "}
+                                                    {toGMT8Date(
+                                                        grant.expires_at
+                                                    ).toLocaleDateString(
+                                                        "en-GB",
+                                                        {
+                                                            day: "2-digit",
+                                                            month: "short",
+                                                            year: "numeric",
+                                                        }
+                                                    )}
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="text-right">
                                             <p className="text-2xl font-bold text-orange-600">
@@ -348,7 +379,7 @@ export default function ViewCustomerTransaction() {
                                             <p className="font-medium text-gray-900 mb-1">
                                                 {transaction.description}
                                             </p>
-                                            <div className="flex items-center gap-4 text-xs text-gray-500">
+                                            <div className="flex items-center gap-2 text-xs text-gray-500">
                                                 <Calendar size={12} />
                                                 {formatDateTime(
                                                     transaction.created_at
@@ -358,7 +389,7 @@ export default function ViewCustomerTransaction() {
 
                                         <div className="text-right ml-4">
                                             <p
-                                                className={`text-2xl font-bold ${
+                                                className={`text-3xl font-bold mb-2 ${
                                                     isPositive
                                                         ? "text-green-600"
                                                         : "text-red-600"
@@ -370,12 +401,32 @@ export default function ViewCustomerTransaction() {
                                             {transaction.delta_free !== 0 &&
                                                 transaction.delta_paid !==
                                                     0 && (
-                                                    <p className="text-xs text-gray-500 mt-1">
-                                                        Free:{" "}
-                                                        {transaction.delta_free}{" "}
-                                                        | Paid:{" "}
-                                                        {transaction.delta_paid}
-                                                    </p>
+                                                    <>
+                                                        <div className="flex items-center text-xs text-gray-500 gap-1 mb-1">
+                                                            <DollarSign
+                                                                className="text-green-600"
+                                                                size={14}
+                                                            />
+                                                            <span className="text-green-600 font-semibold">
+                                                                Paid Credits:{" "}
+                                                                {
+                                                                    transaction.delta_paid
+                                                                }
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center text-xs text-gray-500 gap-1">
+                                                            <Gift
+                                                                className="text-blue-600"
+                                                                size={14}
+                                                            />
+                                                            <span className="text-blue-600 font-semibold">
+                                                                Free Credits:{" "}
+                                                                {
+                                                                    transaction.delta_free
+                                                                }
+                                                            </span>
+                                                        </div>
+                                                    </>
                                                 )}
                                         </div>
                                     </div>

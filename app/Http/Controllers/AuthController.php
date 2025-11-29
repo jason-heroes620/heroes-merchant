@@ -92,12 +92,34 @@ class AuthController extends Controller
                 if ($referrer) {
                     $customer->referred_by = $referrer->id;
                     $customer->save();
+                    Log::info('Referrer linked', [
+                        'customer_id' => $customer->id,
+                        'referrer_id' => $referrer->id
+                    ]);
+                } else {
+                    Log::warning('Referrer code invalid', ['code' => $validated['referrer_code']]);
                 }
             }
  
-            $walletService->registrationBonus($customer);
+           try {
+                $walletService->registrationBonus($customer);
+                Log::info('Registration bonus applied', ['customer_id' => $customer->id]);
+            } catch (\Exception $e) {
+                Log::error('Registration bonus failed', [
+                    'customer_id' => $customer->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
 
-            $walletService->referralBonus($customer);
+            try {
+                $walletService->referralBonus($customer);
+                Log::info('Referral bonus applied', ['customer_id' => $customer->id]);
+            } catch (\Exception $e) {
+                Log::error('Referral bonus failed', [
+                    'customer_id' => $customer->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
         }
 
         // Response handling

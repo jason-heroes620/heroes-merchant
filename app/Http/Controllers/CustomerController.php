@@ -54,11 +54,8 @@ class CustomerController extends Controller
         if (!empty($validated['referrer_code'])) {
             $referrer = Customer::where('referral_code', $validated['referrer_code'])->first();
             if ($referrer) {
-                Referral::create([
-                    'referrer_id' => $referrer->id,
-                    'referred_id' => $customer->id,
-                    'status' => 'pending',
-                ]);
+                $customer->referred_by = $referrer->id;
+                $customer->save();
             }
         }
  
@@ -72,19 +69,9 @@ class CustomerController extends Controller
      // 🔹 List all customers (for admin)
     public function index()
     {
-        $customers = Customer::with(['user', 'referrer.user'])->get();
-        
+        $customers = Customer::with(['user', 'referrer'])->get();
         return inertia('Admin/CustomerList', [
-            'customers' => $customers->map(function ($customer) {
-                return [
-                    'id' => $customer->id,
-                    'full_name' => $customer->user->full_name,
-                    'email' => $customer->user->email,
-                    'referral_code' => $customer->referral_code,
-                    'referrer_name' => $customer->referrer?->user->full_name,
-                    'referees_count' => $customer->referees_count, // accessor
-                ];
-            }),
+            'customers' => $customers,
         ]);
     }
 
@@ -194,9 +181,9 @@ class CustomerController extends Controller
         ])->findOrFail($id);
 
         // Calculate total referral bonus earned
-        $referralBonuses = $customer->wallet->creditGrants
+        $referralBonuses = $customer->wallet?->creditGrants
             ->where('grant_type', 'bonus')
-            ->whereNotNull('reference_id');
+            ->whereNotNull('reference_id') ?? collect();
 
         $totalFreeBonus = $referralBonuses->sum('free_credits');
 
@@ -213,6 +200,7 @@ class CustomerController extends Controller
                     'name' => $r->user->full_name,
                     'email' => $r->user->email,
                     'referral_code' => $r->referral_code,
+                    'created_at' => $r->created_at,
                 ]),
                 'referral_bonus' => [
                     'free' => $totalFreeBonus,
@@ -225,13 +213,16 @@ class CustomerController extends Controller
             'referrer' => $customer->referrer ? [
                 'id' => $customer->referrer->id,
                 'name' => $customer->referrer->user->full_name,
+                'profile_picture' => $customer->referrer->user->profile_picture,
                 'email' => $customer->referrer->user->email,
             ] : null,
             'referees' => $customer->referees->map(fn($r) => [
                 'id' => $r->id,
                 'name' => $r->user->full_name,
                 'email' => $r->user->email,
+                'profile_picture' => $r->user->profile_picture,
                 'referral_code' => $r->referral_code,
+                'created_at' => $r->created_at,
             ]),
             'referral_bonus' => [
                 'free' => $totalFreeBonus,

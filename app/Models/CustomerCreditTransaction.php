@@ -39,6 +39,11 @@ class CustomerCreditTransaction extends Model
         return $this->belongsTo(CustomerWallet::class, 'wallet_id');
     }
 
+    public function grant()
+    {
+        return $this->belongsTo(WalletCreditGrant::class, 'wallet_credit_grant_id');
+    }
+
     public function booking()
     {
         return $this->belongsTo(Booking::class, 'booking_id');

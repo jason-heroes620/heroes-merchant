@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Inertia } from "@inertiajs/inertia";
-import { Search, Eye, Users, Wallet } from "lucide-react";
+import { Search, Eye, Users, Wallet, TrendingUp } from "lucide-react";
 import type { User } from "../../types/index";
 
 interface BaseEntity {
@@ -38,22 +38,20 @@ export default function EntityList({
 
     // Generic filtering
     const filteredData = data.filter((item: any) => {
-        const nameMatch = item.user.full_name
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase());
-        const emailMatch = item.user.email
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase());
+        const name = item.user?.full_name?.toLowerCase() ?? "";
+        const email = item.user?.email?.toLowerCase() ?? "";
+        const search = searchTerm.toLowerCase();
+
+        const nameMatch = name.includes(search);
+        const emailMatch = email.includes(search);
 
         const companyMatch =
             type === "merchant" &&
-            item.company_name?.toLowerCase().includes(searchTerm.toLowerCase());
+            item.company_name?.toLowerCase()?.includes(search);
 
         const referralMatch =
             type === "customer" &&
-            item.referral_code
-                ?.toLowerCase()
-                .includes(searchTerm.toLowerCase());
+            item.referral_code?.toLowerCase()?.includes(search);
 
         const matchesSearch =
             nameMatch || emailMatch || companyMatch || referralMatch;
@@ -214,7 +212,7 @@ export default function EntityList({
                                             </>
                                         )}
                                         {type === "merchant" && (
-                                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                                 Status
                                             </th>
                                         )}
@@ -232,9 +230,9 @@ export default function EntityList({
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex items-center gap-3">
                                                     {item.user
-                                                        .profile_picture ? (
+                                                        ?.profile_picture ? (
                                                         <img
-                                                            src={`/storage/${item.user.profile_picture}`}
+                                                            src={`/storage/${item.user?.profile_picture}`}
                                                             alt={
                                                                 item.user
                                                                     .full_name
@@ -243,13 +241,15 @@ export default function EntityList({
                                                         />
                                                     ) : (
                                                         <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-sm">
-                                                            {item.user.full_name
-                                                                .charAt(0)
-                                                                .toUpperCase()}
+                                                            {item.user?.full_name
+                                                                ?.charAt(0)
+                                                                ?.toUpperCase() ??
+                                                                "?"}
                                                         </div>
                                                     )}
                                                     <div className="font-medium text-gray-900">
-                                                        {item.user.full_name}
+                                                        {item.user?.full_name ??
+                                                            "User"}
                                                     </div>
                                                 </div>
                                             </td>
@@ -268,20 +268,6 @@ export default function EntityList({
                                                         {item.age ?? "-"}
                                                     </td>
                                                     <td className="px-6 py-4 text-gray-900 font-medium">
-                                                        {item.referral_code ??
-                                                            "-"}
-                                                        {item.referrer_name && (
-                                                            <div className="text-xs text-gray-500">
-                                                                Referred by:{" "}
-                                                                {
-                                                                    item.referrer_name
-                                                                }{" "}
-                                                                | Referees:{" "}
-                                                                {
-                                                                    item.referees_count
-                                                                }
-                                                            </div>
-                                                        )}
                                                         <button
                                                             onClick={() =>
                                                                 Inertia.get(
@@ -291,8 +277,11 @@ export default function EntityList({
                                                                     )
                                                                 )
                                                             }
-                                                            className="inline-flex items-center gap-2 bg-orange-800 text-white px-4 py-2 rounded-lg hover:bg-orange-900 transition-all font-medium"
+                                                            className="inline-flex items-center justify-center gap-2 bg-gray-100 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-200 transition-all font-medium text-sm"
                                                         >
+                                                            <TrendingUp
+                                                                size={16}
+                                                            />
                                                             View Referrals
                                                         </button>
                                                     </td>
@@ -346,7 +335,7 @@ export default function EntityList({
                                                     className="inline-flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-all font-medium"
                                                 >
                                                     <Eye size={16} />
-                                                    View/Edit
+                                                    View/Edit Profile
                                                 </button>
                                             </td>
                                         </tr>

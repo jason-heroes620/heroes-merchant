@@ -45,4 +45,9 @@ class WalletCreditGrant extends Model
     {
         return $this->belongsTo(PurchasePackage::class, 'purchase_package_id');
     }
+
+    public function transactions()
+    {
+        return $this->hasMany(CustomerCreditTransaction::class, 'wallet_credit_grant_id');
+    }
 }

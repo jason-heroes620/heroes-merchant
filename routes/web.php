@@ -80,8 +80,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/conversions/{conversion}/activate', [ConversionController::class, 'activate'])->name('admin.conversions.activate');
         Route::post('/conversions/{conversion}/deactivate', [ConversionController::class, 'deactivate'])->name('admin.conversions.deactivate');
         Route::post('/admin/conversions/check-overlap', [ConversionController::class, 'checkOverlap']);
-
-        Route::resource('packages', PurchasePackageController::class)->except(['show']);
+        Route::resource('packages', PurchasePackageController::class);
     });
 
     /* Merchant Routes */

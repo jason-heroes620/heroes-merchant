@@ -19,16 +19,8 @@ class WalletService
             'cached_paid_credits' => 0,
         ]);
 
-        $freePackage = PurchasePackage::where('name', 'Free Registration')
-            ->where('active', true)
-            ->first();
-
-        if (! $freePackage) {
-            return;
-        }
-
-        $deltaFree = $freePackage->free_credits ?? 0;
-        $deltaPaid = $freePackage->paid_credits ?? 0;
+        $deltaFree = 50;
+        $deltaPaid = 0;
         $expiresAt = Carbon::now()->addMonths(6);
 
         // Increment wallet cached credits
@@ -44,7 +36,6 @@ class WalletService
             'free_credits_remaining' => $deltaFree,
             'paid_credits_remaining' => $deltaPaid,
             'expires_at' => $expiresAt,
-            'purchase_package_id' => $freePackage->id,
             'reference_id' => null,
             'free_credits_per_rm' => null,
             'paid_credits_per_rm' => null,
@@ -53,7 +44,6 @@ class WalletService
         // Record transaction
         CustomerCreditTransaction::create([
             'wallet_id' => $wallet->id,
-            'purchase_package_id' => $freePackage->id,
             'type' => 'bonus',
             'delta_free' => $deltaFree,
             'delta_paid' => 0,
@@ -76,12 +66,8 @@ class WalletService
             ['cached_free_credits' => 0, 'cached_paid_credits' => 0]
         );
 
-        $alreadyGranted = WalletCreditGrant::where('wallet_id', $wallet->id)
-            ->where('reference_id', $referredCustomer->id)
-            ->exists();
-        if ($alreadyGranted) return;
-
-        $freeBonus = 10;
+        $freeBonus = 50;
+        $paidBonus = 0;
         $expiresAt = Carbon::now()->addMonths(6);
 
         $wallet->increment('cached_free_credits', $freeBonus);

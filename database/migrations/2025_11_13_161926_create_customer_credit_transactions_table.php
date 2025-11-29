@@ -14,7 +14,12 @@ return new class extends Migration
         Schema::create('customer_credit_transactions', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('wallet_id')->constrained('customer_wallets')->onDelete('cascade');
-
+            $table->uuid('wallet_credit_grant_id')->nullable()->after('wallet_id');
+            $table->foreign('wallet_credit_grant_id')
+                ->references('id')
+                ->on('wallet_credit_grants')
+                ->onDelete('set null');
+                
             $table->enum('type', ['purchase', 'booking', 'refund', 'bonus']);
             $table->integer('before_free_credits')->nullable();
             $table->integer('before_paid_credits')->nullable();

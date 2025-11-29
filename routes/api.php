@@ -40,7 +40,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Wallet
     Route::get('/wallet', [WalletController::class, 'show']);
-    Route::post('/wallet', [WalletController::class, 'addWalletTransaction']);
+    Route::post('/wallet/transactions', [WalletController::class, 'addWalletTransaction']);
 
     //Referrals
     Route::get('/referrals', [CustomerController::class, 'viewReferral']);
