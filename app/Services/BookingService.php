@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Booking;
+use App\Models\BookingItem;
 use App\Models\EventSlot;
 use App\Models\EventSlotPrice;
 use App\Models\CustomerWallet;
@@ -27,24 +28,104 @@ class BookingService
         $this->walletService = $walletService;
         $this->slotAvailability = $slotAvailability;
     }
-    /**
-     * BOOK SLOT (main function)
-     */
-    public function bookSlot($customer, EventSlot $slot, ?string $ageGroupId = null, int $quantity = 1)
+
+    public function bookSlot($customer, EventSlot $slot, array $quantitiesByAgeGroup, bool $allowFallback = false)
     {
-        return DB::transaction(function () use ($customer, $slot, $ageGroupId, $quantity) {
+        return DB::transaction(function () use ($customer, $slot, $quantitiesByAgeGroup, $allowFallback) {
+            $totalQuantity = array_sum($quantitiesByAgeGroup);
+            if ($totalQuantity < 1) {
+                throw new \Exception('Please select at least one ticket.');
+            }
 
-            // Step 1 — Create booking + credit checks
-            [$booking, $slot, $requiredFree, $requiredPaid] =
-                $this->createBooking($customer, $slot, $ageGroupId, $quantity);
+            // Lock slot
+            $slot = EventSlot::where('id', $slot->id)->lockForUpdate()->firstOrFail();
 
-            // Step 2 — Deduct credits + reduce capacity
-            $this->processCreditsAndCapacity($customer, $slot, $booking, $requiredFree, $requiredPaid, $quantity);
+            if (! $this->slotAvailability->isAvailable($slot, $totalQuantity)) {
+                throw new \Exception('Not enough seats available for this slot.');
+            }
 
-            // Step 3 — Generate QR & store path
+            $wallet = $customer->wallet ?? throw new \Exception('Wallet not found.');
+
+            // Step 1: Validate credits first
+            foreach ($quantitiesByAgeGroup as $ageGroupId => $quantity) {
+                if ($quantity < 1) continue;
+
+                $ageGroupIdForQuery = $ageGroupId === 'general' ? null : $ageGroupId;
+                $slotPrice = $slot->prices()
+                    ->when($ageGroupIdForQuery, fn($q) => $q->where('event_age_group_id', $ageGroupIdForQuery))
+                    ->first();
+
+                $requiredPaid = $slotPrice->paid_credits ?? 0;
+                $requiredFree = $slotPrice->free_credits ?? 0;
+
+                $this->walletService->canBookWithCredits($wallet, $requiredPaid, $requiredFree, $quantity, $allowFallback);
+            }
+
+            // Step 2: Create main booking
+            $booking = Booking::create([
+                'customer_id' => $customer->id,
+                'event_id' => $slot->event_id,
+                'slot_id' => $slot->id,
+                'wallet_id' => $wallet->id,
+                'status' => 'confirmed',
+                'booked_at' => now(),
+                'quantity' => $totalQuantity,
+            ]);
+
+            // Step 3: Create booking items per age group
+            foreach ($quantitiesByAgeGroup as $ageGroupId => $quantity) {
+                if ($quantity < 1) continue;
+
+                $ageGroupIdForQuery = $ageGroupId === 'general' ? null : $ageGroupId;
+                $slotPrice = $slot->prices()
+                    ->when($ageGroupIdForQuery, fn($q) => $q->where('event_age_group_id', $ageGroupIdForQuery))
+                    ->first();
+
+                Log::info("Creating BookingItem", [
+                    'booking_id' => $booking->id,
+                    'age_group_id' => $ageGroupIdForQuery,
+                    'quantity' => $quantity,
+                    'paid' => $slotPrice->paid_credits,
+                    'free' => $slotPrice->free_credits,
+                ]);
+
+                BookingItem::create([
+                    'booking_id' => $booking->id,
+                    'age_group_id' => $ageGroupIdForQuery,
+                    'quantity' => $quantity,
+                    'paid_credits' => $slotPrice->paid_credits ?? 0,
+                    'free_credits' => $slotPrice->free_credits ?? 0,
+                    'price' => $slotPrice->price ?? 0,
+                ]);
+            }
+
+            // Step 4: Deduct credits after booking items
+            $totalPaid = 0;
+            $totalFree = 0;
+
+            foreach ($quantitiesByAgeGroup as $ageGroupId => $quantity) {
+                if ($quantity < 1) continue;
+
+                $ageGroupIdForQuery = $ageGroupId === 'general' ? null : $ageGroupId;
+                $slotPrice = $slot->prices()
+                    ->when($ageGroupIdForQuery, fn($q) => $q->where('event_age_group_id', $ageGroupIdForQuery))
+                    ->first();
+                $totalPaid += ($slotPrice->paid_credits ?? 0) * $quantity;
+                $totalFree += ($slotPrice->free_credits ?? 0) * $quantity;
+            }
+
+            $this->walletService->deductCredits(
+                $wallet,
+                $totalPaid,
+                $totalFree,
+                "Booking for slot {$slot->id}",
+                $booking->id,
+                1,
+                $allowFallback
+            );
+
+            // Step 5: Generate QR & send notifications
             $this->generateQrCode($booking);
-
-            // Step 4 — Push notification + reminder scheduling
             $this->sendConfirmationAndReminder($customer, $slot, $booking);
 
             return $booking;
@@ -54,67 +135,67 @@ class BookingService
     /**
      * 1️⃣ Create booking & validate everything
      */
-    private function createBooking($customer, $slot, $ageGroupId, $quantity)
-    {
-        // Reload with lock
-        $slot = EventSlot::where('id', $slot->id)
-            ->lockForUpdate()
-            ->firstOrFail();
+    // private function createBooking($customer, $slot, $ageGroupId, $quantity)
+    // {
+    //     // Reload with lock
+    //     $slot = EventSlot::where('id', $slot->id)
+    //         ->lockForUpdate()
+    //         ->firstOrFail();
 
-        if (! $this->slotAvailability->isAvailable($slot, $quantity)) {
-            throw new \Exception('Not enough seats available for this slot.');
-        }
+    //     if (! $this->slotAvailability->isAvailable($slot, $quantity)) {
+    //         throw new \Exception('Not enough seats available for this slot.');
+    //     }
 
-        $event = $slot->event;
-        $ageGroups = $event->age_groups ?? collect([]);
+    //     $event = $slot->event;
+    //     $ageGroups = $event->age_groups ?? collect([]);
 
-        if ($event->is_suitable_for_all_ages || $ageGroups->count() === 0) {
-            $slotPrice = $slot->prices()->first();
-        } else {
-            $slotPrice = $slot->prices()
-                ->when($ageGroupId, fn($q) => $q->where('event_age_group_id', $ageGroupId))
-                ->first();
-        }
+    //     if ($event->is_suitable_for_all_ages || $ageGroups->count() === 0) {
+    //         $slotPrice = $slot->prices()->first();
+    //     } else {
+    //         $slotPrice = $slot->prices()
+    //             ->when($ageGroupId, fn($q) => $q->where('event_age_group_id', $ageGroupId))
+    //             ->first();
+    //     }
 
-        $requiredFree = $slotPrice->free_credits ?? 0;
-        $requiredPaid = $slotPrice->paid_credits ?? 0;
+    //     $requiredFree = $slotPrice->free_credits ?? 0;
+    //     $requiredPaid = $slotPrice->paid_credits ?? 0;
 
-        $wallet = $customer->wallet ?? throw new \Exception('Wallet not found.');
+    //     $wallet = $customer->wallet ?? throw new \Exception('Wallet not found.');
 
-        if (! $this->walletService->hasEnoughCredits($wallet, $requiredPaid, $requiredFree, $quantity)) {
-            throw new \Exception('Insufficient credits for the requested quantity.');
-        }
+    //     if (! $this->walletService->hasEnoughCredits($wallet, $requiredPaid, $requiredFree, $quantity)) {
+    //         throw new \Exception('Insufficient credits for the requested quantity.');
+    //     }
 
-        $booking = Booking::create([
-            'customer_id' => $customer->id,
-            'event_id' => $slot->event_id,
-            'slot_id' => $slot->id,
-            'wallet_id' => $wallet->id,
-            'age_group_id' => $ageGroupId,
-            'status' => 'confirmed',
-            'booked_at' => now(),
-            'quantity' => $quantity,
-        ]);
+    //     $booking = Booking::create([
+    //         'customer_id' => $customer->id,
+    //         'event_id' => $slot->event_id,
+    //         'slot_id' => $slot->id,
+    //         'wallet_id' => $wallet->id,
+    //         'age_group_id' => $ageGroupId,
+    //         'status' => 'confirmed',
+    //         'booked_at' => now(),
+    //         'quantity' => $quantity,
+    //     ]);
 
-        return [$booking, $slot, $requiredFree, $requiredPaid];
-    }
+    //     return [$booking, $slot, $requiredFree, $requiredPaid];
+    // }
 
-    /**
-     * 2️⃣ Deduct credits + reduce slot capacity
-     */
-    private function processCreditsAndCapacity($customer, $slot, $booking, $requiredFree, $requiredPaid, $quantity)
-    {
-        $wallet = $customer->wallet;
+    // /**
+    //  * 2️⃣ Deduct credits + reduce slot capacity
+    //  */
+    // private function processCreditsAndCapacity($customer, $slot, $booking, $requiredFree, $requiredPaid, $quantity)
+    // {
+    //     $wallet = $customer->wallet;
 
-        $this->walletService->deductCredits(
-            $wallet,
-            $requiredPaid,
-            $requiredFree,
-            "Booking: {$booking->id} for slot {$slot->id}",
-            $booking->id,
-            $quantity
-        );
-    }
+    //     $this->walletService->deductCredits(
+    //         $wallet,
+    //         $requiredPaid,
+    //         $requiredFree,
+    //         "Booking: {$booking->id} for slot {$slot->id}",
+    //         $booking->id,
+    //         $quantity
+    //     );
+    // }
 
     /**
      * 3️⃣ Generate QR Code

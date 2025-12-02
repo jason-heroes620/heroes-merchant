@@ -60,6 +60,11 @@ class Booking extends Model
     {
         return $this->hasMany(CustomerCreditTransaction::class, 'booking_id');
     }
+    
+    public function items()
+    {
+        return $this->hasMany(BookingItem::class, 'booking_id');
+    }
 
     public function merchantPayout()
     {

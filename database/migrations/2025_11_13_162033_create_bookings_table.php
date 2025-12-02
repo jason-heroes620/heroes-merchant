@@ -17,7 +17,6 @@ return new class extends Migration
             $table->foreignUuid('customer_id')->constrained('customers')->onDelete('cascade');
             $table->foreignUuid('event_id')->constrained('events')->onDelete('cascade');
             $table->foreignUuid('slot_id')->constrained('event_slots')->onDelete('cascade');
-            $table->foreignUuid('age_group_id')->nullable()->constrained('event_age_groups')->onDelete('set null');
             $table->foreignUuid('wallet_id')->nullable()->constrained('customer_wallets')->onDelete('set null');
 
             $table->integer('quantity')->default(1);

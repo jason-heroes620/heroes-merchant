@@ -40,97 +40,40 @@ class BookingController extends Controller
             'slot_id' => 'required|uuid|exists:event_slots,id',
             'quantities_by_age_group' => 'required|array',
             'quantities_by_age_group.*' => 'integer|min:1',
+            'allow_paid_fallback' => 'sometimes|boolean',
         ]);
 
-        \Log::info('Booking payload received', $data);
+        $allowFallback = $data['allow_paid_fallback'] ?? false;
 
         $customer = $request->user()->customer ?? throw new \Exception('Customer record not found for this user.');
         $slot = EventSlot::findOrFail($data['slot_id']);
-        $event = $slot->event;
+        $event = $slot->event->load('ageGroups');
 
-        $event->load('ageGroups');
-        $ageGroupsCollection = $event->ageGroups;
+        $quantitiesByAgeGroup = $data['quantities_by_age_group'];
 
-        // If event is suitable for all ages
+        // Validate age groups
         if ($event->is_suitable_for_all_ages) {
-            $quantity = $data['quantities_by_age_group']['general'] ?? 0;
-
+            $quantity = $quantitiesByAgeGroup['general'] ?? 0;
             if ($quantity < 1) {
-                return response()->json([
-                    'message' => 'Please select at least one ticket.'
-                ], 422);
+                return response()->json(['message' => 'Please select at least one ticket.'], 422);
             }
-
-            try {
-                Log::info('Attempting booking', [
-                    'customer_id' => $customer->id,
-                    'slot_id' => $slot->id,
-                    'age_group_id' => null,
-                    'quantity' => $quantity,
-                ]);
-
-                $booking = $this->bookingService->bookSlot($customer, $slot, null, $quantity);
-
-                Log::info('Booking successful', [
-                    'booking_id' => $booking->id,
-                    'customer_id' => $customer->id,
-                ]);
-
-                return response()->json($booking, 201);
-            } catch (\Exception $e) {
-                Log::error('Booking failed', [
-                    'customer_id' => $customer->id,
-                    'slot_id' => $slot->id,
-                    'age_group_id' => null,
-                    'quantity' => $quantity,
-                    'error' => $e->getMessage(),
-                ]);
-
-                return response()->json(['message' => $e->getMessage()], 400);
-            }
-        }
-        // Otherwise, event has age groups
-        \Log::info('Event age group IDs', $ageGroupsCollection->pluck('id')->toArray());
-
-        foreach ($data['quantities_by_age_group'] as $ageGroupId => $quantity) {
-            if ($quantity < 1) continue;
-
-            if (!in_array($ageGroupId, $ageGroupsCollection->pluck('id')->toArray())) {
-                return response()->json([
-                    'message' => 'Invalid age group for this event.'
-                ], 422);
-            }
-
-            try {
-                Log::info('Attempting booking', [
-                    'customer_id' => $customer->id,
-                    'slot_id' => $slot->id,
-                    'age_group_id' => $ageGroupId,
-                    'quantity' => $quantity,
-                ]);
-
-                $booking = $this->bookingService->bookSlot($customer, $slot, $ageGroupId, $quantity);
-
-                Log::info('Booking successful', [
-                    'booking_id' => $booking->id,
-                    'customer_id' => $customer->id,
-                    'age_group_id' => $ageGroupId,
-                    'quantity' => $quantity,
-                ]);
-            } catch (\Exception $e) {
-                Log::error('Booking failed', [
-                    'customer_id' => $customer->id,
-                    'slot_id' => $slot->id,
-                    'age_group_id' => $ageGroupId,
-                    'quantity' => $quantity,
-                    'error' => $e->getMessage(),
-                ]);
-
-                return response()->json(['message' => $e->getMessage()], 400);
+            $quantitiesByAgeGroup = ['general' => $quantity];
+        } else {
+            $validIds = $event->ageGroups->pluck('id')->toArray();
+            foreach ($quantitiesByAgeGroup as $ageGroupId => $quantity) {
+                if ($quantity < 1) continue;
+                if (!in_array($ageGroupId, $validIds)) {
+                    return response()->json(['message' => "Invalid age group ID: $ageGroupId"], 422);
+                }
             }
         }
 
-        return response()->json(['message' => 'Bookings completed successfully.'], 201);
+        try {
+            $booking = $this->bookingService->bookSlot($customer, $slot, $quantitiesByAgeGroup, $allowFallback);
+            return response()->json($booking, 201);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 400);
+        }
     }
 
     /**

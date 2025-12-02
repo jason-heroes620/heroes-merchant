@@ -61,8 +61,12 @@ export default function EventsIndexPage() {
     const upcomingEvents = filteredEvents.filter((event) =>
         ((event.is_recurring ? event.slots : event.dates) ?? []).some(
             (slot) => {
-                const date = "start_date" in slot ? slot.start_date : slot.date;
-                return new Date(date) >= now;
+                const slotDate =
+                    "start_date" in slot ? slot.start_date : slot.date;
+
+                if (!slotDate) return false;
+
+                return new Date(slotDate) >= now;
             }
         )
     );
@@ -70,8 +74,12 @@ export default function EventsIndexPage() {
     const pastEvents = filteredEvents.filter((event) =>
         ((event.is_recurring ? event.slots : event.dates) ?? []).every(
             (slot) => {
-                const date = "start_date" in slot ? slot.start_date : slot.date;
-                return new Date(date) < now;
+                const slotDate =
+                    "start_date" in slot ? slot.start_date : slot.date;
+
+                if (!slotDate) return true; // treat missing date as "past"
+
+                return new Date(slotDate) < now;
             }
         )
     );
@@ -395,7 +403,9 @@ export default function EventsIndexPage() {
                 ) : viewMode === "table" ? (
                     /* Table View */
                     <TableView
-                        filteredEvents={tab === "upcoming" ? upcomingEvents : pastEvents}
+                        filteredEvents={
+                            tab === "upcoming" ? upcomingEvents : pastEvents
+                        }
                         statusColors={statusColors}
                         getEventTypeLabel={getEventTypeLabel}
                         userRole={userRole}
@@ -410,7 +420,9 @@ export default function EventsIndexPage() {
                         userRole={userRole}
                         router={router}
                         handleDeactivate={handleDeactivate}
-                        filteredEvents={tab === "upcoming" ? upcomingEvents : pastEvents}
+                        filteredEvents={
+                            tab === "upcoming" ? upcomingEvents : pastEvents
+                        }
                         statusColors={statusColors}
                         getEventTypeLabel={getEventTypeLabel}
                         getPriceRange={getPriceRange}

@@ -44,12 +44,6 @@ class EventController extends Controller
     {
         $user = Auth::user();
 
-        Log::info('Event Index Hit', [
-            'user' => $user->id,
-            'role' => $user->role,
-            'request_merchant' => $request->merchant_id ?? null,
-        ]);
-
         $query = Event::with([
             'merchant:id,company_name',
             'location',

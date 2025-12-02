@@ -21,10 +21,6 @@ Route::get('/', function () {
         : redirect()->route('login.show');
 });
 
-Route::get('/php-info', function () {
-    phpinfo();
-});
-
 /* Dashboard (Shared for all authenticated users) */
 Route::get('/dashboard', function () {
     return Inertia::render('Dashboard', [

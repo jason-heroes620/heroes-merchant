@@ -105,32 +105,74 @@ class WalletService
             && ($wallet->cached_free_credits >= $totalFree);
     }
 
-    public function deductCredits(CustomerWallet $wallet, int $paid, int $free, string $desc = '', ?string $bookingId = null, int $quantity = 1)
+    public function canBookWithCredits(CustomerWallet $wallet, int $paidNeeded, int $freeNeeded, int $quantity = 1, bool $allowFallback = false): bool
     {
+        $totalPaid = $paidNeeded * $quantity;
+        $totalFree = $freeNeeded * $quantity;
+
+        // Step 1: paid credits must always be enough
+        if ($wallet->cached_paid_credits < $totalPaid) {
+            throw new \Exception("Insufficient paid credits. Booking failed.");
+        }
+
+        // Step 2: check free credits
+        if ($wallet->cached_free_credits >= $totalFree) {
+            return true; // enough free credits, no fallback needed
+        }
+
+        $shortfall = $totalFree - $wallet->cached_free_credits;
+
+        if ($allowFallback && $wallet->cached_paid_credits >= $totalPaid + $shortfall) {
+            return true; // enough paid credits to cover remaining free
+        }
+
+        // Not enough free, fallback not allowed or paid insufficient
+        throw new \Exception("Insufficient free credits. You can use paid credits to cover missing free credits.");
+    }
+
+    public function deductCredits(CustomerWallet $wallet, int $paidNeeded, int $freeNeeded, string $desc = '', ?string $bookingId = null, int $quantity = 1, bool $allowFallback = false)
+    {
+        $totalPaid = $paidNeeded * $quantity;
+        $totalFree = $freeNeeded * $quantity;
+
+        $beforePaid = $wallet->cached_paid_credits;
+        $beforeFree = $wallet->cached_free_credits;
+
+        // Deduct free first
+        $deductFree = min($totalFree, $wallet->cached_free_credits);
+        $remainingFree = $totalFree - $deductFree;
+
+        // Deduct remaining free from paid if allowed
+        $deductPaid = $totalPaid;
+        if ($remainingFree > 0) {
+            if (!$allowFallback) {
+                throw new \Exception("Insufficient free credits. Cannot proceed without using paid credits.");
+            }
+            $deductPaid += $remainingFree;
+        }
+
+        if ($deductPaid > $wallet->cached_paid_credits) {
+            throw new \Exception("Insufficient paid credits to cover free credit shortfall.");
+        }
+
         try {
-            $totalPaid = $paid * $quantity;
-            $totalFree = $free * $quantity;
-
-            $beforePaid = $wallet->cached_paid_credits;
-            $beforeFree = $wallet->cached_free_credits;
-
-            $wallet->decrement('cached_paid_credits', $totalPaid);
-            $wallet->decrement('cached_free_credits', $totalFree);
+            if ($deductFree > 0) $wallet->decrement('cached_free_credits', $deductFree);
+            if ($deductPaid > 0) $wallet->decrement('cached_paid_credits', $deductPaid);
 
             CustomerCreditTransaction::create([
                 'wallet_id' => $wallet->id,
                 'type' => 'booking',
                 'before_paid_credits' => $beforePaid,
                 'before_free_credits' => $beforeFree,
-                'delta_paid' => -$totalPaid,
-                'delta_free' => -$totalFree,
+                'delta_paid' => -$deductPaid,
+                'delta_free' => -$deductFree,
                 'description' => $desc,
                 'booking_id' => $bookingId,
             ]);
 
             Log::info("Credits deducted for wallet {$wallet->id}", [
-                'paid' => $totalPaid,
-                'free' => $totalFree,
+                'paid' => $deductPaid,
+                'free' => $deductFree,
                 'beforePaid' => $beforePaid,
                 'beforeFree' => $beforeFree,
                 'bookingId' => $bookingId
@@ -138,8 +180,8 @@ class WalletService
         } catch (\Exception $e) {
             Log::error("Failed to deduct credits for wallet {$wallet->id}", [
                 'error' => $e->getMessage(),
-                'paid' => $totalPaid,
-                'free' => $totalFree,
+                'paid' => $deductPaid,
+                'free' => $deductFree,
                 'bookingId' => $bookingId,
             ]);
             throw $e;
