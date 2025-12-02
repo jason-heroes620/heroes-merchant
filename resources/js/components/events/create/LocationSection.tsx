@@ -163,7 +163,7 @@ export default function LocationSection({ setData, data }: any) {
     return (
         <div className="bg-white rounded-2xl shadow-lg p-8 border-2 border-orange-100 space-y-6">
             <div className="flex items-center gap-3 pb-4 border-b-2 border-orange-100">
-                <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
+                <div className="p-3 bg-linear-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
                     <MapPin className="text-white" size={24} />
                 </div>
                 <div>

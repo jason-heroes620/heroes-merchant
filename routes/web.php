@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BookingController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\MerchantController;
 use App\Http\Controllers\CustomerController;
@@ -18,6 +19,10 @@ Route::get('/', function () {
     return Auth::check()
         ? redirect()->route('dashboard')
         : redirect()->route('login.show');
+});
+
+Route::get('/php-info', function () {
+    phpinfo();
 });
 
 /* Dashboard (Shared for all authenticated users) */
@@ -99,4 +104,7 @@ Route::middleware(['auth'])->group(function () {
     /* Notifications (shared for all authenticated users) */
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.markAsRead');
+
+    Route::get('/bookings', [BookingController::class, 'index']);
+    Route::post('/bookings/{booking}/cancel', [BookingController::class, 'cancel']);
 });

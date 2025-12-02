@@ -14,11 +14,9 @@ class Booking extends Model
         'customer_id',
         'event_id',
         'slot_id',
+        'age_group_id',
         'wallet_id',
-        'free_credits_spent',
-        'paid_credits_spent',
         'quantity',
-        'amount_paid_in_rm',
         'status',
         'qr_code_path',
         'booked_at',
@@ -26,10 +24,7 @@ class Booking extends Model
     ];
 
     protected $casts = [
-        'free_credits_spent' => 'integer',
-        'paid_credits_spent' => 'integer',
         'quantity' => 'integer',
-        'amount_paid_in_rm' => 'decimal:2',
         'booked_at' => 'datetime',
         'cancelled_at' => 'datetime',
     ];
@@ -49,6 +44,11 @@ class Booking extends Model
     public function slot()
     {
         return $this->belongsTo(EventSlot::class, 'slot_id');
+    }
+
+    public function ageGroup()
+    {
+        return $this->belongsTo(EventAgeGroup::class, 'age_group_id');
     }
 
     public function wallet()

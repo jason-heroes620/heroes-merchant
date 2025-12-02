@@ -15,16 +15,10 @@ const SlotCard: React.FC<{
     bookings: Booking[];
     userRole: UserRole;
     event: Event;
-}> = ({ slot, slotPrices, ageGroups, bookings, userRole, event }) => {
-    const slotBookings = bookings.filter(
-        (b) => b.slot_id === slot.id && b.status === "confirmed"
-    );
-
-    const totalBooked = slotBookings.reduce((sum, b) => sum + b.quantity, 0);
-
+}> = ({ slot, slotPrices, ageGroups, userRole, event }) => {
     const capacityText = slot.is_unlimited
         ? "Unlimited"
-        : `${totalBooked} / ${slot.capacity}`;
+        : `${slot.booked_quantity} / ${slot.capacity} (${slot.available_seats} left)`;
 
     return (
         <div className="p-4 border-2 border-gray-200 rounded-lg hover:border-orange-300 hover:shadow-sm transition-all">

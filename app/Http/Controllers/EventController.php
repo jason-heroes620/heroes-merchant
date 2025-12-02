@@ -40,15 +40,41 @@ class EventController extends Controller
     }
 
     /** Display a listing of events */
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
 
-        $query = Event::with(['location', 'ageGroups', 'slots.prices', 'frequencies', 'dates', 'slots', 'media'])
-            ->orderByDesc('created_at');
+        Log::info('Event Index Hit', [
+            'user' => $user->id,
+            'role' => $user->role,
+            'request_merchant' => $request->merchant_id ?? null,
+        ]);
+
+        $query = Event::with([
+            'merchant:id,company_name',
+            'location',
+            'ageGroups',
+            'slots.prices',
+            'frequencies',
+            'dates',
+            'slots',
+            'media'
+        ])->orderByDesc('created_at');
+
+        if ($user->role === 'admin') {
+            if ($request->merchant_id) {
+                Log::info('Applying merchant filter', [
+                    'merchant_id' => $request->merchant_id
+                ]);
+                $query->where('merchant_id', $request->merchant_id);
+            }
+        }
 
         if ($user->role === 'merchant') {
             $merchant = Merchant::where('user_id', $user->id)->firstOrFail();
+            Log::info('Merchant user detected', [
+                'merchant_id' => $merchant->id
+            ]);
             $query->where('merchant_id', $merchant->id);
         }
 
@@ -56,17 +82,63 @@ class EventController extends Controller
 
         $events->getCollection()->transform(function ($event) {
             $event->media->transform(function ($media) {
-                $media->file_path = $media->url; 
+                $media->file_path = $media->url;
                 return $media;
             });
-            $event->frequency = $event->frequencies->first(); 
+
+            $event->slots->transform(function ($slot) {
+                $slot->available_seats = $slot->is_unlimited
+                    ? null
+                    : $slot->capacity - $slot->booked_quantity;
+                return $slot;
+            });
+
+            $event->frequency = $event->frequencies->first();
             $event->slotPrices = $event->slots->flatMap(fn($slot) => $slot->prices)->values();
+
+            if ($event->is_recurring && $event->slots->count() > 0) {
+                $slot = $event->slots->sortBy('date')->first();
+                $event->slot = $slot; 
+            } else {
+                $date = $event->dates->first();
+                if ($date) {
+                    $event->slot = (object) [
+                        'date' => $date->start_date,
+                        'start_time' => $date->start_time ?? null,
+                        'end_time' => $date->end_date ?? null,
+                    ];
+                } else {
+                    $event->slot = null;
+                }
+            }
+
             return $event;
         });
+
+        $sorted = $events->getCollection()->sortByDesc(function ($ev) {
+            return $ev->slot?->date ? strtotime($ev->slot->date) : 0;
+        });
+
+        $events->setCollection($sorted->values());
+
+        $merchants = Merchant::select('id', 'company_name')->orderBy('company_name')->get();
+
+        Log::info('Loaded Merchants:', $merchants->toArray());
+
+        $first = $events->first();
+        if ($first) {
+            Log::info('First Event Merchant', [
+                'event_id' => $first->id,
+                'merchant_id' => $first->merchant_id,
+                'merchant_relation' => $first->merchant ? $first->merchant->toArray() : null,
+            ]);
+        }
 
         return Inertia::render('Events/Index', [
             'events' => $events,
             'role' => $user->role,
+            'merchants' => $merchants,
+            'selectedMerchant' => $request->merchant_id,
         ]);
     }
 
@@ -84,6 +156,13 @@ class EventController extends Controller
         }
 
         $event->load(['location', 'ageGroups', 'slots.prices', 'frequencies', 'dates', 'media']);
+
+        $event->slots->transform(function ($slot) {
+            $slot->available_seats = $slot->is_unlimited
+                ? null
+                : $slot->capacity - $slot->booked_quantity;
+            return $slot;
+        });
 
         $event->media->transform(function ($media) {
             $media->file_path = $media->url;

@@ -8,6 +8,8 @@ use App\Models\CustomerCreditTransaction;
 use App\Models\WalletCreditGrant;
 use App\Models\PurchasePackage;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class WalletService
 {
@@ -94,29 +96,53 @@ class WalletService
         ]);
     }
 
-    public function hasEnoughCredits(CustomerWallet $wallet, int $paidNeeded, int $freeNeeded = 0): bool
+    public function hasEnoughCredits(CustomerWallet $wallet, int $paidNeeded, int $freeNeeded = 0, int $quantity = 1): bool
     {
-        return ($wallet->cached_paid_credits >= $paidNeeded)
-            && ($wallet->cached_free_credits >= $freeNeeded);
+        $totalPaid = $paidNeeded * $quantity;
+        $totalFree = $freeNeeded * $quantity;
+
+        return ($wallet->cached_paid_credits >= $totalPaid)
+            && ($wallet->cached_free_credits >= $totalFree);
     }
 
-    public function deductCredits(CustomerWallet $wallet, int $paid, int $free, string $desc = '', ?string $bookingId = null)
+    public function deductCredits(CustomerWallet $wallet, int $paid, int $free, string $desc = '', ?string $bookingId = null, int $quantity = 1)
     {
-        $beforePaid = $wallet->cached_paid_credits;
-        $beforeFree = $wallet->cached_free_credits;
+        try {
+            $totalPaid = $paid * $quantity;
+            $totalFree = $free * $quantity;
 
-        $wallet->decrement('cached_paid_credits', $paid);
-        $wallet->decrement('cached_free_credits', $free);
+            $beforePaid = $wallet->cached_paid_credits;
+            $beforeFree = $wallet->cached_free_credits;
 
-        CustomerCreditTransaction::create([
-            'wallet_id' => $wallet->id,
-            'type' => 'booking',
-            'before_paid_credits' => $beforePaid,
-            'before_free_credits' => $beforeFree,
-            'delta_paid' => -$paid,
-            'delta_free' => -$free,
-            'description' => $desc,
-            'booking_id' => $bookingId,
-        ]);
+            $wallet->decrement('cached_paid_credits', $totalPaid);
+            $wallet->decrement('cached_free_credits', $totalFree);
+
+            CustomerCreditTransaction::create([
+                'wallet_id' => $wallet->id,
+                'type' => 'booking',
+                'before_paid_credits' => $beforePaid,
+                'before_free_credits' => $beforeFree,
+                'delta_paid' => -$totalPaid,
+                'delta_free' => -$totalFree,
+                'description' => $desc,
+                'booking_id' => $bookingId,
+            ]);
+
+            Log::info("Credits deducted for wallet {$wallet->id}", [
+                'paid' => $totalPaid,
+                'free' => $totalFree,
+                'beforePaid' => $beforePaid,
+                'beforeFree' => $beforeFree,
+                'bookingId' => $bookingId
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Failed to deduct credits for wallet {$wallet->id}", [
+                'error' => $e->getMessage(),
+                'paid' => $totalPaid,
+                'free' => $totalFree,
+                'bookingId' => $bookingId,
+            ]);
+            throw $e;
+        }
     }
 }

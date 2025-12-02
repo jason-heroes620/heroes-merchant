@@ -17,12 +17,6 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/password/forgot', [AuthController::class, 'sendResetLinkEmail']);
 Route::post('/password/reset', [AuthController::class, 'resetPassword']);
 
-Route::prefix('events')->group(function () {
-    Route::get('/', [MobileEventController::class, 'index']);
-    Route::post('/{id}/click', [MobileEventController::class, 'incrementClickCount']);
-    Route::get('/{event}', [MobileEventController::class, 'show']); 
-});
-
 Route::get('/packages', [PurchasePackageController::class, 'index']);
 
 // Authenticated routes (mobile)
@@ -32,7 +26,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/deactivate/{id}', [AuthController::class, 'deactivate']);
 
-    // ProfileController =
+    // ProfileController
     Route::get('/user', [ProfileController::class, 'show']);
     Route::put('/user', [ProfileController::class, 'update']);
     Route::delete('/user', [ProfileController::class, 'destroy']);
@@ -40,18 +34,24 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Wallet
     Route::get('/wallet', [WalletController::class, 'show']);
-    Route::post('/wallet/transactions', [WalletController::class, 'addWalletTransaction']);
+    Route::post('/wallet/transactions', [WalletController::class, 'addWalletTransaction']);  
 
     //Referrals
     Route::get('/referrals', [CustomerController::class, 'viewReferral']);
 
-    // EventController
-    Route::post('/events/{id}/toggle-like', [EventLikeController::class, 'toggleLike']);
     Route::get('/events/liked', [MobileEventController::class, 'likedEvents']);
+    Route::post('/events/{id}/toggle-like', [EventLikeController::class, 'toggleLike']);
+    
 
     // BookingController
-    Route::post('/bookings', [BookingController::class, 'bookSlot']);
-    Route::post('/bookings/{id}/cancel', [BookingController::class, 'cancelBooking']);
-    Route::get('/bookings', [BookingController::class, 'myBookings']);
+    Route::get('/bookings', [BookingController::class, 'index']);
+    Route::post('/bookings', [BookingController::class, 'book']);
+    Route::post('/bookings/{booking}/cancel', [BookingController::class, 'cancel']);
     Route::post('/notifications/token', [NotificationController::class, 'saveToken']);
+});
+
+Route::prefix('events')->group(function () {
+    Route::get('/', [MobileEventController::class, 'index']);
+    Route::post('/{id}/click', [MobileEventController::class, 'incrementClickCount']);   
+    Route::get('/{event}', [MobileEventController::class, 'show']);  
 });

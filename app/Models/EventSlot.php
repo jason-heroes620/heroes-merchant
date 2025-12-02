@@ -30,6 +30,8 @@ class EventSlot extends Model
         'end_time' => 'datetime:H:i',
     ];
 
+    protected $appends = ['booked_quantity'];
+
     public function event()
     {
         return $this->belongsTo(Event::class);
@@ -43,5 +45,23 @@ class EventSlot extends Model
     public function prices()
     {
         return $this->hasMany(EventSlotPrice::class, 'event_slot_id');
+    }
+
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class, 'slot_id');
+    }
+
+    public function getBookedQuantityAttribute(): int
+    {
+        return $this->bookings()
+            ->whereNotIn('status', ['cancelled', 'refunded'])
+            ->sum('quantity');
+    }
+
+    public function getAvailableSeatsAttribute(): ?int
+    {
+        if ($this->is_unlimited) return null;
+        return $this->capacity - $this->booked_quantity;
     }
 }

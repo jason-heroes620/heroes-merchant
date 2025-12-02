@@ -39,6 +39,8 @@ export interface EventSlot {
     duration?: number | null;
     capacity: number | null;
     is_unlimited: boolean;
+    booked_quantity?: number | null;
+    available_seats?: number | null;
     prices?: EventSlotPrice[];
 }
 
@@ -111,6 +113,42 @@ export interface EventSubmissionData
     extends Omit<EventFormShape, "media" | "removed_media"> {
     media?: File[];
     removed_media?: string[];
+}
+
+export interface Merchant {
+  id: string;
+  company_name: string;
+}
+
+export interface SyntheticSlot {
+  date: string;
+  start_time?: string | null;
+  end_time?: string | null;
+}
+
+export interface EventType {
+    id: string;
+    merchant_id?: string;
+    merchant?: Merchant;           
+    slot?: EventSlot | SyntheticSlot | null;
+    title: string;
+    type: string;
+    category?: string;
+    status: string;
+    featured: boolean;
+    location?: EventLocation;
+    media?: EventMedia[];
+    is_suitable_for_all_ages: boolean;
+    is_recurring: boolean;
+    age_groups?: AgeGroup[];
+    prices?: Price[];
+    slots?: EventSlot[];
+    created_at: string;
+    like_count?: number;
+    click_count?: number;
+    slotPrices?: EventSlotPrice[];
+    dates?: EventDate[];
+    frequency?: Frequency[];
 }
 
 export interface Event {

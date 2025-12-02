@@ -42,6 +42,13 @@ class MobileEventController extends Controller
         ->get();
 
         $events->transform(function ($event) {
+            $event->slots->transform(function ($slot) {
+                $slot->available_seats = $slot->is_unlimited
+                    ? null
+                    : $slot->capacity - $slot->booked_quantity;
+                return $slot;
+            });
+
             $event->slotPrices = $event->slots->flatMap(fn($slot) => $slot->prices)->values();
 
             $event->media->transform(function ($media) {
@@ -73,8 +80,15 @@ class MobileEventController extends Controller
             'media',
         ]);
 
+        $event->slots->transform(function ($slot) {
+            $slot->available_seats = $slot->is_unlimited
+                ? null
+                : $slot->capacity - $slot->booked_quantity;
+            return $slot;
+        });
+
         $event->media->transform(function ($media) {
-            $media->file_path = $media->url ?? $media->file_path;
+            $media->file_path = $media->url;
             return $media;
         });
 
@@ -103,13 +117,8 @@ class MobileEventController extends Controller
         return response()->json([
             'success' => true,
             'event' => $event,
-            'media' => $event->media,
-            'ageGroups' => $event->ageGroups,
-            'prices' => $event->prices,
             'dates' => $dates,
-            'slots' => $event->slots,
             'slotPrices' => $slotPrices,
-            'location' => $event->location,
         ]);
     }
 
@@ -130,7 +139,7 @@ class MobileEventController extends Controller
 
     public function likedEvents()
     {
-        $user = auth()->user();
+        $user = Auth::user();
 
         if ($user->role !== 'customer') {
             return response()->json(['events' => []]);
@@ -139,8 +148,30 @@ class MobileEventController extends Controller
         $customer = Customer::where('user_id', $user->id)->firstOrFail();
 
         $events = $customer->likedEvents()
-            ->with(['location', 'media', 'prices', 'ageGroups'])
+            ->with([
+            'location',
+            'prices',
+            'ageGroups',
+            'frequencies',
+            'slots' => fn($q) => $q->whereDate('date', '>=', now())
+                                   ->orderBy('date'),
+            'media'
+            ])
+            ->where('status', 'active')
             ->get();
+
+        $events->transform(function ($event) {
+            $event->slotPrices = $event->slots
+                ->flatMap(fn($slot) => $slot->prices)
+                ->values();
+
+            $event->media->transform(function ($media) {
+                $media->file_path = $media->url;
+                return $media;
+            });
+
+            return $event;
+        });
 
         return response()->json([
             'events' => $events

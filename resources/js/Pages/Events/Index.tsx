@@ -3,55 +3,20 @@ import type { PageProps } from "../../types/index";
 import { usePage, router } from "@inertiajs/react";
 import {
     Calendar,
-    MapPin,
-    DollarSign,
-    Eye,
-    Edit,
-    BadgeX,
     Plus,
     Search,
     Filter,
-    AlertCircle,
-    CheckCircle,
-    XCircle,
-    Clock,
-    Star,
-    TrendingUp,
     Grid3x3,
     List,
+    CheckCircle,
+    Clock,
+    BadgeX,
+    XCircle,
+    AlertCircle,
 } from "lucide-react";
-import type {
-    AgeGroup,
-    Price,
-    EventSlot,
-    EventMedia,
-    EventLocation,
-    EventSlotPrice,
-    EventDate,
-    Frequency,
-} from "../../types/events";
-
-interface EventType {
-    id: string;
-    title: string;
-    type: string;
-    category?: string;
-    status: string;
-    featured: boolean;
-    location?: EventLocation;
-    media?: EventMedia[];
-    is_suitable_for_all_ages: boolean;
-    is_recurring: boolean;
-    age_groups?: AgeGroup[];
-    prices?: Price[];
-    slots?: EventSlot[];
-    created_at: string;
-    like_count?: number;
-    click_count?: number;
-    slotPrices?: EventSlotPrice[];
-    dates?: EventDate[];
-    frequency?: Frequency[];
-}
+import type { EventType, EventSlotPrice } from "../../types/events";
+import TableView from "../../components/events/index/TableView";
+import GridView from "../../components/events/index/GridView";
 
 interface EventsProps extends PageProps {
     events: {
@@ -59,6 +24,7 @@ interface EventsProps extends PageProps {
         links: { url: string | null; label: string; active: boolean }[];
     };
     role: string;
+    selectedMerchant?: string | null;
 }
 
 export default function EventsIndexPage() {
@@ -66,9 +32,49 @@ export default function EventsIndexPage() {
     const { events, role: userRole } = props;
 
     const [searchQuery, setSearchQuery] = useState("");
+    const [merchantQuery, setMerchantQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [typeFilter, setTypeFilter] = useState("all");
     const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+
+    const filteredEvents = events.data.filter((event) => {
+        const matchesSearch =
+            event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            event.category?.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesMerchant =
+            merchantQuery.trim() === "" ||
+            (userRole === "admin" &&
+                (event.merchant?.company_name
+                    ?.toLowerCase()
+                    .includes(merchantQuery.toLowerCase()) ||
+                    event.merchant?.id?.includes(merchantQuery)));
+        const matchesStatus =
+            statusFilter === "all" || event.status === statusFilter;
+        const matchesType = typeFilter === "all" || event.type === typeFilter;
+        return matchesSearch && matchesMerchant && matchesStatus && matchesType;
+    });
+
+    const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
+
+    const now = new Date();
+
+    const upcomingEvents = filteredEvents.filter((event) =>
+        ((event.is_recurring ? event.slots : event.dates) ?? []).some(
+            (slot) => {
+                const date = "start_date" in slot ? slot.start_date : slot.date;
+                return new Date(date) >= now;
+            }
+        )
+    );
+
+    const pastEvents = filteredEvents.filter((event) =>
+        ((event.is_recurring ? event.slots : event.dates) ?? []).every(
+            (slot) => {
+                const date = "start_date" in slot ? slot.start_date : slot.date;
+                return new Date(date) < now;
+            }
+        )
+    );
 
     const statusColors = {
         active: {
@@ -81,16 +87,6 @@ export default function EventsIndexPage() {
         rejected: { bg: "bg-red-100", text: "text-red-800", icon: XCircle },
         draft: { bg: "bg-blue-100", text: "text-blue-800", icon: AlertCircle },
     } as const;
-
-    const filteredEvents = events.data.filter((event) => {
-        const matchesSearch =
-            event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            event.category?.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesStatus =
-            statusFilter === "all" || event.status === statusFilter;
-        const matchesType = typeFilter === "all" || event.type === typeFilter;
-        return matchesSearch && matchesStatus && matchesType;
-    });
 
     const getEventTypeLabel = (type: string) => {
         const labels: Record<string, string> = {
@@ -162,8 +158,11 @@ export default function EventsIndexPage() {
         return <span className="font-medium truncate">{priceText}</span>;
     };
 
-    const getFrequencyLabel = (frequency?: Frequency) => {
-        if (!frequency) return "One-Time Event";
+    const getFrequencyLabel = (event?: EventType) => {
+        if (!event?.is_recurring) return "One-Time Event";
+
+        const freq = event.frequency?.[0];
+        if (!freq) return "Recurring Event";
 
         const labels: Record<string, string> = {
             daily: "Daily",
@@ -174,7 +173,7 @@ export default function EventsIndexPage() {
             custom: "Custom Dates",
         };
 
-        return labels[frequency.type] || frequency.type;
+        return labels[freq.type] ?? freq.type;
     };
 
     const formatDate = (dateString: string) => {
@@ -215,11 +214,11 @@ export default function EventsIndexPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
+        <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 py-8 px-4">
             <div className="max-w-[1600px] mx-auto">
                 {/* Header */}
                 <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                    <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 px-8 py-8">
+                    <div className="bg-linear-to-r from-orange-500 via-orange-600 to-red-500 px-8 py-8">
                         <div className="flex items-center justify-between">
                             <div>
                                 <h1 className="text-4xl font-bold text-white mb-2">
@@ -278,7 +277,7 @@ export default function EventsIndexPage() {
 
                 {/* Filters */}
                 <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-                    <div className="grid md:grid-cols-3 gap-4">
+                    <div className="grid md:grid-cols-4 gap-4">
                         <div className="relative">
                             <Search
                                 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
@@ -292,6 +291,24 @@ export default function EventsIndexPage() {
                                 className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                             />
                         </div>
+
+                        {userRole === "admin" && (
+                            <div className="relative">
+                                <Search
+                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                                    size={20}
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="Search merchant ID or company name..."
+                                    value={merchantQuery}
+                                    onChange={(e) =>
+                                        setMerchantQuery(e.target.value)
+                                    }
+                                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                />
+                            </div>
+                        )}
 
                         <div className="relative">
                             <Filter
@@ -313,7 +330,6 @@ export default function EventsIndexPage() {
                                 <option value="draft">Draft</option>
                             </select>
                         </div>
-
                         <select
                             value={typeFilter}
                             onChange={(e) => setTypeFilter(e.target.value)}
@@ -325,6 +341,29 @@ export default function EventsIndexPage() {
                             <option value="location_based">Field Trips</option>
                         </select>
                     </div>
+                </div>
+
+                <div className="flex gap-4 mb-6">
+                    <button
+                        className={`px-4 py-2 rounded-lg ${
+                            tab === "upcoming"
+                                ? "bg-orange-500 text-white"
+                                : "bg-gray-100"
+                        }`}
+                        onClick={() => setTab("upcoming")}
+                    >
+                        Upcoming Events
+                    </button>
+                    <button
+                        className={`px-4 py-2 rounded-lg ${
+                            tab === "past"
+                                ? "bg-orange-500 text-white"
+                                : "bg-gray-100"
+                        }`}
+                        onClick={() => setTab("past")}
+                    >
+                        Past Events
+                    </button>
                 </div>
 
                 {/* Events Display */}
@@ -355,600 +394,30 @@ export default function EventsIndexPage() {
                     </div>
                 ) : viewMode === "table" ? (
                     /* Table View */
-                    <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-gradient-to-r from-orange-50 to-red-50 border-b-2 border-orange-200">
-                                    <tr>
-                                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                            Event
-                                        </th>
-                                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                            Type
-                                        </th>
-                                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                            Location
-                                        </th>
-                                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                            Age Groups
-                                        </th>
-                                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                            Upcoming Dates
-                                        </th>
-
-                                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                            Status
-                                        </th>
-                                        <th className="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                            Actions
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200">
-                                    {filteredEvents.map((event) => {
-                                        const statusKey =
-                                            event.status as keyof typeof statusColors;
-                                        const StatusIcon =
-                                            statusColors[statusKey]?.icon;
-                                        const statusStyle =
-                                            statusColors[statusKey] ||
-                                            statusColors.draft;
-
-                                        return (
-                                            <tr
-                                                key={event.id}
-                                                className="hover:bg-orange-50/30 transition-colors"
-                                            >
-                                                {/* Event Column */}
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="relative flex-shrink-0">
-                                                            {event
-                                                                .media?.[0] ? (
-                                                                <img
-                                                                    src={
-                                                                        event
-                                                                            .media[0]
-                                                                            .file_path
-                                                                    }
-                                                                    alt={
-                                                                        event.title
-                                                                    }
-                                                                    className="w-20 h-20 object-cover rounded-lg shadow-md"
-                                                                />
-                                                            ) : (
-                                                                <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-red-400 rounded-lg flex items-center justify-center">
-                                                                    <Calendar className="h-8 w-8 text-white" />
-                                                                </div>
-                                                            )}
-                                                            {event.featured && (
-                                                                <div className="absolute -top-2 -right-2 bg-yellow-400 rounded-full p-1">
-                                                                    <Star
-                                                                        size={
-                                                                            12
-                                                                        }
-                                                                        className="text-yellow-900"
-                                                                        fill="currentColor"
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <div className="min-w-0 flex-1">
-                                                            <p className="text-sm font-bold text-gray-900 truncate">
-                                                                {event.title}
-                                                            </p>
-                                                            <p className="text-xs text-gray-500 mt-1">
-                                                                {event.category}
-                                                            </p>
-                                                            {event.like_count ||
-                                                            event.click_count ? (
-                                                                <div className="flex items-center gap-3 mt-1">
-                                                                    <span className="text-xs text-gray-400 flex items-center gap-1">
-                                                                        <TrendingUp
-                                                                            size={
-                                                                                12
-                                                                            }
-                                                                        />
-                                                                        {event.click_count ||
-                                                                            0}{" "}
-                                                                        views
-                                                                    </span>
-                                                                </div>
-                                                            ) : null}
-                                                        </div>
-                                                    </div>
-                                                </td>
-
-                                                {/* Type Column */}
-                                                <td className="px-6 py-4">
-                                                    <span className="inline-flex items-center px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
-                                                        {getEventTypeLabel(
-                                                            event.type
-                                                        )}
-                                                    </span>
-                                                </td>
-
-                                                {/* Location Column */}
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-start gap-2 text-sm text-gray-600 max-w-xs">
-                                                        <MapPin
-                                                            size={14}
-                                                            className="text-orange-500 flex-shrink-0 mt-0.5"
-                                                        />
-                                                        <div className="truncate">
-                                                            <p className="font-medium truncate">
-                                                                {event.location
-                                                                    ?.location_name ||
-                                                                    "N/A"}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-
-                                                {/* Age Groups Column */}
-                                                <td className="px-6 py-4">
-                                                    <div className="flex flex-wrap gap-1 max-w-xs">
-                                                        {event.is_suitable_for_all_ages ? (
-                                                            <span className="inline-block px-2 py-1 bg-orange-50 text-orange-700 rounded text-xs font-medium">
-                                                                All Ages
-                                                            </span>
-                                                        ) : event.age_groups &&
-                                                          event.age_groups
-                                                              .length > 0 ? (
-                                                            event.age_groups.map(
-                                                                (
-                                                                    group,
-                                                                    idx
-                                                                ) => (
-                                                                    <span
-                                                                        key={
-                                                                            idx
-                                                                        }
-                                                                        className="inline-block px-2 py-1 bg-orange-50 text-orange-700 rounded text-xs font-medium"
-                                                                    >
-                                                                        {group.label &&
-                                                                            `${group.label}`}
-                                                                        {group.min_age !=
-                                                                            null &&
-                                                                            group.max_age !=
-                                                                                null &&
-                                                                            ` (${group.min_age}-${group.max_age})`}
-                                                                    </span>
-                                                                )
-                                                            )
-                                                        ) : (
-                                                            <span className="text-xs text-gray-400">
-                                                                No age groups
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-
-                                                {/* Upcoming Dates Column */}
-                                                {/* Upcoming Dates Column */}
-                                                <td className="px-6 py-4">
-                                                    <div className="space-y-1">
-                                                        {(
-                                                            (event.is_recurring
-                                                                ? event.slots
-                                                                : event.dates) ??
-                                                            []
-                                                        ).length > 0 ? (
-                                                            (
-                                                                (event.is_recurring
-                                                                    ? event.slots
-                                                                    : event.dates) ??
-                                                                []
-                                                            ).map(
-                                                                (
-                                                                    slot:
-                                                                        | EventSlot
-                                                                        | EventDate,
-                                                                    idx: number
-                                                                ) => {
-                                                                    // Date display
-                                                                    const dateDisplay =
-                                                                        "start_date" in
-                                                                            slot &&
-                                                                        slot.start_date
-                                                                            ? slot.start_date ===
-                                                                              slot.end_date
-                                                                                ? formatDate(
-                                                                                      slot.start_date
-                                                                                  )
-                                                                                : `${formatDate(
-                                                                                      slot.start_date
-                                                                                  )} - ${formatDate(
-                                                                                      slot.end_date
-                                                                                  )}`
-                                                                            : "date" in
-                                                                                  slot &&
-                                                                              slot.date
-                                                                            ? formatDate(
-                                                                                  slot.date
-                                                                              )
-                                                                            : "Date TBD";
-
-                                                                    // Time display (works for both EventSlot and EventDate)
-                                                                    const timeDisplay =
-                                                                        "start_time" in
-                                                                            slot &&
-                                                                        slot.start_time
-                                                                            ? ` • ${formatTime(
-                                                                                  slot.start_time
-                                                                              )}${
-                                                                                  slot.end_time
-                                                                                      ? ` - ${formatTime(
-                                                                                            slot.end_time
-                                                                                        )}`
-                                                                                      : ""
-                                                                              }`
-                                                                            : "";
-
-                                                                    return (
-                                                                        <div
-                                                                            key={
-                                                                                idx
-                                                                            }
-                                                                            className="flex items-center gap-2"
-                                                                        >
-                                                                            <span className="text-xs font-medium text-gray-700">
-                                                                                {
-                                                                                    dateDisplay
-                                                                                }
-                                                                            </span>
-                                                                            {timeDisplay && (
-                                                                                <span className="text-xs text-gray-400">
-                                                                                    {
-                                                                                        timeDisplay
-                                                                                    }
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
-                                                                    );
-                                                                }
-                                                            )
-                                                        ) : (
-                                                            <span className="text-xs text-gray-400">
-                                                                No upcoming
-                                                                dates
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-
-                                                {/* Status Column */}
-                                                <td className="px-6 py-4">
-                                                    <span
-                                                        className={`inline-flex items-center gap-1 ${statusStyle.bg} ${statusStyle.text} px-3 py-1 rounded-full text-xs font-bold`}
-                                                    >
-                                                        <StatusIcon size={12} />
-                                                        {event.status
-                                                            .charAt(0)
-                                                            .toUpperCase() +
-                                                            event.status.slice(
-                                                                1
-                                                            )}
-                                                    </span>
-                                                </td>
-
-                                                {/* Actions Column */}
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        <button
-                                                            onClick={() =>
-                                                                router.visit(
-                                                                    userRole ===
-                                                                        "admin"
-                                                                        ? `/admin/events/${event.id}`
-                                                                        : `/merchant/events/${event.id}`
-                                                                )
-                                                            }
-                                                            className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-all"
-                                                            title="View"
-                                                        >
-                                                            <Eye size={16} />
-                                                        </button>
-                                                        {userRole ===
-                                                            "merchant" && (
-                                                            <>
-                                                                <button
-                                                                    onClick={() =>
-                                                                        router.visit(
-                                                                            `/merchant/events/${event.id}/edit`
-                                                                        )
-                                                                    }
-                                                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                                                    title="Edit"
-                                                                >
-                                                                    <Edit
-                                                                        size={
-                                                                            16
-                                                                        }
-                                                                    />
-                                                                </button>
-                                                                {event.status ===
-                                                                    "active" && (
-                                                                    <button
-                                                                        onClick={() =>
-                                                                            handleDeactivate(
-                                                                                event.id
-                                                                            )
-                                                                        }
-                                                                        className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-                                                                        title="Deactivate"
-                                                                    >
-                                                                        <BadgeX
-                                                                            size={
-                                                                                16
-                                                                            }
-                                                                        />
-                                                                    </button>
-                                                                )}
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                    <TableView
+                        filteredEvents={tab === "upcoming" ? upcomingEvents : pastEvents}
+                        statusColors={statusColors}
+                        getEventTypeLabel={getEventTypeLabel}
+                        userRole={userRole}
+                        formatDate={formatDate}
+                        formatTime={formatTime}
+                        router={router}
+                        handleDeactivate={handleDeactivate}
+                    />
                 ) : (
                     /* Grid View - Compact Cards */
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredEvents.map((event) => {
-                            const statusKey =
-                                event.status as keyof typeof statusColors;
-                            const StatusIcon = statusColors[statusKey]?.icon;
-                            const statusStyle =
-                                statusColors[statusKey] || statusColors.draft;
-
-                            return (
-                                <div
-                                    key={event.id}
-                                    className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all transform hover:scale-105"
-                                >
-                                    {/* Image */}
-                                    <div className="relative h-48 bg-gradient-to-br from-orange-400 to-red-400">
-                                        {event.media?.[0] ? (
-                                            <img
-                                                src={event.media[0].file_path}
-                                                alt={event.title}
-                                                className="w-full h-full object-cover"
-                                            />
-                                        ) : (
-                                            <div className="flex items-center justify-center h-full">
-                                                <Calendar className="h-20 w-20 text-white opacity-50" />
-                                            </div>
-                                        )}
-                                        {event.featured && (
-                                            <div className="absolute top-3 right-3 bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                                                ⭐ Featured
-                                            </div>
-                                        )}
-                                        <div
-                                            className={`absolute top-3 left-3 ${statusStyle.bg} ${statusStyle.text} px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1`}
-                                        >
-                                            <StatusIcon size={12} />
-                                            {event.status
-                                                .charAt(0)
-                                                .toUpperCase() +
-                                                event.status.slice(1)}
-                                        </div>
-                                    </div>
-
-                                    {/* Content */}
-                                    <div className="p-6">
-                                        <div className="flex items-start justify-between mb-3">
-                                            <span className="inline-block px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
-                                                {getEventTypeLabel(event.type)}
-                                            </span>
-                                        </div>
-
-                                        <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2">
-                                            {event.title}
-                                        </h3>
-
-                                        {/* Age Groups */}
-                                        <div className="space-y-2 mb-4">
-                                            {event.is_suitable_for_all_ages ? (
-                                                <span className="inline-block px-2 py-1 bg-orange-50 text-orange-700 rounded text-xs font-medium">
-                                                    All Ages
-                                                </span>
-                                            ) : event.age_groups &&
-                                              event.age_groups.length > 0 ? (
-                                                event.age_groups.map(
-                                                    (group, idx) => (
-                                                        <span
-                                                            key={idx}
-                                                            className="inline-block px-2 py-1 bg-orange-50 text-orange-700 rounded text-xs font-medium"
-                                                        >
-                                                            {group.label &&
-                                                                `${group.label}`}
-                                                            {group.min_age !=
-                                                                null &&
-                                                                group.max_age !=
-                                                                    null &&
-                                                                ` (${group.min_age}-${group.max_age})`}
-                                                        </span>
-                                                    )
-                                                )
-                                            ) : (
-                                                <span className="text-xs text-gray-400">
-                                                    No age groups
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        <div className="space-y-2 mb-4">
-                                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                                                <MapPin
-                                                    size={16}
-                                                    className="text-orange-500 flex-shrink-0"
-                                                />
-                                                <span className="truncate">
-                                                    {
-                                                        event.location
-                                                            ?.location_name
-                                                    }
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                                                <DollarSign
-                                                    size={16}
-                                                    className="text-orange-500 flex-shrink-0"
-                                                />
-                                                <span>
-                                                    {getPriceRange(
-                                                        event.slotPrices,
-                                                        userRole as
-                                                            | "admin"
-                                                            | "merchant",
-                                                        event.status
-                                                    )}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {/* Upcoming Dates */}
-                                        {(
-                                            (event.is_recurring
-                                                ? event.slots
-                                                : event.dates) ?? []
-                                        ).length > 0 && (
-                                            <div className="mb-4 p-3 bg-orange-50 rounded-lg border border-orange-200 text-sm text-gray-600">
-                                                {/* Frequency label */}
-                                                <p className="text-xs font-semibold text-orange-800 mb-2">
-                                                    {getFrequencyLabel(
-                                                        event.frequency?.[0]
-                                                    )}
-                                                </p>
-
-                                                <div className="space-y-1">
-                                                    {(
-                                                        (event.is_recurring
-                                                            ? event.slots
-                                                            : event.dates) ?? []
-                                                    )
-                                                        .slice(0, 3)
-                                                        .map(
-                                                            (
-                                                                slot:
-                                                                    | EventSlot
-                                                                    | EventDate,
-                                                                idx: number
-                                                            ) => {
-                                                                const dateDisplay =
-                                                                    "start_date" in
-                                                                        slot &&
-                                                                    slot.start_date
-                                                                        ? slot.start_date ===
-                                                                          slot.end_date
-                                                                            ? formatDate(
-                                                                                  slot.start_date
-                                                                              )
-                                                                            : `${formatDate(
-                                                                                  slot.start_date
-                                                                              )} - ${formatDate(
-                                                                                  slot.end_date
-                                                                              )}`
-                                                                        : "date" in
-                                                                              slot &&
-                                                                          slot.date
-                                                                        ? formatDate(
-                                                                              slot.date
-                                                                          )
-                                                                        : "Date TBD";
-
-                                                                const timeDisplay =
-                                                                    "start_time" in
-                                                                        slot &&
-                                                                    slot.start_time
-                                                                        ? ` • ${formatTime(
-                                                                              slot.start_time
-                                                                          )}${
-                                                                              slot.end_time
-                                                                                  ? ` - ${formatTime(
-                                                                                        slot.end_time
-                                                                                    )}`
-                                                                                  : ""
-                                                                          }`
-                                                                        : "";
-
-                                                                return (
-                                                                    <p
-                                                                        key={
-                                                                            idx
-                                                                        }
-                                                                        className="text-xs text-gray-700"
-                                                                    >
-                                                                        {
-                                                                            dateDisplay
-                                                                        }
-                                                                        {
-                                                                            timeDisplay
-                                                                        }
-                                                                    </p>
-                                                                );
-                                                            }
-                                                        )}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Actions */}
-                                        <div className="flex gap-2 pt-4 border-t border-gray-100">
-                                            <button
-                                                onClick={() =>
-                                                    router.visit(
-                                                        userRole === "admin"
-                                                            ? `/admin/events/${event.id}`
-                                                            : `/merchant/events/${event.id}`
-                                                    )
-                                                }
-                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-all font-medium"
-                                            >
-                                                <Eye size={16} />
-                                                View
-                                            </button>
-                                            {userRole === "merchant" && (
-                                                <>
-                                                    <button
-                                                        onClick={() =>
-                                                            router.visit(
-                                                                `/merchant/events/${event.id}/edit`
-                                                            )
-                                                        }
-                                                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all font-medium"
-                                                    >
-                                                        <Edit size={16} />
-                                                        Edit
-                                                    </button>
-                                                    {event.status ===
-                                                        "active" && (
-                                                        <button
-                                                            onClick={() =>
-                                                                handleDeactivate(
-                                                                    event.id
-                                                                )
-                                                            }
-                                                            className="px-4 py-2 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-all"
-                                                            title="Deactivate"
-                                                        >
-                                                            <BadgeX size={16} />
-                                                        </button>
-                                                    )}
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                    <GridView
+                        userRole={userRole}
+                        router={router}
+                        handleDeactivate={handleDeactivate}
+                        filteredEvents={tab === "upcoming" ? upcomingEvents : pastEvents}
+                        statusColors={statusColors}
+                        getEventTypeLabel={getEventTypeLabel}
+                        getPriceRange={getPriceRange}
+                        getFrequencyLabel={getFrequencyLabel}
+                        formatDate={formatDate}
+                        formatTime={formatTime}
+                    />
                 )}
 
                 {/* Pagination */}
@@ -958,7 +427,12 @@ export default function EventsIndexPage() {
                             link.url ? (
                                 <button
                                     key={index}
-                                    onClick={() => router.get(link.url!)}
+                                    onClick={() =>
+                                        router.get(link.url!, {
+                                            preserveState: true,
+                                            data: { viewMode },
+                                        })
+                                    }
                                     disabled={link.active}
                                     className={`px-4 py-2 border-2 rounded-lg transition-all font-medium ${
                                         link.active
