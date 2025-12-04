@@ -36,54 +36,53 @@ const BookingInfoSection: React.FC<{
             </div>
 
             <div className="p-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                        {/* Total Bookings */}
-                        <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg flex items-center gap-3">
-                            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                                <Users className="w-5 h-5 text-orange-600" />
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-xs uppercase text-gray-600 font-medium">
-                                    Total Bookings
-                                </p>
-                                <p className="text-2xl font-bold text-orange-600">
-                                    {totalBookings}
-                                </p>
-                            </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                    {/* Total Bookings */}
+                    <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg flex items-center gap-3">
+                        <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                            <Users className="w-5 h-5 text-orange-600" />
                         </div>
+                        <div className="flex-1">
+                            <p className="text-xs uppercase text-gray-600 font-medium">
+                                Total Bookings
+                            </p>
+                            <p className="text-2xl font-bold text-orange-600">
+                                {totalBookings}
+                            </p>
+                        </div>
+                    </div>
 
-                        {/* Total Capacity */}
-                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
-                            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                                <Layers className="w-5 h-5 text-blue-600" />
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-xs uppercase text-gray-600 font-medium">
-                                    Total Capacity
-                                </p>
-                                <p className="text-2xl font-bold text-blue-600">
-                                    {hasUnlimited ? "∞" : totalCapacity}
-                                </p>
-                            </div>
+                    {/* Total Capacity */}
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <Layers className="w-5 h-5 text-blue-600" />
                         </div>
+                        <div className="flex-1">
+                            <p className="text-xs uppercase text-gray-600 font-medium">
+                                Total Capacity
+                            </p>
+                            <p className="text-2xl font-bold text-blue-600">
+                                {hasUnlimited ? "∞" : totalCapacity}
+                            </p>
+                        </div>
+                    </div>
 
-                        {/* Availability */}
-                        <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
-                            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                                <CheckCircle2 className="w-5 h-5 text-green-600" />
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-xs uppercase text-gray-600 font-medium">
-                                    Availability
-                                </p>
-                                <p className="text-2xl font-bold text-green-600">
-                                    {hasUnlimited
-                                        ? "∞"
-                                        : totalCapacity - totalBookings}
-                                </p>
-                            </div>
+                    {/* Availability */}
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
+                        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                            <CheckCircle2 className="w-5 h-5 text-green-600" />
                         </div>
-       
+                        <div className="flex-1">
+                            <p className="text-xs uppercase text-gray-600 font-medium">
+                                Availability
+                            </p>
+                            <p className="text-2xl font-bold text-green-600">
+                                {hasUnlimited
+                                    ? "∞"
+                                    : totalCapacity - totalBookings}
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-4">
@@ -131,7 +130,7 @@ const BookingInfoSection: React.FC<{
                             cancellations
                         </p>
                         <a
-                            href={`/bookings?event_id=${event.id}`}
+                            href={`/bookings/event/${event.id}`}
                             className="inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors"
                         >
                             Go to Booking Page

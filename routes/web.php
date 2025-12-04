@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\BookingController;
+use App\Http\Controllers\MerchantBookingController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\MerchantController;
 use App\Http\Controllers\CustomerController;
@@ -68,7 +68,6 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/admin/customers/{id}/referees', [CustomerController::class, 'viewReferral'])->name('customers.referrals');
 
-
         // Admin Event Management
         Route::get('/events', [EventController::class, 'index'])->name('events.index');
         Route::get('/events/{event}', [EventController::class, 'show'])->name('events.show');
@@ -101,6 +100,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.markAsRead');
 
-    Route::get('/bookings', [BookingController::class, 'index']);
-    Route::post('/bookings/{booking}/cancel', [BookingController::class, 'cancel']);
+    //Bookings 
+    Route::get('/bookings', [MerchantBookingController::class, 'main'])->name('bookings.main');
+    Route::get('/bookings/event/{eventId}', [MerchantBookingController::class, 'bookingsByEvent'])->name('bookings.by-event');
+    Route::patch('/bookings/update-status', [MerchantBookingController::class, 'updateStatus'])->name('bookings.updateStatus');
 });

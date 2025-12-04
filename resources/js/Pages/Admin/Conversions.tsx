@@ -96,7 +96,7 @@ const ConversionsIndex: React.FC<Props> = ({ conversions }) => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
+        <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 py-8 px-4">
             <div className="max-w-[1600px] mx-auto">
                 {errors && Object.keys(errors).length > 0 && (
                     <div className="mb-6 max-w-7xl mx-auto px-6">
@@ -114,7 +114,7 @@ const ConversionsIndex: React.FC<Props> = ({ conversions }) => {
 
                 {/* Header Section */}
                 <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                    <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 px-8 py-8">
+                    <div className="bg-linear-to-r from-orange-500 via-orange-600 to-red-500 px-8 py-8">
                         <div className="flex items-center justify-between">
                             <div>
                                 <h1 className="text-4xl font-bold text-white mb-2">
@@ -168,7 +168,7 @@ const ConversionsIndex: React.FC<Props> = ({ conversions }) => {
                                             <div
                                                 className={`px-6 py-3 ${
                                                     active
-                                                        ? "bg-gradient-to-r from-orange-500 to-red-500"
+                                                        ? "bg-linear-to-r from-orange-500 to-red-500"
                                                         : "bg-gray-200"
                                                 }`}
                                             >
@@ -308,7 +308,7 @@ const ConversionsIndex: React.FC<Props> = ({ conversions }) => {
                                                                 "activate"
                                                             )
                                                         }
-                                                        className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white px-4 py-3 rounded-lg font-semibold hover:shadow-lg transition-all"
+                                                        className="w-full bg-linear-to-r from-orange-500 to-red-500 text-white px-4 py-3 rounded-lg font-semibold hover:shadow-lg transition-all"
                                                     >
                                                         Activate
                                                     </button>
@@ -329,7 +329,7 @@ const ConversionsIndex: React.FC<Props> = ({ conversions }) => {
                                     className={`px-6 py-4 ${
                                         actionType === "deactivate"
                                             ? "bg-red-500"
-                                            : "bg-gradient-to-r from-orange-500 to-red-500"
+                                            : "bg-linear-to-r from-orange-500 to-red-500"
                                     }`}
                                 >
                                     <h2 className="text-xl font-bold text-white">
@@ -366,7 +366,7 @@ const ConversionsIndex: React.FC<Props> = ({ conversions }) => {
                                         className={`flex-1 px-4 py-3 rounded-lg font-semibold text-white transition-all ${
                                             actionType === "deactivate"
                                                 ? "bg-red-600 hover:bg-red-700"
-                                                : "bg-gradient-to-r from-orange-500 to-red-500 hover:shadow-lg"
+                                                : "bg-linear-to-r from-orange-500 to-red-500 hover:shadow-lg"
                                         }`}
                                     >
                                         Confirm

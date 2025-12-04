@@ -51,9 +51,11 @@ export default function TableView({
                             <th className="px-16 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
                                 Upcoming Dates
                             </th>
-
                             <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                                 Status
+                            </th>
+                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider  whitespace-nowrap">
+                                View Bookings
                             </th>
                             <th className="px-4 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                                 Actions
@@ -283,6 +285,22 @@ export default function TableView({
                                                 .toUpperCase() +
                                                 event.status.slice(1)}
                                         </span>
+                                    </td>
+
+                                    <td className="px-6 py-4">
+                                        <button
+                                            onClick={() =>
+                                                router.visit(
+                                                    userRole === "admin"
+                                                        ? `/admin/events/${event.id}`
+                                                        : `/merchant/events/${event.id}`
+                                                )
+                                            }
+                                            className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-all"
+                                            title="View"
+                                        >
+                                            <Eye size={16} />
+                                        </button>
                                     </td>
 
                                     {/* Actions Column */}

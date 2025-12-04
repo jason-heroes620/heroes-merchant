@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Services\BookingService;
+use App\Http\Resources\BookingResource;
 use App\Models\Booking;
+use App\Models\Event;
 use App\Models\EventSlot;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class BookingController extends Controller
 {
@@ -23,12 +26,71 @@ class BookingController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        $customer = $user->customer ?? null;
+        if (! $customer) {
+            return response()->json(['message' => 'Customer record not found.'], 404);
+        }
+        
+        $status = $request->query('status', 'upcoming'); 
+        $perPage = (int) $request->query('per_page', 12);
+        $now = Carbon::now('Asia/Kuala_Lumpur');
 
-        $bookings = Booking::with(['slot', 'event', 'transactions'])
-            ->where('customer_id', $user->id)
-            ->get();
+        $query = Booking::with(['slot', 'event.location', 'event.media', 'items.ageGroup', 'transactions'])
+                        ->forCustomer($customer->id)
+                        ->orderBy('booked_at', 'desc');
 
-        return response()->json($bookings);
+        switch ($status) {
+            case 'upcoming':
+                $query->whereNotIn('status', ['cancelled', 'refunded'])
+                    ->whereHas('slot', function($q) use ($now) {
+                        $q->whereRaw("STR_TO_DATE(CONCAT(date, ' ', start_time), '%Y-%m-%d %H:%i:%s') >= ?", [$now]);
+                    });
+                break;
+
+            case 'completed':
+                $query->whereNotIn('status', ['cancelled', 'refunded'])
+                    ->whereHas('slot', function($q) use ($now) {
+                        $q->whereRaw("STR_TO_DATE(CONCAT(date, ' ', end_time), '%Y-%m-%d %H:%i:%s') < ?", [$now]);
+                    });
+                break;
+
+            case 'cancelled':
+                $query->whereIn('status', ['cancelled', 'refunded']);
+                break;
+
+            default:
+                break;
+        }
+
+        $page = $query->paginate($perPage)->withQueryString();
+
+        return response()->json([
+            'data' => BookingResource::collection($page->items()),
+            'current_page' => $page->currentPage(),
+            'last_page' => $page->lastPage(),
+            'per_page' => $page->perPage(),
+            'total' => $page->total(),
+        ]);
+    }
+
+    /**
+     * Endpoint to return the QR image file or URL
+     */
+    public function qr(Request $request, $id)
+    {
+        $user = $request->user();
+        $customer = $user->customer ?? null;
+        if (! $customer) return response()->json(['message' => 'Customer not found'], 404);
+
+        $booking = Booking::forCustomer($customer->id)->findOrFail($id);
+
+        if (! $booking->qr_code_path) {
+            return response()->json(['message' => 'QR code not available'], 404);
+        }
+
+        return response()->json([
+            'qr_url' => asset("storage/{$booking->qr_code_path}")
+        ]);
     }
 
     /**
@@ -79,36 +141,44 @@ class BookingController extends Controller
     /**
      * Cancel a booking
      */
-    public function cancel(Request $request, string $bookingId)
+    public function cancel(Request $request, Booking $booking)
     {
-        $customer = $request->user();
+        $user = $request->user();
+        $customer = $user->customer ?? null;
 
-        $booking = Booking::where('id', $bookingId)
-            ->where('customer_id', $customer->id)
-            ->firstOrFail();
+        Log::info("Cancel request received", [
+            'booking_id' => $booking->id,
+            'user_id' => $user->id ?? null,
+            'customer_id' => $customer->id ?? null,
+            'request_data' => $request->all(),
+        ]);
+
+        if (!$customer) {
+            Log::warning("Customer record not found for user {$user->id}");
+            return response()->json(['message' => 'Customer record not found.'], 404);
+        }
 
         try {
-            Log::info('Attempting booking cancellation', [
-                'booking_id' => $booking->id,
-                'customer_id' => $customer->id,
-            ]);
+            $result = $this->bookingService->cancelBooking($booking);
 
-            $booking = $this->bookingService->cancelBooking($booking);
+            // If not refunded, calculate forfeited credits
+            if (!$result['refunded']) {
+                $freeCredits = $booking->items->sum('free_credits');
+                $paidCredits = $booking->items->sum('paid_credits');
 
-            Log::info('Booking cancelled', [
-                'booking_id' => $booking->id,
-                'customer_id' => $customer->id,
-            ]);
+                $result['message'] = "Free credits ({$freeCredits}) and total credits ({$paidCredits}) will be forfeited. Are you sure you want to cancel?";
+            }
 
-            return response()->json($booking);
+            Log::info("Cancel result prepared", ['result' => $result]);
+
+            return response()->json($result, 200);
         } catch (\Exception $e) {
-            Log::error('Booking cancellation failed', [
+            Log::error("Cancel booking failed", [
                 'booking_id' => $booking->id,
-                'customer_id' => $customer->id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
-
-            return response()->json(['message' => $e->getMessage()], 400);
+            return response()->json(['error' => $e->getMessage()], 400);
         }
     }
-}
+}   

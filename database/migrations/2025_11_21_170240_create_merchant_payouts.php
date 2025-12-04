@@ -14,14 +14,15 @@ return new class extends Migration
         Schema::create('merchant_payouts', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('merchant_id')->constrained('merchants')->onDelete('cascade');
-            $table->foreignUuid('booking_id')->nullable()->constrained('bookings')->onDelete('set null');
+
+            $table->string('month'); 
+            $table->unsignedInteger('tickets_sold')->default(0);
 
             $table->decimal('gross_in_rm', 10, 2)->default(0);
             $table->decimal('admin_fee_in_rm', 10, 2)->default(0);
             $table->decimal('merchant_net_in_rm', 10, 2)->default(0);
 
             $table->enum('status', ['pending', 'paid', 'failed'])->default('pending');
-
             $table->text('notes')->nullable();
             $table->timestamps();
         });

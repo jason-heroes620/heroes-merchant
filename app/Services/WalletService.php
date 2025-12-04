@@ -144,15 +144,19 @@ class WalletService
 
         // Deduct remaining free from paid if allowed
         $deductPaid = $totalPaid;
+
         if ($remainingFree > 0) {
             if (!$allowFallback) {
-                throw new \Exception("Insufficient free credits. Cannot proceed without using paid credits.");
+                // Don't deduct anything extra, but signal the frontend to ask user
+                throw new \Exception("Insufficient free credits. You can use paid credits to cover missing free credits.");
             }
+
+            // Fallback allowed: paid covers remaining free
             $deductPaid += $remainingFree;
         }
 
         if ($deductPaid > $wallet->cached_paid_credits) {
-            throw new \Exception("Insufficient paid credits to cover free credit shortfall.");
+            throw new \Exception("Insufficient paid credits to cover free credit.");
         }
 
         try {
@@ -183,6 +187,43 @@ class WalletService
                 'paid' => $deductPaid,
                 'free' => $deductFree,
                 'bookingId' => $bookingId,
+            ]);
+            throw $e;
+        }
+    }
+
+    public function refundCredits($transaction, string $walletId)
+    {
+        $wallet = CustomerWallet::findOrFail($walletId);
+
+        $refundPaid = abs($transaction->delta_paid);
+        $refundFree = abs($transaction->delta_free);
+
+        $beforePaid = $wallet->cached_paid_credits;
+        $beforeFree = $wallet->cached_free_credits;
+
+        try {
+            if ($refundPaid > 0) {
+                $wallet->increment('cached_paid_credits', $refundPaid);
+            }
+
+            if ($refundFree > 0) {
+                $wallet->increment('cached_free_credits', $refundFree);
+            }
+
+            CustomerCreditTransaction::create([
+                'wallet_id' => $wallet->id,
+                'type' => 'refund',
+                'before_paid_credits' => $beforePaid,
+                'before_free_credits' => $beforeFree,
+                'delta_paid' => $refundPaid,
+                'delta_free' => $refundFree,
+                'description' => "Refund for cancelled booking {$transaction->booking_id}",
+                'booking_id' => $transaction->booking_id,
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Failed to refund credits for wallet {$wallet->id}", [
+                'error' => $e->getMessage(),
             ]);
             throw $e;
         }

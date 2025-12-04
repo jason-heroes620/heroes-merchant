@@ -32,8 +32,8 @@ export interface Frequency {
 export interface EventSlot {
     id?: string;
     event_id?: string;
-    event_date_id?: string;
-    date?: string;
+    event_date: EventDate[];
+    date: string;
     start_time: string;
     end_time: string;
     duration?: number | null;
@@ -116,20 +116,20 @@ export interface EventSubmissionData
 }
 
 export interface Merchant {
-  id: string;
-  company_name: string;
+    id: string;
+    company_name: string;
 }
 
 export interface SyntheticSlot {
-  date: string;
-  start_time?: string | null;
-  end_time?: string | null;
+    date: string;
+    start_time?: string | null;
+    end_time?: string | null;
 }
 
 export interface EventType {
     id: string;
     merchant_id?: string;
-    merchant?: Merchant;           
+    merchant?: Merchant;
     slot?: EventSlot | SyntheticSlot | null;
     title: string;
     type: string;
@@ -158,6 +158,8 @@ export interface Event {
     title: string;
     description: string | null;
     category: string | null;
+    location?: string;
+    media?: string | null;
     is_suitable_for_all_ages: boolean;
     is_recurring: boolean;
     featured: boolean;
@@ -183,11 +185,57 @@ export interface Conversion {
     status: "active" | "inactive";
 }
 
+export interface Customer {
+    id: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    profile_picture?: string;
+}
+
+export interface BookingItem {
+    age_group_id: string | null;
+    age_group_label: string;
+    quantity: number;
+    paid_credits?: number;
+    free_credits?: number;
+    total_paid?: number;
+    total_free?: number;
+}
+
 export interface Booking {
     id: string;
-    customer_id: string;
-    event_id: string;
-    slot_id: string;
+    booking_id?: string;
+    status: string;
     quantity: number;
-    status: "pending" | "confirmed" | "cancelled" | "refunded";
+    booked_at: string;
+    cancelled_at?: string;
+    slot?: EventSlot;
+    event?: Event;
+    items: BookingItem[];
+    transactions?: Transaction[] | null;
+    customer?: Customer | null;
+    attendance?: Attendance[];
+}
+
+export interface Transaction {
+    id: string;
+    type: string;
+    delta_free: number;
+    delta_paid: number;
+    created_at: string;
+}
+
+export interface Attendance {
+    id: string;
+    booking_id: string;
+    slot_id: string;
+    event_id: string;
+    customer_id: string;
+    status: string;
+    scanned_at: string;
+    total_attendees: number;
+    attended_count: number;
+    pending_count: number;
+    absent_count: number;
 }

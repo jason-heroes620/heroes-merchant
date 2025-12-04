@@ -12,9 +12,10 @@ class MerchantPayout extends Model
 
     protected $fillable = [
         'merchant_id',
-        'booking_id',
+        'month',
+        'tickets_sold',
         'gross_in_rm',
-        'admin_fee_in_rm',
+        'platform_fee_in_rm',
         'merchant_net_in_rm',
         'status',
         'notes',
@@ -22,7 +23,7 @@ class MerchantPayout extends Model
 
     protected $casts = [
         'gross_in_rm' => 'decimal:2',
-        'admin_fee_in_rm' => 'decimal:2',
+        'platform_fee_in_rm' => 'decimal:2',
         'merchant_net_in_rm' => 'decimal:2',
     ];
 
@@ -31,10 +32,5 @@ class MerchantPayout extends Model
     public function merchant()
     {
         return $this->belongsTo(Merchant::class);
-    }
-
-    public function booking()
-    {
-        return $this->belongsTo(Booking::class, 'booking_id');
     }
 }
