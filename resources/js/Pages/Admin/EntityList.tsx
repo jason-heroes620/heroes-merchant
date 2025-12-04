@@ -101,7 +101,7 @@ export default function EntityList({
             <div className="max-w-7xl mx-auto">
                 <div className="bg-white rounded-xl shadow-lg overflow-hidden">
                     {/* Header */}
-                    <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-8 py-6">
+                    <div className="bg-linear-to-r from-orange-500 to-orange-600 px-8 py-6">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <Users className="text-white" size={32} />
@@ -126,7 +126,7 @@ export default function EntityList({
                     {/* Filters and Search */}
                     <div className="p-6 bg-gray-50 border-b border-gray-200">
                         <div className="flex flex-col md:flex-row gap-4">
-                            <div className="flex-grow relative">
+                            <div className="grow relative">
                                 <Search
                                     className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                                     size={20}

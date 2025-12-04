@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 class Booking extends Model
 {
@@ -60,7 +62,7 @@ class Booking extends Model
     {
         return $this->hasMany(CustomerCreditTransaction::class, 'booking_id');
     }
-    
+
     public function items()
     {
         return $this->hasMany(BookingItem::class, 'booking_id');
@@ -69,5 +71,54 @@ class Booking extends Model
     public function merchantPayout()
     {
         return $this->hasOne(MerchantPayout::class, 'booking_id');
+    }
+
+    public function scopeForCustomer($query, $customerId)
+    {
+        return $query->where('customer_id', $customerId);
+    }
+
+    public function scopeUpcoming($query)
+    {
+        return $query->where('status', 'confirmed')
+                     ->whereHas('slot', function ($q) {
+                         $q->where('start_time', '>=', Carbon::now());
+                     });
+    }
+
+    public function scopeCompleted($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('status', 'completed')
+              ->orWhereHas('slot', function ($q2) {
+                  $q2->where('end_time', '<', Carbon::now());
+              });
+        });
+    }
+
+    public function scopeCancelled($query)
+    {
+        return $query->where('status', 'cancelled');
+    }
+
+    public function getQrUrlAttribute()
+    {
+        if (! $this->qr_code_path) return null;
+        return asset($this->qr_code_path);
+    }
+
+    public function getSlotStartAttribute()
+    {
+        return $this->slot?->start_time;
+    }
+
+    public function getSlotEndAttribute()
+    {
+        return $this->slot?->end_at;
+    }
+
+    public function attendances()
+    {
+        return $this->hasMany(Attendance::class);
     }
 }

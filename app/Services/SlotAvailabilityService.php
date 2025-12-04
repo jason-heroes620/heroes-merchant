@@ -33,5 +33,5 @@ class SlotAvailabilityService
             ->sum('quantity');
 
         return $slot->capacity - $bookedQuantity;
-    }
+    }  
 }

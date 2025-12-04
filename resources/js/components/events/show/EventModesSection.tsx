@@ -18,15 +18,7 @@ const EventModesSection: React.FC<{
     frequency: Frequency | null;
     dates: EventDate[];
     userRole: UserRole;
-}> = ({
-    event,
-    slots,
-    ageGroups,
-    bookings,
-    frequency,
-    dates,
-    userRole,
-}) => {
+}> = ({ event, slots, ageGroups, bookings, frequency, dates, userRole }) => {
     const isWeekend = (dateString: string) => {
         const day = new Date(dateString).getDay();
         return day === 0 || day === 6;
@@ -42,7 +34,7 @@ const EventModesSection: React.FC<{
     };
 
     const slotsByDate: Record<string, EventSlot[]> = slots
-        .filter((slot): slot is EventSlot & { date: string } => !!slot.date) 
+        .filter((slot): slot is EventSlot & { date: string } => !!slot.date)
         .reduce((acc, slot) => {
             if (!acc[slot.date]) acc[slot.date] = [];
             acc[slot.date].push(slot);
@@ -74,8 +66,12 @@ const EventModesSection: React.FC<{
                         <Calendar className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                        <h2 className="text-lg font-bold text-gray-900">Event Schedule</h2>
-                        <p className="text-sm text-gray-600">Available time slots and dates</p>
+                        <h2 className="text-lg font-bold text-gray-900">
+                            Event Schedule
+                        </h2>
+                        <p className="text-sm text-gray-600">
+                            Available time slots and dates
+                        </p>
                     </div>
                 </div>
             </div>
@@ -85,15 +81,19 @@ const EventModesSection: React.FC<{
                     <div className="flex items-center gap-2 mb-2">
                         <Calendar className="w-5 h-5 text-orange-600" />
                         <span className="font-semibold text-gray-900">
-                            {event.is_recurring ? getFrequencyLabel() : "One-Time Event"}
+                            {event.is_recurring
+                                ? getFrequencyLabel()
+                                : "One-Time Event"}
                         </span>
                     </div>
 
-                    {dates.length > 0 && (
+                    {!event.is_recurring && (
                         <div className="text-sm text-gray-600">
                             {dates[0].start_date === dates[0].end_date
                                 ? formatDate(dates[0].start_date)
-                                : `${formatDate(dates[0].start_date)} to ${formatDate(dates[0].end_date)}`}
+                                : `${formatDate(
+                                      dates[0].start_date
+                                  )} to ${formatDate(dates[0].end_date)}`}
                         </div>
                     )}
 
@@ -101,7 +101,18 @@ const EventModesSection: React.FC<{
                         <div className="text-sm text-gray-600 mt-1">
                             <span className="font-medium">Days:</span>{" "}
                             {frequency.days_of_week
-                                .map((day) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][day])
+                                .map(
+                                    (day) =>
+                                        [
+                                            "Sun",
+                                            "Mon",
+                                            "Tue",
+                                            "Wed",
+                                            "Thu",
+                                            "Fri",
+                                            "Sat",
+                                        ][day]
+                                )
                                 .join(", ")}
                         </div>
                     ) : null}
@@ -110,11 +121,16 @@ const EventModesSection: React.FC<{
                 {event.is_recurring ? (
                     <div className="space-y-6">
                         {sortedDates.map((date) => (
-                            <div key={date} className="border-l-4 border-orange-500 pl-4">
+                            <div
+                                key={date}
+                                className="border-l-4 border-orange-500 pl-4"
+                            >
                                 <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                                     <span>{formatDate(date)}</span>
                                     <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">
-                                        {isWeekend(date) ? "Weekend" : "Weekday"}
+                                        {isWeekend(date)
+                                            ? "Weekend"
+                                            : "Weekday"}
                                     </span>
                                 </h3>
                                 <div className="grid md:grid-cols-2 gap-4">
@@ -122,7 +138,7 @@ const EventModesSection: React.FC<{
                                         <SlotCard
                                             key={slot.id}
                                             slot={slot}
-                                            slotPrices={slot.prices ?? []} 
+                                            slotPrices={slot.prices ?? []}
                                             ageGroups={ageGroups}
                                             bookings={bookings}
                                             userRole={userRole}
@@ -143,7 +159,7 @@ const EventModesSection: React.FC<{
                                 <SlotCard
                                     key={slot.id}
                                     slot={slot}
-                                    slotPrices={slot.prices ?? []} 
+                                    slotPrices={slot.prices ?? []}
                                     ageGroups={ageGroups}
                                     bookings={bookings}
                                     userRole={userRole}

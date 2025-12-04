@@ -133,71 +133,6 @@ class BookingService
     }
 
     /**
-     * 1️⃣ Create booking & validate everything
-     */
-    // private function createBooking($customer, $slot, $ageGroupId, $quantity)
-    // {
-    //     // Reload with lock
-    //     $slot = EventSlot::where('id', $slot->id)
-    //         ->lockForUpdate()
-    //         ->firstOrFail();
-
-    //     if (! $this->slotAvailability->isAvailable($slot, $quantity)) {
-    //         throw new \Exception('Not enough seats available for this slot.');
-    //     }
-
-    //     $event = $slot->event;
-    //     $ageGroups = $event->age_groups ?? collect([]);
-
-    //     if ($event->is_suitable_for_all_ages || $ageGroups->count() === 0) {
-    //         $slotPrice = $slot->prices()->first();
-    //     } else {
-    //         $slotPrice = $slot->prices()
-    //             ->when($ageGroupId, fn($q) => $q->where('event_age_group_id', $ageGroupId))
-    //             ->first();
-    //     }
-
-    //     $requiredFree = $slotPrice->free_credits ?? 0;
-    //     $requiredPaid = $slotPrice->paid_credits ?? 0;
-
-    //     $wallet = $customer->wallet ?? throw new \Exception('Wallet not found.');
-
-    //     if (! $this->walletService->hasEnoughCredits($wallet, $requiredPaid, $requiredFree, $quantity)) {
-    //         throw new \Exception('Insufficient credits for the requested quantity.');
-    //     }
-
-    //     $booking = Booking::create([
-    //         'customer_id' => $customer->id,
-    //         'event_id' => $slot->event_id,
-    //         'slot_id' => $slot->id,
-    //         'wallet_id' => $wallet->id,
-    //         'age_group_id' => $ageGroupId,
-    //         'status' => 'confirmed',
-    //         'booked_at' => now(),
-    //         'quantity' => $quantity,
-    //     ]);
-
-    //     return [$booking, $slot, $requiredFree, $requiredPaid];
-    // }
-
-    // /**
-    //  * 2️⃣ Deduct credits + reduce slot capacity
-    //  */
-    // private function processCreditsAndCapacity($customer, $slot, $booking, $requiredFree, $requiredPaid, $quantity)
-    // {
-    //     $wallet = $customer->wallet;
-
-    //     $this->walletService->deductCredits(
-    //         $wallet,
-    //         $requiredPaid,
-    //         $requiredFree,
-    //         "Booking: {$booking->id} for slot {$slot->id}",
-    //         $booking->id,
-    //         $quantity
-    //     );
-    // }
-
-    /**
      * 3️⃣ Generate QR Code
      */
     private function generateQrCode($booking)
@@ -208,13 +143,13 @@ class BookingService
             $dir = public_path('qrcodes');
             File::ensureDirectoryExists($dir);
 
-            $file = $dir . "/{$booking->id}.png";
+            $file = $dir . "/{$booking->id}.svg";
 
             QrCode::format('svg')
                 ->size(300)
                 ->generate($content, $file);
 
-            $booking->qr_code_path = "qrcodes/{$booking->id}.png";
+            $booking->qr_code_path = "qrcodes/{$booking->id}.svg";
             $booking->save();
         } catch (\Exception $e) {
             \Log::error('QR code generation failed', [
@@ -242,17 +177,29 @@ class BookingService
 
         $event = $slot->event;
 
-        $rawDate = $slot->date ?? optional($event->dates->first())->start_date;
+        $slotDate = $slot->date 
+        ? $slot->date->format('Y-m-d') 
+        : (optional($event->dates->first())->start_date 
+            ? optional($event->dates->first())->start_date->format('Y-m-d') 
+            : null
+        );
 
-        if (!$rawDate) {
-            \Log::warning('No slot or event date found', ['slot_id' => $slot->id, 'event_id' => $event->id]);
-            return;
-        }
+    $slotTime = $slot->start_time instanceof \Carbon\Carbon
+        ? $slot->start_time->format('H:i:s')
+        : $slot->start_time;
 
-        $slotDate = Carbon::parse($rawDate)->format('Y-m-d');
-        $slotTime = Carbon::parse($slot->start_time)->format('H:i:s');
-        $slotStart = Carbon::parse("{$slotDate} {$slotTime}", 'Asia/Kuala_Lumpur');
-        \Log::info("Slot start datetime:", ['slotStart' => $slotStart->toDateTimeString()]);
+    if (!$slotDate || !$slotTime) {
+        \Log::warning('No slot date or start time found', [
+            'slot_id' => $slot->id,
+            'event_id' => $event->id,
+            'slot_date' => $slotDate,
+            'start_time' => $slotTime,
+        ]);
+        return;
+    }
+
+    $slotStart = Carbon::createFromFormat('Y-m-d H:i:s', "{$slotDate} {$slotTime}", 'Asia/Kuala_Lumpur');
+    \Log::info("Slot start datetime:", ['slotStart' => $slotStart->toDateTimeString()]);
 
         // 24 hrs before event
         $reminderAt = $slotStart->copy()->subHours(24);
@@ -272,54 +219,78 @@ class BookingService
             ->delay($reminderAt);
     }
 
-    /**
-     * Cancel booking
-     */
     public function cancelBooking(Booking $booking)
     {
         return DB::transaction(function () use ($booking) {
-            $slot = $booking->slot()->lockForUpdate()->firstOrFail();
-            $wallet = $booking->wallet;
 
-            // Booking time (GMT+8)
-            $slotStart = Carbon::parse($slot->date . ' ' . $slot->start_time);
-            $now = Carbon::now('Asia/Kuala_Lumpur');
-            $hoursUntilStart = $now->diffInHours($slotStart, false); 
+            if ($booking->status !== 'confirmed') {
+                throw new \Exception('This booking cannot be cancelled.');
+            }
 
-            // Mark booking as cancelled
+            $slot = $booking->slot;
+            $event = $slot->event;
+
+            // Determine slot start datetime
+            $slotDate = $slot->date 
+                ? $slot->date->format('Y-m-d') 
+                : optional($event->dates->first())->start_date?->format('Y-m-d');
+
+            $slotTime = $slot->start_time instanceof \Carbon\Carbon
+                ? $slot->start_time->format('H:i:s')
+                : $slot->start_time;
+
+            if (!$slotDate || !$slotTime) {
+                throw new \Exception('Unable to determine event start time. Cancellation blocked.');
+            }
+
+            $slotStart = Carbon::createFromFormat('Y-m-d H:i:s', "{$slotDate} {$slotTime}", 'Asia/Kuala_Lumpur');
+
+            // 24-hour cutoff
+            $eligibleForRefund = now('Asia/Kuala_Lumpur')->lt($slotStart->copy()->subHours(24));
+
+            // Fetch the original credit transaction for the booking
+            $transaction = $booking->transactions()
+                ->where('type', 'booking')
+                ->first();
+
+            if (!$transaction) {
+                throw new \Exception('No credit transaction found for this booking.');
+            }
+
+            // Refund credits (only if before 24hr cutoff)
+            if ($eligibleForRefund) {
+                $this->walletService->refundCredits($transaction, $booking->wallet_id);
+            }
+
+           $totalSeats = $booking->items->sum('quantity');
+
+            // Mark booking cancelled
             $booking->status = 'cancelled';
             $booking->cancelled_at = now();
             $booking->save();
 
-            // Cancel reminder record (so job will do nothing)
-            $reminder = Reminder::where('booking_id', $booking->id)->first();
-            if ($reminder) {
-                $reminder->status = 'cancelled';
-                $reminder->save();
-            }
+            Log::info("Booking {$booking->id} cancelled", [
+                'refunded' => $eligibleForRefund,
+                'seats_restored' => $totalSeats,
+            ]);
 
-            // If cancellation happens more than 24 hours before slot start -> refund, else forfeit
-            if ($hoursUntilStart >= 24) {
-                // refund: add credits back (negative deduction)
-                $this->walletService->deductCredits(
-                    $wallet,
-                    "Refund for cancellation: {$booking->id}",
-                    $booking->id
-                );
-            } else {
-                // less than 24 hours -> credits forfeited (no refund)
-            }
+            // Mark booking cancelled
+            $booking->status = 'cancelled';
+            $booking->cancelled_at = now();
+            $booking->save();
 
-            // restore capacity
-            if (! $slot->is_unlimited) {
-                $slot->capacity += $booking->quantity;
-                $slot->save();
-            }
+            Log::info("Booking {$booking->id} cancelled", [
+                'refunded' => $eligibleForRefund,
+                'seats_restored' => true,
+            ]);
 
-            // send push notification about cancellation
-            SendPushNotification::dispatch($booking->customer->id, "Booking cancelled", "Your booking was cancelled.", ['booking_id' => (string)$booking->id]);
-
-            return $booking;
+            return [
+                'booking_id' => (string)$booking->id,
+                'refunded' => $eligibleForRefund,
+                'message' => $eligibleForRefund 
+                    ? 'Booking cancelled and credits refunded.'
+                    : 'Booking cancelled. Credits forfeited (within 24 hours).'
+            ];
         });
     }
 }

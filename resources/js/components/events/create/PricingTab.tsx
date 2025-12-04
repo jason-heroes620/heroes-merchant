@@ -122,9 +122,9 @@ export default function PricingTab({
     };
 
     const PricingBanner = () => (
-        <div className="bg-gradient-to-r from-orange-50 to-orange-100 border-l-4 border-orange-500 p-6 rounded-r-xl shadow-sm">
+        <div className="bg-linear-to-r from-orange-50 to-orange-100 border-l-4 border-orange-500 p-6 rounded-r-xl shadow-sm">
             <div className="flex gap-4">
-                <div className="flex-shrink-0">
+                <div className="shrink-0">
                     <div className="p-2 bg-orange-500 rounded-lg">
                         <Info className="text-white" size={20} />
                     </div>
@@ -170,7 +170,7 @@ export default function PricingTab({
             <label
                 className={`relative p-6 border-2 rounded-xl cursor-pointer transition-all transform hover:scale-105 ${
                     selected
-                        ? "border-orange-500 bg-gradient-to-br from-orange-50 to-orange-100 shadow-xl"
+                        ? "border-orange-500 bg-linear-to-br from-orange-50 to-orange-100 shadow-xl"
                         : "border-gray-200 hover:border-orange-300 hover:shadow-md"
                 }`}
             >
@@ -186,7 +186,7 @@ export default function PricingTab({
                     <div
                         className={`p-3 rounded-xl ${
                             selected
-                                ? "bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg"
+                                ? "bg-linear-to-br from-orange-500 to-orange-600 shadow-lg"
                                 : "bg-gray-100"
                         }`}
                     >
@@ -262,7 +262,7 @@ export default function PricingTab({
         const value = currentPrice.fixed_price_in_rm ?? null;
 
         return (
-            <section className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-300 rounded-xl p-8 shadow-md">
+            <section className="bg-linear-to-br from-orange-50 to-orange-100 border-2 border-orange-300 rounded-xl p-8 shadow-md">
                 <PriceInput
                     label="Base Price (RM)"
                     value={value}
@@ -287,7 +287,7 @@ export default function PricingTab({
         const weekendPrice = currentPrice.weekend_price_in_rm ?? null;
 
         return (
-            <section className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-300 rounded-xl p-8 shadow-md">
+            <section className="bg-linear-to-br from-orange-50 to-orange-100 border-2 border-orange-300 rounded-xl p-8 shadow-md">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <PriceInput
                         label="Weekday Price (Mon–Fri)"
