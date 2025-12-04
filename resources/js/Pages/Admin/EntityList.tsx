@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Inertia } from "@inertiajs/inertia";
 import { Search, Eye, Users, Wallet, TrendingUp } from "lucide-react";
 import type { User } from "../../types/index";
+import { router } from "@inertiajs/react";
 
 interface BaseEntity {
     id: string;
@@ -115,7 +115,7 @@ export default function EntityList({
                                 </div>
                             </div>
                             <button
-                                onClick={() => Inertia.get(route(createRoute))}
+                                onClick={() => router.get(route(createRoute))}
                                 className="bg-white text-orange-600 px-6 py-2.5 rounded-lg font-semibold hover:bg-orange-50 transition-all"
                             >
                                 + Add {title.slice(0, -1)}
@@ -270,7 +270,7 @@ export default function EntityList({
                                                     <td className="px-6 py-4 text-gray-900 font-medium">
                                                         <button
                                                             onClick={() =>
-                                                                Inertia.get(
+                                                                router.get(
                                                                     route(
                                                                         "admin.customers.referrals",
                                                                         item.id
@@ -289,7 +289,7 @@ export default function EntityList({
                                                     <td className="px-6 py-4 text-center">
                                                         <button
                                                             onClick={() =>
-                                                                Inertia.get(
+                                                                router.get(
                                                                     route(
                                                                         "admin.customers.wallet",
                                                                         item.id
@@ -325,7 +325,7 @@ export default function EntityList({
                                             <td className="px-6 py-4 text-center">
                                                 <button
                                                     onClick={() =>
-                                                        Inertia.get(
+                                                        router.get(
                                                             route(
                                                                 showRoute,
                                                                 item.id

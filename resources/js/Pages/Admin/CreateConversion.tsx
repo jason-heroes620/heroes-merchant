@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Inertia } from "@inertiajs/inertia";
-import { usePage } from "@inertiajs/react";
+import { useForm, usePage } from "@inertiajs/react";
 import {
     TrendingUp,
     DollarSign,
@@ -10,7 +9,7 @@ import {
     Info,
 } from "lucide-react";
 
-interface FormState {
+interface FormData {
     credits: string;
     rm: string;
     credits_per_rm: string;
@@ -32,9 +31,7 @@ interface Errors {
 
 const ConversionsCreate: React.FC = () => {
     const { props } = usePage<any>();
-    const errors = props.errors as Errors;
-
-    const [form, setForm] = useState<FormState>({
+    const { post, data, setData } = useForm<FormData>({
         credits: "",
         rm: "",
         credits_per_rm: "",
@@ -45,55 +42,69 @@ const ConversionsCreate: React.FC = () => {
         effective_from: "",
         valid_until: "",
     });
+    const errors = props.errors as Errors;
+
+    // const [form, setForm] = useState<FormState>({
+    //     credits: "",
+    //     rm: "",
+    //     credits_per_rm: "",
+    //     paid_credit_percentage: 80,
+    //     free_credit_percentage: 20,
+    //     paid_credits_preview: null,
+    //     free_credits_preview: null,
+    //     effective_from: "",
+    //     valid_until: "",
+    // });
 
     // Auto-calculate credits_per_rm when credits or rm changes
     useEffect(() => {
-        const credits = parseFloat(form.credits);
-        const rm = parseFloat(form.rm);
+        const credits = parseFloat(data.credits);
+        const rm = parseFloat(data.rm);
 
         if (!isNaN(credits) && !isNaN(rm) && rm > 0) {
-            setForm((prev) => ({
+            setData((prev) => ({
                 ...prev,
                 credits_per_rm: (credits / rm).toFixed(2),
             }));
         } else {
-            setForm((prev) => ({ ...prev, credits_per_rm: "" }));
+            setData((prev) => ({ ...prev, credits_per_rm: "" }));
         }
-    }, [form.credits, form.rm]);
+    }, [data.credits, data.rm, setData]);
 
     // Calculate preview credits
     useEffect(() => {
-        const creditsPerRM = parseFloat(form.credits_per_rm);
+        const creditsPerRM = parseFloat(data.credits_per_rm);
         if (!isNaN(creditsPerRM) && creditsPerRM > 0) {
             // Minimum paid credits must be at least credits_per_rm (rounded up)
             const minPaidCredits = Math.ceil(creditsPerRM);
             const calculatedPaid = Math.ceil(
-                creditsPerRM * (form.paid_credit_percentage / 100)
+                creditsPerRM * (data.paid_credit_percentage / 100)
             );
             const paidCredits = Math.max(calculatedPaid, minPaidCredits);
 
             // Free credits calculated from paid credits
             const freeCredits = Math.ceil(
-                (paidCredits / form.paid_credit_percentage) *
-                    form.free_credit_percentage
+                (paidCredits / data.paid_credit_percentage) *
+                    data.free_credit_percentage
             );
 
-            setForm((prev) => ({
+            setData((prev) => ({
                 ...prev,
                 paid_credits_preview: paidCredits,
                 free_credits_preview: freeCredits,
             }));
         } else {
-            setForm((prev) => ({
+            setData((prev) => ({
                 ...prev,
                 paid_credits_preview: null,
                 free_credits_preview: null,
             }));
         }
     }, [
-        form.credits_per_rm,
-        form.paid_credit_percentage,
-        form.free_credit_percentage,
+        data.credits_per_rm,
+        data.paid_credit_percentage,
+        data.free_credit_percentage,
+        setData,
     ]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -101,20 +112,20 @@ const ConversionsCreate: React.FC = () => {
 
         if (name === "paid_credit_percentage") {
             const numValue = Math.max(0, Math.min(100, Number(value) || 0));
-            setForm((prev) => ({
+            setData((prev) => ({
                 ...prev,
                 paid_credit_percentage: numValue,
                 free_credit_percentage: 100 - numValue,
             }));
         } else if (name === "free_credit_percentage") {
             const numValue = Math.max(0, Math.min(100, Number(value) || 0));
-            setForm((prev) => ({
+            setData((prev) => ({
                 ...prev,
                 free_credit_percentage: numValue,
                 paid_credit_percentage: 100 - numValue,
             }));
         } else {
-            setForm((prev) => ({
+            setData((prev) => ({
                 ...prev,
                 [name]: value,
             }));
@@ -123,16 +134,12 @@ const ConversionsCreate: React.FC = () => {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        Inertia.post("/admin/conversions", {
-            ...form,
-            credits_per_rm: parseFloat(form.credits_per_rm),
-            paid_credit_percentage: form.paid_credit_percentage,
-            free_credit_percentage: form.free_credit_percentage,
-        });
+
+        post("/admin/conversions");
     };
 
     const totalCredits =
-        (form.paid_credits_preview || 0) + (form.free_credits_preview || 0);
+        (data.paid_credits_preview || 0) + (data.free_credits_preview || 0);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
@@ -177,7 +184,7 @@ const ConversionsCreate: React.FC = () => {
                                             <input
                                                 type="number"
                                                 name="credits"
-                                                value={form.credits}
+                                                value={data.credits}
                                                 placeholder="e.g., 1"
                                                 onChange={handleChange}
                                                 className="w-full border-2 border-gray-200 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all"
@@ -193,7 +200,7 @@ const ConversionsCreate: React.FC = () => {
                                             <input
                                                 type="number"
                                                 name="rm"
-                                                value={form.rm}
+                                                value={data.rm}
                                                 placeholder="e.g., 1.80"
                                                 onChange={handleChange}
                                                 className="w-full border-2 border-gray-200 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all"
@@ -212,7 +219,7 @@ const ConversionsCreate: React.FC = () => {
                                                 type="text"
                                                 name="credits_per_rm"
                                                 value={
-                                                    form.credits_per_rm || "—"
+                                                    data.credits_per_rm || "—"
                                                 }
                                                 readOnly
                                                 className="w-full border-2 border-orange-200 bg-orange-50 px-4 py-3 rounded-lg font-semibold text-orange-700 cursor-not-allowed pr-10"
@@ -254,7 +261,7 @@ const ConversionsCreate: React.FC = () => {
                                                 type="number"
                                                 name="paid_credit_percentage"
                                                 value={
-                                                    form.paid_credit_percentage
+                                                    data.paid_credit_percentage
                                                 }
                                                 onChange={handleChange}
                                                 min={0}
@@ -271,7 +278,7 @@ const ConversionsCreate: React.FC = () => {
                                                 type="number"
                                                 name="free_credit_percentage"
                                                 value={
-                                                    form.free_credit_percentage
+                                                    data.free_credit_percentage
                                                 }
                                                 onChange={handleChange}
                                                 min={0}
@@ -287,24 +294,24 @@ const ConversionsCreate: React.FC = () => {
                                             <div
                                                 className="bg-blue-500 transition-all duration-300"
                                                 style={{
-                                                    width: `${form.paid_credit_percentage}%`,
+                                                    width: `${data.paid_credit_percentage}%`,
                                                 }}
                                             />
                                             <div
                                                 className="bg-green-500 transition-all duration-300"
                                                 style={{
-                                                    width: `${form.free_credit_percentage}%`,
+                                                    width: `${data.free_credit_percentage}%`,
                                                 }}
                                             />
                                         </div>
                                         <div className="flex justify-between text-xs text-gray-600">
                                             <span>
                                                 Paid:{" "}
-                                                {form.paid_credit_percentage}%
+                                                {data.paid_credit_percentage}%
                                             </span>
                                             <span>
                                                 Free:{" "}
-                                                {form.free_credit_percentage}%
+                                                {data.free_credit_percentage}%
                                             </span>
                                         </div>
                                     </div>
@@ -329,7 +336,7 @@ const ConversionsCreate: React.FC = () => {
                                             <input
                                                 type="date"
                                                 name="effective_from"
-                                                value={form.effective_from}
+                                                value={data.effective_from}
                                                 onChange={handleChange}
                                                 className="w-full border-2 border-gray-200 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all"
                                             />
@@ -347,7 +354,7 @@ const ConversionsCreate: React.FC = () => {
                                             <input
                                                 type="date"
                                                 name="valid_until"
-                                                value={form.valid_until}
+                                                value={data.valid_until}
                                                 onChange={handleChange}
                                                 className="w-full border-2 border-gray-200 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all"
                                             />
@@ -381,11 +388,11 @@ const ConversionsCreate: React.FC = () => {
 
                                 <div className="p-6 space-y-6">
                                     {/* Main Rate Display */}
-                                    {form.credits_per_rm ? (
+                                    {data.credits_per_rm ? (
                                         <>
                                             <div className="text-center pb-6 border-b border-gray-100">
                                                 <div className="text-5xl font-bold text-gray-800 mb-2">
-                                                    {form.credits_per_rm}
+                                                    {data.credits_per_rm}
                                                 </div>
                                                 <div className="text-sm text-gray-500 font-medium">
                                                     Credits per RM
@@ -393,9 +400,9 @@ const ConversionsCreate: React.FC = () => {
                                             </div>
 
                                             {/* Credit Breakdown */}
-                                            {form.paid_credits_preview !==
+                                            {data.paid_credits_preview !==
                                                 null &&
-                                                form.free_credits_preview !==
+                                                data.free_credits_preview !==
                                                     null && (
                                                     <div className="space-y-3">
                                                         <div className="bg-blue-50 px-4 py-4 rounded-lg border border-blue-100">
@@ -409,13 +416,13 @@ const ConversionsCreate: React.FC = () => {
                                                                 </div>
                                                                 <span className="text-2xl font-bold text-blue-600">
                                                                     {
-                                                                        form.paid_credits_preview
+                                                                        data.paid_credits_preview
                                                                     }
                                                                 </span>
                                                             </div>
                                                             <div className="text-xs text-gray-500 ml-6">
                                                                 {
-                                                                    form.paid_credit_percentage
+                                                                    data.paid_credit_percentage
                                                                 }
                                                                 % of total
                                                             </div>
@@ -432,13 +439,13 @@ const ConversionsCreate: React.FC = () => {
                                                                 </div>
                                                                 <span className="text-2xl font-bold text-green-600">
                                                                     {
-                                                                        form.free_credits_preview
+                                                                        data.free_credits_preview
                                                                     }
                                                                 </span>
                                                             </div>
                                                             <div className="text-xs text-gray-500 ml-6">
                                                                 {
-                                                                    form.free_credit_percentage
+                                                                    data.free_credit_percentage
                                                                 }
                                                                 % of total
                                                             </div>

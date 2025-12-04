@@ -75,7 +75,7 @@ class MerchantController extends Controller
     public function update(Request $request, $id)
     {
         $merchant = Merchant::with('user')->findOrFail($id);
-        
+
         $request->validate([
             'full_name' => 'required|string|max:255',
             'email' => [
