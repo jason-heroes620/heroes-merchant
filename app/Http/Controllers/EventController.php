@@ -4,22 +4,18 @@ namespace App\Http\Controllers;
 
 use App\Models\{
     Merchant,
-    Admin,
     Event,
     EventMedia,
     EventPrice,
     EventAgeGroup,
     EventFrequency,
     EventDate,
-    EventSlot,
     EventSlotPrice,
     EventLocation,
-    Conversion
 };
 use App\Services\EventSlotService;
 use App\Services\ConversionService;
 use App\Notifications\EventStatusNotification;
-use Illuminate\Validation\Rule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -185,7 +181,7 @@ class EventController extends Controller
 
         $frequency = $event->frequencies->first() ?? null;
 
-        $activeConversion = app(\App\Services\ConversionService::class)->getActiveConversion();
+        $activeConversion = app(ConversionService::class)->getActiveConversion();
 
         $eventData = [
             'event' => $event,
@@ -979,13 +975,19 @@ class EventController extends Controller
     /** Soft deactivate */
     public function deactivate(Event $event)
     {
+        $user = Auth::user();
+
         if ($user->role === 'merchant') {
             $merchant = Merchant::where('user_id', $user->id)->firstOrFail();
-            $query->where('merchant_id', $merchant->id);
+
+            // Ensure the merchant owns this event
+            if ($event->merchant_id !== $merchant->id) {
+                abort(403, 'Unauthorized action.');
+            }
         }
 
         $event->update(['status' => 'inactive']);
 
-        return redirect()->route('events.index')->with('success', 'Event deactivated successfully!');
+        return redirect()->route('merchant.events.index')->with('success', 'Event deactivated successfully!');
     }
 }

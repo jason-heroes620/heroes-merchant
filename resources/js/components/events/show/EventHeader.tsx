@@ -33,7 +33,7 @@ const EventHeader: React.FC<{
 
     return (
         <>
-            <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-8 text-white mb-6">
+            <div className="bg-linear-to-r from-orange-500 to-red-500 rounded-2xl p-8 text-white mb-6">
                 {/* Back Button */}
                 <div className="mb-4">
                     <button

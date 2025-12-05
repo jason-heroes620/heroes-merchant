@@ -142,7 +142,7 @@ export default function EntityProfileForm({
             <div className="max-w-4xl mx-auto">
                 <div className="bg-white rounded-xl shadow-lg overflow-hidden">
                     {/* Header */}
-                    <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-8 py-6 flex items-center justify-between">
+                    <div className="bg-linear-to-r from-orange-500 to-orange-600 px-8 py-6 flex items-center justify-between">
                         <div>
                             <h1 className="text-3xl font-bold text-white">
                                 {title}

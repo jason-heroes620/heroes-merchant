@@ -5,9 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Http\Resources\BookingAdminResource;
 use App\Models\Booking;
+use App\Models\Attendance;
 use App\Models\Event;
-use App\Models\EventSlot;
-use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use Inertia\Inertia;
 

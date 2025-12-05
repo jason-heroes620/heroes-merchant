@@ -68,11 +68,6 @@ class Booking extends Model
         return $this->hasMany(BookingItem::class, 'booking_id');
     }
 
-    public function merchantPayout()
-    {
-        return $this->hasOne(MerchantPayout::class, 'booking_id');
-    }
-
     public function scopeForCustomer($query, $customerId)
     {
         return $query->where('customer_id', $customerId);

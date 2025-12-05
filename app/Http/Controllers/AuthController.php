@@ -5,9 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\Merchant;
 use App\Models\Customer;
-use App\Models\CustomerWallet;
-use App\Models\PurchasePackage;
-use App\Models\CustomerCreditTransaction;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,7 +13,6 @@ use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
-use Carbon\Carbon;
 
 class AuthController extends Controller
 {
@@ -54,7 +50,7 @@ class AuthController extends Controller
 
          // Prevent duplicate device ID for API customers
         if ($isApi && $role === 'customer') {
-            $existingCustomer = \App\Models\Customer::where('device_id', $validated['device_id'])->first();
+            $existingCustomer = Customer::where('device_id', $validated['device_id'])->first();
             if ($existingCustomer) {
                 return response()->json([
                     'message' => 'This device is already registered with another account.'
@@ -82,7 +78,7 @@ class AuthController extends Controller
 
         // Create customer profile if API customer
         if ($isApi && $role === 'customer') {
-            $customer = \App\Models\Customer::create([
+            $customer = Customer::create([
                 'user_id' => $user->id,
                 'device_id' => $validated['device_id'],
             ]);

@@ -76,13 +76,48 @@ class EventSlot extends Model
             : null;
     }
 
-    public function getDisplayEndAttribute(): ?Carbon
+   public function getDisplayEndAttribute(): ?Carbon
     {
-        $date = $this->date ?? optional($this->date()->first())->end_date;
-        $time = $this->end_time instanceof Carbon ? $this->end_time->format('H:i:s') : $this->end_time;
+        // Get date part
+        $slotDate = $this->date instanceof Carbon 
+            ? $this->date->format('Y-m-d') 
+            : (is_string($this->date) ? substr($this->date, 0, 10) : null);
 
-        return $date && $time
-            ? Carbon::parse("{$date->format('Y-m-d')} {$time}", 'Asia/Kuala_Lumpur')
-            : null;
+        if (!$slotDate) {
+            $eventEndDate = optional($this->event->dates->first())->end_date;
+            $slotDate = $eventEndDate instanceof Carbon 
+                ? $eventEndDate->format('Y-m-d') 
+                : (is_string($eventEndDate) ? substr($eventEndDate, 0, 10) : null);
+        }
+
+        $slotTime = $this->end_time instanceof Carbon
+            ? $this->end_time->format('H:i:s')
+            : (is_string($this->end_time) ? substr($this->end_time, 0, 8) : null);
+
+        if (!$slotDate || !$slotTime) {
+            \Log::warning('Slot display_end is missing date or time', [
+                'slot_id' => $this->id,
+                'slot_date' => $slotDate,
+                'slot_time' => $slotTime,
+            ]);
+            return null;
+        }
+
+        try {
+            return Carbon::createFromFormat('Y-m-d H:i:s', "{$slotDate} {$slotTime}", 'Asia/Kuala_Lumpur');
+        } catch (\Exception $e) {
+            \Log::error('Failed to parse display_end', [
+                'slot_id' => $this->id,
+                'slot_date' => $slotDate,
+                'slot_time' => $slotTime,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    public function payout()
+    {
+        return $this->hasOne(MerchantSlotPayout::class,'slot_id');
     }
 }

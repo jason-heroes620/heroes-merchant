@@ -5,8 +5,6 @@ namespace App\Services;
 use App\Models\Booking;
 use App\Models\BookingItem;
 use App\Models\EventSlot;
-use App\Models\EventSlotPrice;
-use App\Models\CustomerWallet;
 use App\Models\Reminder;
 use App\Jobs\SendPushNotification;
 use App\Jobs\SendReminder;
@@ -94,9 +92,7 @@ class BookingService
                     'age_group_id' => $ageGroupIdForQuery,
                     'quantity' => $quantity,
                     'paid_credits' => $slotPrice->paid_credits ?? 0,
-                    'free_credits' => $slotPrice->free_credits ?? 0,
-                    'price' => $slotPrice->price ?? 0,
-                ]);
+                    'free_credits' => $slotPrice->free_credits ?? 0,                ]);
             }
 
             // Step 4: Deduct credits after booking items
@@ -184,7 +180,7 @@ class BookingService
             : null
         );
 
-    $slotTime = $slot->start_time instanceof \Carbon\Carbon
+    $slotTime = $slot->start_time instanceof Carbon
         ? $slot->start_time->format('H:i:s')
         : $slot->start_time;
 
@@ -235,7 +231,7 @@ class BookingService
                 ? $slot->date->format('Y-m-d') 
                 : optional($event->dates->first())->start_date?->format('Y-m-d');
 
-            $slotTime = $slot->start_time instanceof \Carbon\Carbon
+            $slotTime = $slot->start_time instanceof Carbon
                 ? $slot->start_time->format('H:i:s')
                 : $slot->start_time;
 

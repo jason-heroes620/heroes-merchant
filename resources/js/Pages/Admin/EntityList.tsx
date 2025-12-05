@@ -212,9 +212,14 @@ export default function EntityList({
                                             </>
                                         )}
                                         {type === "merchant" && (
-                                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                                Status
-                                            </th>
+                                            <>
+                                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                                    Status
+                                                </th>
+                                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                                    Payout Status
+                                                </th>
+                                            </>
                                         )}
                                         <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                             Actions
@@ -306,20 +311,32 @@ export default function EntityList({
                                             )}
 
                                             {type === "merchant" && (
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <span
-                                                        className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(
-                                                            item.business_status
-                                                        )}`}
-                                                    >
-                                                        {(
-                                                            item.business_status ||
-                                                            "N/A"
-                                                        )
-                                                            .replace("_", " ")
-                                                            .toUpperCase()}
-                                                    </span>
-                                                </td>
+                                                <>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <span
+                                                            className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(
+                                                                item.business_status
+                                                            )}`}
+                                                        >
+                                                            {(
+                                                                item.business_status ||
+                                                                "N/A"
+                                                            )
+                                                                .replace(
+                                                                    "_",
+                                                                    " "
+                                                                )
+                                                                .toUpperCase()}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <span
+                                                            className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border`}
+                                                        >
+                                                            <Eye size={16} />
+                                                        </span>
+                                                    </td>
+                                                </>
                                             )}
 
                                             <td className="px-6 py-4 text-center">

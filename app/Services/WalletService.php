@@ -6,9 +6,9 @@ use App\Models\Customer;
 use App\Models\CustomerWallet;
 use App\Models\CustomerCreditTransaction;
 use App\Models\WalletCreditGrant;
-use App\Models\PurchasePackage;
+use App\Models\Booking;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 
 class WalletService
@@ -163,6 +163,27 @@ class WalletService
             if ($deductFree > 0) $wallet->decrement('cached_free_credits', $deductFree);
             if ($deductPaid > 0) $wallet->decrement('cached_paid_credits', $deductPaid);
 
+            $conversionId = null;
+            $creditsPerRm = null;
+
+            if ($bookingId) {
+                // try to find conversion via booking -> slot -> slot price -> conversion_id
+                $booking = Booking::with('slot.prices.conversion')->find($bookingId);
+                if ($booking && $booking->slot && $booking->slot->prices && $booking->slot->prices->first()) {
+                    $slotPrice = $booking->slot->prices->first();
+                    if ($slotPrice->conversion) {
+                        $conversionId = $slotPrice->conversion->id;
+                        $creditsPerRm = (float)$slotPrice->conversion->credits_per_rm;
+                    }
+                }
+            }
+
+             // compute RM-equivalent for paid credits (only)
+            $amountInRm = null;
+            if ($creditsPerRm && $creditsPerRm > 0) {
+                $amountInRm = round($deductPaid / $creditsPerRm, 2);
+            }
+
             CustomerCreditTransaction::create([
                 'wallet_id' => $wallet->id,
                 'type' => 'booking',
@@ -170,8 +191,12 @@ class WalletService
                 'before_free_credits' => $beforeFree,
                 'delta_paid' => -$deductPaid,
                 'delta_free' => -$deductFree,
+                'amount_in_rm' => $amountInRm,
                 'description' => $desc,
                 'booking_id' => $bookingId,
+                'conversion_id' => $conversionId,
+                'credits_per_rm_at_booking' => $creditsPerRm,
+                'transaction_id' => Str::uuid()->toString(),
             ]);
 
             Log::info("Credits deducted for wallet {$wallet->id}", [
@@ -179,7 +204,10 @@ class WalletService
                 'free' => $deductFree,
                 'beforePaid' => $beforePaid,
                 'beforeFree' => $beforeFree,
-                'bookingId' => $bookingId
+                'bookingId' => $bookingId,
+                'amount_in_rm' => $amountInRm,
+                'conversion_id' => $conversionId,
+                'credits_per_rm_at_booking' => $creditsPerRm,
             ]);
         } catch (\Exception $e) {
             Log::error("Failed to deduct credits for wallet {$wallet->id}", [

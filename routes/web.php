@@ -4,8 +4,6 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\MerchantBookingController;
-use App\Http\Controllers\UserController;
 use App\Http\Controllers\MerchantController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\ProfileController;
@@ -13,19 +11,34 @@ use App\Http\Controllers\EventController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ConversionController;
 use App\Http\Controllers\PurchasePackageController;
+use App\Http\Controllers\MerchantBookingController;
+use App\Http\Controllers\MerchantPayoutController;
+use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\MerchantDashboardController;
 
 /* Root Redirect */
 Route::get('/', function () {
-    return Auth::check()
-        ? redirect()->route('dashboard')
-        : redirect()->route('login.show');
+    if (!Auth::check()) {
+        return redirect()->route('login.show');
+    }
+
+    $user = Auth::user();
+    return match ($user->role) {
+        'admin' => redirect()->route('admin.dashboard'),
+        'merchant' => redirect()->route('merchant.dashboard'),
+        default => redirect()->route('login.show'),
+    };
 });
 
-/* Dashboard (Shared for all authenticated users) */
+/* Shared Dashboard Redirect */
 Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard', [
-        'user' => Auth::user(),
-    ]);
+    $user = Auth::user();
+
+    return match ($user->role) {
+        'admin' => redirect()->route('admin.dashboard'),
+        'merchant' => redirect()->route('merchant.dashboard'),
+        default => redirect()->route('login.show'),
+    };
 })->middleware('auth')->name('dashboard');
 
 /* Authentication */
@@ -66,7 +79,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/customers/{id}/wallet', [CustomerController::class, 'wallet'])->name('customers.wallet');
         Route::get('/customers/{customer}/transactions/export-pdf', [CustomerController::class, 'exportPdf'])->name('customers.transactions.exportPdf');
 
-        Route::get('/admin/customers/{id}/referees', [CustomerController::class, 'viewReferral'])->name('customers.referrals');
+        Route::get('/customers/{id}/referees', [CustomerController::class, 'viewReferral'])->name('customers.referrals');
 
         // Admin Event Management
         Route::get('/events', [EventController::class, 'index'])->name('events.index');
@@ -77,10 +90,21 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/conversions', [ConversionController::class, 'index'])->name('conversions.index');
         Route::get('/conversions/create', [ConversionController::class, 'create'])->name('conversions.create');
         Route::post('/conversions', [ConversionController::class, 'store'])->name('conversions.store');
-        Route::post('/conversions/{conversion}/activate', [ConversionController::class, 'activate'])->name('admin.conversions.activate');
-        Route::post('/conversions/{conversion}/deactivate', [ConversionController::class, 'deactivate'])->name('admin.conversions.deactivate');
-        Route::post('/admin/conversions/check-overlap', [ConversionController::class, 'checkOverlap']);
+        Route::post('/conversions/{conversion}/activate', [ConversionController::class, 'activate'])->name('conversions.activate');
+        Route::post('/conversions/{conversion}/deactivate', [ConversionController::class, 'deactivate'])->name('conversions.deactivate');
         Route::resource('packages', PurchasePackageController::class);
+
+        //Bookings
+        Route::get('/bookings', [MerchantBookingController::class, 'main'])->name('bookings.main');
+         Route::get('/bookings/event/{eventId}', [MerchantBookingController::class, 'bookingsByEvent'])->name('bookings.by-event');
+        Route::patch('/bookings/update-status', [MerchantBookingController::class, 'updateStatus'])->name('bookings.updateStatus');
+
+        // Merchant Payouts
+        Route::get('/payouts', [MerchantPayoutController::class, 'index'])->name('payouts.index');
+        Route::post('/payouts/{id}/mark-paid', [MerchantPayoutController::class, 'markPaid']);
+
+        //Dashboard       
+        Route::get('/summary', [AdminDashboardController::class, 'summary']);
     });
 
     /* Merchant Routes */
@@ -94,14 +118,18 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/events/{event}', [EventController::class, 'update'])->name('events.update');
         Route::post('/events/{event}/deactivate', [EventController::class, 'deactivate'])->name('events.deactivate');
         Route::post('/events/{event}/update-status', [EventController::class, 'updateStatus'])->name('events.updateStatus');
+
+        Route::get('/bookings', [MerchantBookingController::class, 'main'])->name('bookings.main');
+        Route::get('/bookings/event/{eventId}', [MerchantBookingController::class, 'bookingsByEvent'])->name('bookings.by-event');
+        Route::patch('/bookings/update-status', [MerchantBookingController::class, 'updateStatus'])->name('bookings.updateStatus');
+
+        Route::get('/payouts', [MerchantPayoutController::class, 'index']);
+        Route::post('/payouts/request', [MerchantPayoutController::class, 'requestPayouts']);
+        Route::post('/payouts/{id}/mark-paid', [MerchantPayoutController::class, 'markPaid']);
+        Route::get('/dashboard', [MerchantDashboardController::class, 'index'])->name('dashboard');
     });
 
     /* Notifications (shared for all authenticated users) */
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
-    Route::post('/notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.markAsRead');
-
-    //Bookings 
-    Route::get('/bookings', [MerchantBookingController::class, 'main'])->name('bookings.main');
-    Route::get('/bookings/event/{eventId}', [MerchantBookingController::class, 'bookingsByEvent'])->name('bookings.by-event');
-    Route::patch('/bookings/update-status', [MerchantBookingController::class, 'updateStatus'])->name('bookings.updateStatus');
+    Route::post('/notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.markAsRead'); 
 });

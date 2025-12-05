@@ -79,7 +79,7 @@ const Auth: React.FC = () => {
             <Head title={isLogin ? "Login" : "Register"} />
 
             {/* Left Panel - Brand Section */}
-            <div className="hidden lg:flex lg:w-1/3 bg-gradient-to-br from-orange-400 via-orange-500 to-orange-600 p-12 flex-col justify-center relative overflow-hidden">
+            <div className="hidden lg:flex lg:w-1/3 bg-linear-to-br from-orange-400 via-orange-500 to-orange-600 p-12 flex-col justify-center relative overflow-hidden">
                 {/* Decorative circles */}
                 <div className="absolute top-0 right-0 w-96 h-96 bg-white opacity-5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
                 <div className="absolute bottom-0 left-0 w-64 h-64 bg-white opacity-5 rounded-full translate-y-1/2 -translate-x-1/2"></div>

@@ -35,4 +35,9 @@ class EventSlotPrice extends Model
     {
         return $this->belongsTo(EventAgeGroup::class, 'event_age_group_id');
     }
+    
+    public function conversion()
+    {
+        return $this->belongsTo(Conversion::class);
+    }
 }

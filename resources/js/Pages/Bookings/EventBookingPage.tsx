@@ -5,7 +5,6 @@ import {
     Gift,
     User,
     CalendarClock,
-    MapPin,
     TrendingUp,
     Users,
     CheckCircle,
@@ -128,32 +127,12 @@ const EventBookingPage: React.FC<EventBookingProps> = ({ event, bookings }) => {
             {/* Event Header */}
             <div className="bg-linear-to-r from-orange-500 to-red-500 px-8 py-12 shadow-lg">
                 <div className="max-w-7xl mx-auto">
-                    <div className="flex items-start gap-6">
-                        {event.media && event.media.length > 0 ? (
-                            <img
-                                src={`/storage/${event.media[0].file_path}`}
-                                alt={event.title}
-                                className="w-48 h-36 rounded-2xl object-cover shadow-xl border-4 border-white/30 shrink-0"
-                            />
-                        ) : (
-                            <div className="w-48 h-36 rounded-2xl bg-white/20 flex items-center justify-center text-white/60 text-sm font-medium shrink-0">
-                                No Image
-                            </div>
-                        )}
-
+                    <div className="flex  gap-6">
                         <div className="flex-1">
                             <h1 className="text-4xl font-bold text-white mb-3">
                                 {event.title}
                             </h1>
                             <div className="space-y-2">
-                                {event.location && (
-                                    <div className="flex items-center gap-2 text-orange-100">
-                                        <MapPin size={18} />
-                                        <span className="text-lg">
-                                            {event.location}
-                                        </span>
-                                    </div>
-                                )}
                                 <div className="flex items-center gap-3">
                                     <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-semibold rounded-full">
                                         {getEventTypeLabel(event.type)}
@@ -193,20 +172,6 @@ const EventBookingPage: React.FC<EventBookingProps> = ({ event, bookings }) => {
                             bg: "from-purple-100 to-purple-200",
                             border: "border-purple-100",
                         },
-                        isRecurring
-                            ? {
-                                  label: "Upcoming",
-                                  value: stats.upcoming,
-                                  icon: (
-                                      <CalendarClock
-                                          className="text-blue-600"
-                                          size={28}
-                                      />
-                                  ),
-                                  bg: "from-blue-100 to-blue-200",
-                                  border: "border-blue-100",
-                              }
-                            : null,
                         {
                             label: "Completed",
                             value: stats.completed,

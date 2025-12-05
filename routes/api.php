@@ -51,7 +51,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/bookings/{booking}', [BookingController::class, 'show']);
     Route::get('bookings/{booking}/qr', [BookingController::class, 'qr']);
     Route::patch('/bookings/{booking}/cancel', [BookingController::class, 'cancel']);
-    Route::post('/scan-qr', [AttendanceController::class, 'scanQr']);
+    Route::post('/scan-qr', [MerchantBookingController::class, 'scanQr']);
 
     Route::post('/notifications/token', [NotificationController::class, 'saveToken']);
 });
