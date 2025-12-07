@@ -23,17 +23,59 @@ class MerchantDashboardController extends Controller
         // -----------------------------
         // Active & Past Events
         // -----------------------------
-        $activeEvents = Event::where('merchant_id', $merchant->id)
-            ->whereHas('dates', fn($q) => $q->where('end_date', '>=', $today))
-            ->with(['dates', 'media'])
+        $events = Event::where('merchant_id', $merchant->id)
+            ->with(['dates', 'media', 'slots', 'ageGroups', 'location'])
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $pastEvents = Event::where('merchant_id', $merchant->id)
-            ->whereDoesntHave('dates', fn($q) => $q->where('end_date', '>=', $today))
-            ->with('media')
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $activeEvents = collect();
+        $pastEvents = collect();
+
+        foreach ($events as $event) {
+            $isActive = false;
+
+            // --- Non-recurring events ---
+            if (!$event->is_recurring) {
+                $date = $event->dates->first();
+
+                if ($date && Carbon::parse($date->end_date)->gte($today)) {
+                    $isActive = true;
+                }
+            }
+
+            // --- Recurring events (use slot date + end_time) ---
+            else {
+                foreach ($event->slots as $slot) {
+                    if (!$slot->date || !$slot->end_time) {
+                        continue;
+                    }
+
+                    try {
+                        $normalizedDate = Carbon::parse($slot->date)
+                            ->setTimezone('Asia/Kuala_Lumpur')
+                            ->format('Y-m-d');
+
+                        $normalizedTime = Carbon::parse($slot->end_time)
+                            ->format('H:i:s');
+
+                        $slotEnd = Carbon::parse("{$normalizedDate} {$normalizedTime}", 'Asia/Kuala_Lumpur');
+                    } catch (\Exception $e) {
+                        continue; 
+                    }
+
+                    if ($slotEnd->gte($today)) {
+                        $isActive = true;
+                        break;
+                    }
+                }
+            }
+
+            if ($isActive) {
+                $activeEvents->push($event);
+            } else {
+                $pastEvents->push($event);
+            }
+        }
 
         // -----------------------------
         // Bookings
@@ -45,7 +87,7 @@ class MerchantDashboardController extends Controller
 
         $allBookings = Booking::where('status', 'confirmed')
             ->whereHas('slot', fn($q) => $q->whereIn('event_id', $merchantEventIds))
-            ->with(['event.media', 'slot', 'customer.user'])
+            ->with(['event.media', 'slot', 'customer.user', 'event.ageGroups'])
             ->orderBy('booked_at', 'desc')
             ->get();
 
@@ -74,23 +116,46 @@ class MerchantDashboardController extends Controller
         // -----------------------------
         // Dashboard stats
         // -----------------------------
-        $monthlySales = $allBookings
-            ->filter(fn($b) => Carbon::parse($b->booked_at)->between($startOfMonth, $endOfMonth))
-            ->sum('quantity');
+        $monthlySales = MerchantSlotPayout::where('merchant_id', $merchant->id)
+            ->where('status', 'pending')
+            ->whereBetween('calculated_at', [$startOfMonth, $endOfMonth])
+            ->sum('gross_amount_in_rm');
 
         $lastMonthStart = $startOfMonth->copy()->subMonth()->startOfMonth();
         $lastMonthEnd = $startOfMonth->copy()->subMonth()->endOfMonth();
 
-        $lastMonthSales = $allBookings
-            ->filter(fn($b) => Carbon::parse($b->booked_at)->between($lastMonthStart, $lastMonthEnd))
-            ->sum('quantity');
+        $lastMonthSales = MerchantSlotPayout::where('merchant_id', $merchant->id)
+            ->where('status', 'pending')
+            ->whereBetween('calculated_at', [$lastMonthStart, $lastMonthEnd])
+            ->sum('gross_amount_in_rm');
 
-        $percentageIncrease = $lastMonthSales > 0
+        $monthlyPercentageIncrease = $lastMonthSales > 0
             ? (($monthlySales - $lastMonthSales) / $lastMonthSales) * 100
             : null;
 
-        $totalBookingsThisMonth = $allBookings
-            ->filter(fn($b) => Carbon::parse($b->booked_at)->between($startOfMonth, $endOfMonth))
+        $startOfWeek = $today->copy()->startOfWeek(); // Monday start
+        $endOfWeek = $today->copy()->endOfWeek();
+
+        $weeklySales = MerchantSlotPayout::where('merchant_id', $merchant->id)
+            ->where('status', 'pending')
+            ->whereBetween('calculated_at', [$startOfWeek, $endOfWeek])
+            ->sum('gross_amount_in_rm');
+
+        $lastWeekStart = $startOfWeek->copy()->subWeek();       
+        $lastWeekEnd = $startOfWeek->copy()->subWeek()->endOfWeek();
+
+        $lastWeekSales = MerchantSlotPayout::where('merchant_id', $merchant->id)
+            ->where('status', 'pending')
+            ->whereBetween('calculated_at', [$lastWeekStart, $lastWeekEnd])
+            ->sum('gross_amount_in_rm');
+
+        $weeklyPercentageIncrease = $lastWeekSales > 0
+            ? (($weeklySales - $lastWeekSales) / $lastWeekSales) * 100
+            : null;
+
+        $totalBookingsThisMonth = Booking::where('status', 'confirmed')
+            ->whereHas('slot', fn($q) => $q->whereIn('event_id', $merchantEventIds))
+            ->whereBetween('booked_at', [$startOfMonth, $endOfMonth])
             ->count();
 
         // -----------------------------
@@ -103,8 +168,10 @@ class MerchantDashboardController extends Controller
             'todayBookings' => $todayBookings,
             'weekBookings' => $weekBookings,
             'monthlySales' => $monthlySales,
+            'weeklySales' => $weeklySales,
             'lastMonthSales' => $lastMonthSales,
-            'percentageIncrease' => $percentageIncrease,
+            'monthlyPercentageIncrease' => $monthlyPercentageIncrease,
+            'weeklyPercentageIncrease' => $weeklyPercentageIncrease,
             'availablePayouts' => $availablePayouts,
             'pendingPayouts' => $pendingPayouts,
             'totalBookingsThisMonth' => $totalBookingsThisMonth,

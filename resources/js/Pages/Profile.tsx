@@ -201,7 +201,7 @@ export default function Profile({ user }: { user: UserType }) {
                                         className={`w-full py-3 px-6 rounded-lg font-semibold text-white transition-all ${
                                             pwProcessing
                                                 ? "bg-gray-400 cursor-not-allowed"
-                                                : "bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-md hover:shadow-lg"
+                                                : "bg-linear-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-md hover:shadow-lg"
                                         }`}
                                     >
                                         {pwProcessing ? (

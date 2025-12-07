@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
-use Inertia\Inertia;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\MerchantController;
 use App\Http\Controllers\CustomerController;
@@ -96,7 +95,7 @@ Route::middleware(['auth'])->group(function () {
 
         //Bookings
         Route::get('/bookings', [MerchantBookingController::class, 'main'])->name('bookings.main');
-         Route::get('/bookings/event/{eventId}', [MerchantBookingController::class, 'bookingsByEvent'])->name('bookings.by-event');
+        Route::get('/bookings/event/{eventId}', [MerchantBookingController::class, 'bookingsByEvent'])->name('bookings.by-event');
         Route::patch('/bookings/update-status', [MerchantBookingController::class, 'updateStatus'])->name('bookings.updateStatus');
 
         // Merchant Payouts
@@ -104,7 +103,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/payouts/{id}/mark-paid', [MerchantPayoutController::class, 'markPaid']);
 
         //Dashboard       
-        Route::get('/summary', [AdminDashboardController::class, 'summary']);
+        Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
     });
 
     /* Merchant Routes */

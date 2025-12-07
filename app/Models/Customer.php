@@ -86,4 +86,9 @@ class Customer extends Model
     {
         return $this->hasMany(CustomerCreditTransaction::class);
     }
+
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class);
+    }
 }

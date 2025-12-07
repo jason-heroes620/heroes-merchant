@@ -167,9 +167,20 @@ class AuthController extends Controller
             if (Auth::attempt($credentials)) {
                 $request->session()->regenerate();
                 Log::info('Login successful (Web)', ['user_id' => Auth::id()]);
+
+                $user = Auth::user();
+
+                if ($user->role === 'admin') {
+                    return redirect()->route('admin.dashboard');
+                }
+
+                if ($user->role === 'merchant') {
+                    return redirect()->route('merchant.dashboard');
+                }
+
+                // fallback (optional)
                 return redirect()->route('dashboard');
             }
-
             Log::warning('Login failed (Web)', ['email' => $request->email]);
             return back()->withErrors(['email' => 'Invalid credentials.']);
         }

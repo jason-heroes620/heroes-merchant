@@ -127,9 +127,9 @@ export default function ViewCustomerTransaction() {
     const totalCredits = wallet.free_credits + wallet.paid_credits;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50">
+        <div className="min-h-screen bg-linear-to-br from-orange-50 via-white to-red-50">
             {/* Header with Gradient */}
-            <div className="bg-gradient-to-r from-orange-500 to-red-500 shadow-lg">
+            <div className="bg-linear-to-r from-orange-500 to-red-500 shadow-lg">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
                     <div className="flex items-center justify-between my-5">
                         <div className="flex items-center gap-4">
@@ -306,7 +306,7 @@ export default function ViewCustomerTransaction() {
 
                                     <div className="w-full bg-gray-200 rounded-full h-2">
                                         <div
-                                            className="bg-gradient-to-r from-orange-500 to-orange-400 h-2 rounded-full transition-all duration-300"
+                                            className="bg-linear-to-r from-orange-500 to-orange-400 h-2 rounded-full transition-all duration-300"
                                             style={{
                                                 width: `${usagePercent}%`,
                                             }}

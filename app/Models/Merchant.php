@@ -49,4 +49,14 @@ class Merchant extends Model
     {
         return $this->user?->email; // send via the linked user’s email
     }
+
+     public function payouts()
+    {
+        return $this->hasMany(MerchantSlotPayout::class, 'merchant_id');
+    }
+
+    public function bookings()
+    {
+        return $this->hasManyThrough(Booking::class, Event::class);
+    }
 }

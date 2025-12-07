@@ -292,7 +292,9 @@ export default function TableView({
                                         <button
                                             onClick={() =>
                                                 router.visit(
-                                                    `/bookings/event/${event.id}`
+                                                    userRole === "admin"
+                                                        ? `/admin/bookings/event/${event.id}`
+                                                        : `/merchant/bookings/event/${event.id}`
                                                 )
                                             }
                                             className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-all"

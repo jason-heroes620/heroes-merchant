@@ -135,11 +135,11 @@ const ConversionsCreate: React.FC = () => {
         (form.paid_credits_preview || 0) + (form.free_credits_preview || 0);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
+        <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 py-8 px-4">
             <div className="max-w-[1600px] mx-auto">
                 {/* Header */}
                 <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                    <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 px-8 py-10">
+                    <div className="bg-linear-to-r from-orange-500 via-orange-600 to-red-500 px-8 py-10">
                         <div className="flex items-center justify-between">
                             <div>
                                 <h1 className="text-4xl font-bold text-white mb-2">
@@ -225,7 +225,7 @@ const ConversionsCreate: React.FC = () => {
                                             </p>
                                         )}
                                         <p className="text-xs text-gray-500 mt-2 flex items-start gap-1">
-                                            <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                            <Info className="w-3 h-3 mt-0.5 shrink-0" />
                                             <span>
                                                 This is the minimum paid credits
                                                 per RM to prevent admin loss
@@ -363,7 +363,7 @@ const ConversionsCreate: React.FC = () => {
                                 {/* Submit Button */}
                                 <button
                                     onClick={handleSubmit}
-                                    className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-4 rounded-lg font-semibold hover:shadow-xl transition-all text-lg"
+                                    className="w-full bg-linear-to-r from-orange-500 to-red-500 text-white px-6 py-4 rounded-lg font-semibold hover:shadow-xl transition-all text-lg"
                                 >
                                     Save Conversion Rate
                                 </button>
@@ -373,7 +373,7 @@ const ConversionsCreate: React.FC = () => {
                         {/* Preview Card */}
                         <div className="lg:col-span-2">
                             <div className="sticky top-6 bg-white rounded-xl shadow-md overflow-hidden">
-                                <div className="bg-gradient-to-r from-orange-500 to-red-500 px-6 py-4">
+                                <div className="bg-linear-to-r from-orange-500 to-red-500 px-6 py-4">
                                     <h3 className="text-white font-semibold text-lg">
                                         Live Preview
                                     </h3>
@@ -444,7 +444,7 @@ const ConversionsCreate: React.FC = () => {
                                                             </div>
                                                         </div>
 
-                                                        <div className="bg-gradient-to-r from-orange-500 to-red-500 px-4 py-4 rounded-lg">
+                                                        <div className="bg-linear-to-r from-orange-500 to-red-500 px-4 py-4 rounded-lg">
                                                             <div className="flex justify-between items-center text-white">
                                                                 <span className="text-sm font-medium">
                                                                     Total

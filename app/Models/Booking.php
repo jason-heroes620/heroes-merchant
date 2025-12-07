@@ -6,13 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class Booking extends Model
 {
     use HasFactory, HasUuids;
 
     protected $fillable = [
+        'booking_code',
         'customer_id',
         'event_id',
         'slot_id',
@@ -30,6 +31,22 @@ class Booking extends Model
         'booked_at' => 'datetime',
         'cancelled_at' => 'datetime',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($booking) {
+            if (empty($booking->id)) {
+                $booking->id = (string) Str::uuid();
+            }
+
+            // Auto-generate booking code if not provided
+            if (empty($booking->booking_code)) {
+                $booking->booking_code = strtoupper(Str::random(8));
+            }
+        });
+    }
 
     /** Relationships */
 

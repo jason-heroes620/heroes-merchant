@@ -41,7 +41,7 @@ export default function ViewReferralPage({
                     Back to Customer List
                 </button>
 
-                <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl shadow-lg p-8 text-white">
+                <div className="bg-linear-to-r from-orange-500 to-red-500 rounded-2xl shadow-lg p-8 text-white">
                     <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
                         <div className="flex-1">
                             <h1 className="text-4xl font-bold mb-3 flex items-center gap-3">
@@ -94,7 +94,7 @@ export default function ViewReferralPage({
                     </div>
 
                     {/* Credits Awarded Card */}
-                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl shadow-md p-8 border-2 border-green-200 text-center">
+                    <div className="bg-linear-to-br from-green-50 to-emerald-50 rounded-xl shadow-md p-8 border-2 border-green-200 text-center">
                         <div className="flex items-center justify-center mb-4 gap-3">
                             <Gift size={28} className="text-green-600" />
                             <h3 className="text-2xl font-semibold text-gray-700">
@@ -127,7 +127,7 @@ export default function ViewReferralPage({
 
                     <div className="relative h-6 bg-gray-200 rounded-full overflow-hidden mb-4">
                         <div
-                            className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-500 flex items-center justify-end pr-3"
+                            className="absolute inset-y-0 left-0 bg-linear-to-r from-orange-500 to-red-500 transition-all duration-500 flex items-center justify-end pr-3"
                             style={{ width: `${progressToNext}%` }}
                         >
                             {progressToNext > 15 && (
@@ -160,7 +160,7 @@ export default function ViewReferralPage({
 
                 {/* Referred By Section */}
                 <div className="bg-white rounded-xl shadow-md overflow-hidden mb-6">
-                    <div className="bg-gradient-to-r from-orange-500 to-red-500 px-8 py-5">
+                    <div className="bg-linear-to-r from-orange-500 to-red-500 px-8 py-5">
                         <h2 className="text-2xl font-bold text-white flex items-center gap-3">
                             <UserPlus size={28} />
                             Referred By
@@ -168,7 +168,7 @@ export default function ViewReferralPage({
                     </div>
                     <div className="p-8">
                         {referrer ? (
-                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 p-6 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border-2 border-orange-200">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 p-6 bg-linear-to-br from-orange-50 to-red-50 rounded-xl border-2 border-orange-200">
                                 <div className="flex items-center gap-5">
                                     {referrer?.profile_picture ? (
                                         <img
@@ -178,7 +178,7 @@ export default function ViewReferralPage({
                                         />
                                     ) : (
                                         <div
-                                            className="w-14 h-14 rounded-full bg-gradient-to-br from-orange-400 to-red-400 
+                                            className="w-14 h-14 rounded-full bg-linear-to-br from-orange-400 to-red-400 
                     flex items-center justify-center text-white 
                     font-bold text-xl shadow-sm"
                                         >
@@ -211,7 +211,7 @@ export default function ViewReferralPage({
 
                 {/* Referees List */}
                 <div className="bg-white rounded-xl shadow-md overflow-hidden">
-                    <div className="bg-gradient-to-r from-orange-500 to-red-500 px-8 py-5">
+                    <div className="bg-linear-to-r from-orange-500 to-red-500 px-8 py-5">
                         <h2 className="text-2xl font-bold text-white flex items-center gap-3">
                             <Users size={28} />
                             Referees ({referees.length})
@@ -234,7 +234,7 @@ export default function ViewReferralPage({
                                                 />
                                             ) : (
                                                 <div
-                                                    className="w-14 h-14 rounded-full bg-gradient-to-br from-orange-400 to-red-400 
+                                                    className="w-14 h-14 rounded-full bg-linear-to-br from-orange-400 to-red-400 
                     flex items-center justify-center text-white 
                     font-bold text-xl shadow-sm"
                                                 >
