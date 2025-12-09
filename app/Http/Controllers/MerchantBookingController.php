@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Http\Resources\BookingAdminResource;
 use App\Models\Booking;
-use App\Models\Attendance;
 use App\Models\Event;
 use Carbon\Carbon;
 use Inertia\Inertia;
@@ -123,47 +122,32 @@ class MerchantBookingController extends Controller
         ]);
     }
 
-    public function scanQr(Request $request)
+    public function apiBookingsByEvent(Request $request, $eventId)
     {
         $user = $request->user();
+        $event = Event::with(['slots', 'media'])->findOrFail($eventId);
 
-        $merchant = $user->merchant ?? null;
-        if (!$merchant) {
-            return response()->json(['message' => 'Merchant record not found'], 404);
-        }
+        $query = Booking::with(['slot', 'customer', 'attendances'])
+            ->whereHas('slot', fn($q) => $q->where('event_id', $eventId))
+            ->whereHas('event', fn($q) => $q->where('merchant_id', $user->merchant->id));
 
-        $data = $request->validate([
-            'qr_code_content' => 'required|string',
-        ]);
-
-        $payload = json_decode($data['qr_code_content'], true);
-        if (!isset($payload['booking_id'])) {
-            return response()->json(['message' => 'Invalid QR code'], 422);
-        }
-
-        $booking = Booking::where('id', $payload['booking_id'])
-            ->where('merchant_id', $merchant->id)
-            ->first();
-
-        if (!$booking) {
-            return response()->json(['message' => 'Booking not found for this merchant'], 404);
-        }
-
-        // Update or create attendance
-        $attendance = Attendance::updateOrCreate(
-            ['booking_id' => $booking->id, 'slot_id' => $booking->slot_id],
-            [
-                'customer_id' => $booking->customer_id,
-                'event_id' => $booking->event_id,
-                'status' => 'attended',
-                'scanned_at' => now(),
-            ]
-        );
+        $bookings = $query->orderBy('slot_id')->get();
 
         return response()->json([
-            'message' => 'Attendance recorded',
-            'attendance_status' => $attendance->status,
-            'scanned_at' => $attendance->scanned_at,
+            'success' => true,
+            'event' => [
+                'id' => $event->id,
+                'title' => $event->title,
+            ],
+            'slots' => $event->slots,
+            'bookings' => $bookings->map(fn($b) => [
+                'id' => $b->id,
+                'customer_name' => $b->customer->user->full_name ?? null,
+                'slot_date' => $b->slot->date ?? null,
+                'slot_start_time' => $b->slot->start_time ?? null,
+                'status' => $b->status,
+                'attendance_status' => $b->attendances->first()->status ?? 'pending',
+            ]),
         ]);
     }
 }

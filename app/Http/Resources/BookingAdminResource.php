@@ -65,7 +65,7 @@ class BookingAdminResource extends JsonResource
                     : null,
             ] : null,
 
-            'event' => ($event instanceof \Illuminate\Database\Eloquent\Model) ? [
+            'event' => ($event instanceof Model) ? [
                 'id' => (string) $event->id,
                 'title' => $event->title,
                 'type' => $event->type,

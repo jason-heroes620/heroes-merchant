@@ -1,4 +1,5 @@
 import { Users, UserPlus, Gift, Award, ArrowLeft } from "lucide-react";
+import AuthenticatedLayout from "@/AuthenticatedLayout";
 
 interface Props {
     customer: any;
@@ -30,6 +31,7 @@ export default function ViewReferralPage({
     const progressToNext = ((successfulReferrals % 3) / 3) * 100;
 
     return (
+        <AuthenticatedLayout>
         <div className="min-h-screen bg-gray-50 py-8 px-4">
             {/* Header */}
             <div className="max-w-7xl mx-auto mb-6">
@@ -288,5 +290,6 @@ export default function ViewReferralPage({
                 </div>
             </div>
         </div>
+        </AuthenticatedLayout>
     );
 }

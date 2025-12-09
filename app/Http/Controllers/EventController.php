@@ -20,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -509,7 +510,10 @@ class EventController extends Controller
 
     public function update(Request $request, EventSlotService $slotService, $id)
     {
+        $user = Auth::user();
+
         Log::info('🔴 DEBUG: Raw Content', ['raw' => $request->getContent()]);
+
         $user = Auth::user();
         $merchant = Merchant::where('user_id', $user->id)->firstOrFail();
 
@@ -517,21 +521,14 @@ class EventController extends Controller
             ->where('merchant_id', $merchant->id)
             ->findOrFail($id);
 
-        $decoded = [
-            'location'     => json_decode($request->input('location', '[]'), true),
-            'prices'       => json_decode($request->input('prices', '[]'), true),
-            'frequencies'  => json_decode($request->input('frequencies', '[]'), true),
-            'event_dates'  => json_decode($request->input('event_dates', '[]'), true),
-            'age_groups'   => json_decode($request->input('age_groups', '[]'), true),
-        ];
+        $hasCustomFreq = false;
 
-        $request->merge($decoded);
-
-        Log::info('🧾 Normalized After Decode:', $decoded);
-
-        $frequencies = $decoded['frequencies'] ?? [];
-        $hasCustomFreq = collect($frequencies)
-            ->contains(fn($f) => ($f['type'] ?? '') === 'custom');
+        foreach ($request->input('frequencies', []) as $freq) {
+            if (($freq['type'] ?? '') === 'custom') {
+                $hasCustomFreq = true;
+                break;
+            }
+        }
 
         // 2️⃣ Validate
         $validated = $request->validate([
@@ -850,7 +847,8 @@ class EventController extends Controller
         $media = $event->media->map(function ($m) {
             return [
                 'id' => $m->id,
-                'file_path' => $m->file_path,
+                'file_path' => $m->file_path, 
+                'url' => Storage::url($m->file_path),
                 'file_type' => $m->file_type,
                 'file_size' => $m->file_size,
             ];

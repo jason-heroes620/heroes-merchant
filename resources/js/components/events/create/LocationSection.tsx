@@ -50,7 +50,6 @@ export default function LocationSection({ setData, data }: any) {
         ).then(() => setMapsReady(true));
     }, []);
 
-
     useEffect(() => {
         if (!mapsReady || !inputRef.current) return;
 
@@ -90,6 +89,7 @@ export default function LocationSection({ setData, data }: any) {
                 raw_place: place,
             });
         });
+        console.log(autocomplete);
     }, [mapsReady, setData, data.location]);
 
     useEffect(() => {
@@ -177,7 +177,6 @@ export default function LocationSection({ setData, data }: any) {
             </div>
 
             {/* Input */}
-
             <div>
                 <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
                     Search Location

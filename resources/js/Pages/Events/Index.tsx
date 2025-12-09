@@ -17,6 +17,7 @@ import {
 import type { EventType, EventSlotPrice } from "../../types/events";
 import TableView from "../../components/events/index/TableView";
 import GridView from "../../components/events/index/GridView";
+import AuthenticatedLayout from "@/AuthenticatedLayout";
 
 interface EventsProps extends PageProps {
     events: {
@@ -222,85 +223,71 @@ export default function EventsIndexPage() {
     };
 
     return (
-        <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 py-8 px-4">
-            <div className="max-w-[1600px] mx-auto">
-                {/* Header */}
-                <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                    <div className="bg-linear-to-r from-orange-500 via-orange-600 to-red-500 px-8 py-8">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h1 className="text-4xl font-bold text-white mb-2">
-                                    {userRole === "admin"
-                                        ? "All Events"
-                                        : "My Events"}
-                                </h1>
-                                <p className="text-orange-50 text-lg">
-                                    {userRole === "admin"
-                                        ? "Manage and review all events on the platform"
-                                        : "Manage your events and programs"}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                {/* View Toggle */}
-                                <div className="flex bg-white rounded-xl p-1 shadow-lg">
-                                    <button
-                                        onClick={() => setViewMode("table")}
-                                        className={`px-4 py-2 rounded-lg transition-all ${
-                                            viewMode === "table"
-                                                ? "bg-orange-500 text-white"
-                                                : "text-gray-600 hover:bg-orange-50"
-                                        }`}
-                                    >
-                                        <List size={20} />
-                                    </button>
-                                    <button
-                                        onClick={() => setViewMode("grid")}
-                                        className={`px-4 py-2 rounded-lg transition-all ${
-                                            viewMode === "grid"
-                                                ? "bg-orange-500 text-white"
-                                                : "text-gray-600 hover:bg-orange-50"
-                                        }`}
-                                    >
-                                        <Grid3x3 size={20} />
-                                    </button>
+        <AuthenticatedLayout>
+            <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 py-8 px-4">
+                <div className="max-w-[1600px] mx-auto">
+                    {/* Header */}
+                    <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                        <div className="bg-linear-to-r from-orange-500 via-orange-600 to-red-500 px-8 py-8">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h1 className="text-4xl font-bold text-white mb-2">
+                                        {userRole === "admin"
+                                            ? "All Events"
+                                            : "My Events"}
+                                    </h1>
+                                    <p className="text-orange-50 text-lg">
+                                        {userRole === "admin"
+                                            ? "Manage and review all events on the platform"
+                                            : "Manage your events and programs"}
+                                    </p>
                                 </div>
+                                <div className="flex items-center gap-3">
+                                    {/* View Toggle */}
+                                    <div className="flex bg-white rounded-xl p-1 shadow-lg">
+                                        <button
+                                            onClick={() => setViewMode("table")}
+                                            className={`px-4 py-2 rounded-lg transition-all ${
+                                                viewMode === "table"
+                                                    ? "bg-orange-500 text-white"
+                                                    : "text-gray-600 hover:bg-orange-50"
+                                            }`}
+                                        >
+                                            <List size={20} />
+                                        </button>
+                                        <button
+                                            onClick={() => setViewMode("grid")}
+                                            className={`px-4 py-2 rounded-lg transition-all ${
+                                                viewMode === "grid"
+                                                    ? "bg-orange-500 text-white"
+                                                    : "text-gray-600 hover:bg-orange-50"
+                                            }`}
+                                        >
+                                            <Grid3x3 size={20} />
+                                        </button>
+                                    </div>
 
-                                {userRole === "merchant" && (
-                                    <button
-                                        onClick={() =>
-                                            router.visit(
-                                                "/merchant/events/create"
-                                            )
-                                        }
-                                        className="flex items-center gap-2 px-6 py-3 bg-white text-orange-600 rounded-xl font-bold hover:bg-orange-50 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
-                                    >
-                                        <Plus size={20} />
-                                        Create Event
-                                    </button>
-                                )}
+                                    {userRole === "merchant" && (
+                                        <button
+                                            onClick={() =>
+                                                router.visit(
+                                                    "/merchant/events/create"
+                                                )
+                                            }
+                                            className="flex items-center gap-2 px-6 py-3 bg-white text-orange-600 rounded-xl font-bold hover:bg-orange-50 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+                                        >
+                                            <Plus size={20} />
+                                            Create Event
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Filters */}
-                <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-                    <div className="grid md:grid-cols-4 gap-4">
-                        <div className="relative">
-                            <Search
-                                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-                                size={20}
-                            />
-                            <input
-                                type="text"
-                                placeholder="Search events..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                            />
-                        </div>
-
-                        {userRole === "admin" && (
+                    {/* Filters */}
+                    <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                        <div className="grid md:grid-cols-4 gap-4">
                             <div className="relative">
                                 <Search
                                     className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
@@ -308,174 +295,200 @@ export default function EventsIndexPage() {
                                 />
                                 <input
                                     type="text"
-                                    placeholder="Search merchant ID or company name..."
-                                    value={merchantQuery}
+                                    placeholder="Search events..."
+                                    value={searchQuery}
                                     onChange={(e) =>
-                                        setMerchantQuery(e.target.value)
+                                        setSearchQuery(e.target.value)
                                     }
                                     className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                                 />
                             </div>
-                        )}
 
-                        <div className="relative">
-                            <Filter
-                                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-                                size={20}
-                            />
+                            {userRole === "admin" && (
+                                <div className="relative">
+                                    <Search
+                                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                                        size={20}
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Search merchant ID or company name..."
+                                        value={merchantQuery}
+                                        onChange={(e) =>
+                                            setMerchantQuery(e.target.value)
+                                        }
+                                        className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                    />
+                                </div>
+                            )}
+
+                            <div className="relative">
+                                <Filter
+                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                                    size={20}
+                                />
+                                <select
+                                    value={statusFilter}
+                                    onChange={(e) =>
+                                        setStatusFilter(e.target.value)
+                                    }
+                                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent appearance-none bg-white"
+                                >
+                                    <option value="all">All Status</option>
+                                    <option value="active">Active</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="inactive">Inactive</option>
+                                    <option value="rejected">Rejected</option>
+                                    <option value="draft">Draft</option>
+                                </select>
+                            </div>
                             <select
-                                value={statusFilter}
-                                onChange={(e) =>
-                                    setStatusFilter(e.target.value)
-                                }
-                                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent appearance-none bg-white"
+                                value={typeFilter}
+                                onChange={(e) => setTypeFilter(e.target.value)}
+                                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent appearance-none bg-white"
                             >
-                                <option value="all">All Status</option>
-                                <option value="active">Active</option>
-                                <option value="pending">Pending</option>
-                                <option value="inactive">Inactive</option>
-                                <option value="rejected">Rejected</option>
-                                <option value="draft">Draft</option>
+                                <option value="all">All Types</option>
+                                <option value="event">Events</option>
+                                <option value="trial_class">
+                                    Trial Classes
+                                </option>
+                                <option value="location_based">
+                                    Field Trips
+                                </option>
                             </select>
                         </div>
-                        <select
-                            value={typeFilter}
-                            onChange={(e) => setTypeFilter(e.target.value)}
-                            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent appearance-none bg-white"
+                    </div>
+
+                    <div className="flex gap-4 mb-6">
+                        <button
+                            className={`px-4 py-2 rounded-lg ${
+                                tab === "upcoming"
+                                    ? "bg-orange-500 text-white"
+                                    : "bg-gray-100"
+                            }`}
+                            onClick={() => setTab("upcoming")}
                         >
-                            <option value="all">All Types</option>
-                            <option value="event">Events</option>
-                            <option value="trial_class">Trial Classes</option>
-                            <option value="location_based">Field Trips</option>
-                        </select>
+                            Upcoming Events
+                        </button>
+                        <button
+                            className={`px-4 py-2 rounded-lg ${
+                                tab === "past"
+                                    ? "bg-orange-500 text-white"
+                                    : "bg-gray-100"
+                            }`}
+                            onClick={() => setTab("past")}
+                        >
+                            Past Events
+                        </button>
                     </div>
-                </div>
 
-                <div className="flex gap-4 mb-6">
-                    <button
-                        className={`px-4 py-2 rounded-lg ${
-                            tab === "upcoming"
-                                ? "bg-orange-500 text-white"
-                                : "bg-gray-100"
-                        }`}
-                        onClick={() => setTab("upcoming")}
-                    >
-                        Upcoming Events
-                    </button>
-                    <button
-                        className={`px-4 py-2 rounded-lg ${
-                            tab === "past"
-                                ? "bg-orange-500 text-white"
-                                : "bg-gray-100"
-                        }`}
-                        onClick={() => setTab("past")}
-                    >
-                        Past Events
-                    </button>
-                </div>
-
-                {/* Events Display */}
-                {filteredEvents.length === 0 ? (
-                    <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
-                        <Calendar className="mx-auto h-20 w-20 text-gray-300 mb-4" />
-                        <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                            No events found
-                        </h3>
-                        <p className="text-gray-600 mb-6">
-                            {searchQuery ||
-                            statusFilter !== "all" ||
-                            typeFilter !== "all"
-                                ? "Try adjusting your filters"
-                                : "Create your first event to get started"}
-                        </p>
-                        {userRole === "merchant" && (
-                            <button
-                                onClick={() =>
-                                    router.visit("/merchant/events/create")
-                                }
-                                className="inline-flex items-center gap-2 px-6 py-3 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-all"
-                            >
-                                <Plus size={20} />
-                                Create Event
-                            </button>
-                        )}
-                    </div>
-                ) : viewMode === "table" ? (
-                    /* Table View */
-                    <TableView
-                        filteredEvents={
-                            tab === "upcoming" ? upcomingEvents : pastEvents
-                        }
-                        statusColors={statusColors}
-                        getEventTypeLabel={getEventTypeLabel}
-                        userRole={userRole}
-                        formatDate={formatDate}
-                        formatTime={formatTime}
-                        router={router}
-                        handleDeactivate={handleDeactivate}
-                    />
-                ) : (
-                    /* Grid View - Compact Cards */
-                    <GridView
-                        userRole={userRole}
-                        router={router}
-                        handleDeactivate={handleDeactivate}
-                        filteredEvents={
-                            tab === "upcoming" ? upcomingEvents : pastEvents
-                        }
-                        statusColors={statusColors}
-                        getEventTypeLabel={getEventTypeLabel}
-                        getPriceRange={getPriceRange}
-                        getFrequencyLabel={getFrequencyLabel}
-                        formatDate={formatDate}
-                        formatTime={formatTime}
-                    />
-                )}
-
-                {/* Pagination */}
-                {events.links.length > 3 && (
-                    <div className="flex justify-center items-center gap-2 mt-8">
-                        {events.links.map((link, index) =>
-                            link.url ? (
+                    {/* Events Display */}
+                    {filteredEvents.length === 0 ? (
+                        <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+                            <Calendar className="mx-auto h-20 w-20 text-gray-300 mb-4" />
+                            <h3 className="text-2xl font-bold text-gray-800 mb-2">
+                                No events found
+                            </h3>
+                            <p className="text-gray-600 mb-6">
+                                {searchQuery ||
+                                statusFilter !== "all" ||
+                                typeFilter !== "all"
+                                    ? "Try adjusting your filters"
+                                    : "Create your first event to get started"}
+                            </p>
+                            {userRole === "merchant" && (
                                 <button
-                                    key={index}
                                     onClick={() =>
-                                        router.get(link.url!, {
-                                            preserveState: true,
-                                            data: { viewMode },
-                                        })
+                                        router.visit("/merchant/events/create")
                                     }
-                                    disabled={link.active}
-                                    className={`px-4 py-2 border-2 rounded-lg transition-all font-medium ${
-                                        link.active
-                                            ? "bg-orange-500 text-white border-orange-500"
-                                            : "bg-white border-gray-200 hover:border-orange-500 hover:text-orange-600"
-                                    }`}
-                                    dangerouslySetInnerHTML={{
-                                        __html: link.label.replace(
-                                            /&laquo;|&raquo;/g,
-                                            (match) =>
-                                                match === "&laquo;" ? "←" : "→"
-                                        ),
-                                    }}
-                                />
-                            ) : (
-                                <span
-                                    key={index}
-                                    className="px-4 py-2 text-gray-400 cursor-not-allowed"
-                                    dangerouslySetInnerHTML={{
-                                        __html: link.label.replace(
-                                            /&laquo;|&raquo;/g,
-                                            (match) =>
-                                                match === "&laquo;" ? "←" : "→"
-                                        ),
-                                    }}
-                                />
-                            )
-                        )}
-                    </div>
-                )}
+                                    className="inline-flex items-center gap-2 px-6 py-3 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-all"
+                                >
+                                    <Plus size={20} />
+                                    Create Event
+                                </button>
+                            )}
+                        </div>
+                    ) : viewMode === "table" ? (
+                        /* Table View */
+                        <TableView
+                            filteredEvents={
+                                tab === "upcoming" ? upcomingEvents : pastEvents
+                            }
+                            statusColors={statusColors}
+                            getEventTypeLabel={getEventTypeLabel}
+                            userRole={userRole}
+                            formatDate={formatDate}
+                            formatTime={formatTime}
+                            router={router}
+                            handleDeactivate={handleDeactivate}
+                        />
+                    ) : (
+                        /* Grid View - Compact Cards */
+                        <GridView
+                            userRole={userRole}
+                            router={router}
+                            handleDeactivate={handleDeactivate}
+                            filteredEvents={
+                                tab === "upcoming" ? upcomingEvents : pastEvents
+                            }
+                            statusColors={statusColors}
+                            getEventTypeLabel={getEventTypeLabel}
+                            getPriceRange={getPriceRange}
+                            getFrequencyLabel={getFrequencyLabel}
+                            formatDate={formatDate}
+                            formatTime={formatTime}
+                        />
+                    )}
+
+                    {/* Pagination */}
+                    {events.links.length > 3 && (
+                        <div className="flex justify-center items-center gap-2 mt-8">
+                            {events.links.map((link, index) =>
+                                link.url ? (
+                                    <button
+                                        key={index}
+                                        onClick={() =>
+                                            router.get(link.url!, {
+                                                preserveState: true,
+                                                data: { viewMode },
+                                            })
+                                        }
+                                        disabled={link.active}
+                                        className={`px-4 py-2 border-2 rounded-lg transition-all font-medium ${
+                                            link.active
+                                                ? "bg-orange-500 text-white border-orange-500"
+                                                : "bg-white border-gray-200 hover:border-orange-500 hover:text-orange-600"
+                                        }`}
+                                        dangerouslySetInnerHTML={{
+                                            __html: link.label.replace(
+                                                /&laquo;|&raquo;/g,
+                                                (match) =>
+                                                    match === "&laquo;"
+                                                        ? "←"
+                                                        : "→"
+                                            ),
+                                        }}
+                                    />
+                                ) : (
+                                    <span
+                                        key={index}
+                                        className="px-4 py-2 text-gray-400 cursor-not-allowed"
+                                        dangerouslySetInnerHTML={{
+                                            __html: link.label.replace(
+                                                /&laquo;|&raquo;/g,
+                                                (match) =>
+                                                    match === "&laquo;"
+                                                        ? "←"
+                                                        : "→"
+                                            ),
+                                        }}
+                                    />
+                                )
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
-        </div>
+        </AuthenticatedLayout>
     );
 }

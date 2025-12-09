@@ -343,10 +343,9 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
             age_groups: data.is_suitable_for_all_ages ? [] : ageGroups,
             prices: finalPrices,
             frequencies: isRecurring ? frequencies : [],
-            event_dates: eventDates, // Already contains nested slots
+            event_dates: eventDates, 
         };
 
-        // Convert to FormData for file uploads
         const formData = new FormData();
 
         Object.entries(submissionData).forEach(([key, value]) => {

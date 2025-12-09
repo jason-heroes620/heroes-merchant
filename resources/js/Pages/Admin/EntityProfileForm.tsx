@@ -67,7 +67,7 @@ export default function EntityProfileForm({
               }
             : {
                   date_of_birth: (entity as Customer).date_of_birth || "",
-                  device_id: (entity as Customer).device_id|| "",
+                  device_id: (entity as Customer).device_id || "",
                   referral_code: (entity as Customer).referral_code || "",
               }),
     });

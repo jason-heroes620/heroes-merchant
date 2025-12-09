@@ -19,7 +19,7 @@ export default function ProfileImageUploader({
   return (
     <div className="flex flex-col items-center gap-6 pb-8 mb-8 border-b border-gray-200">
       <div className="relative group">
-        <div className="absolute -inset-1 bg-gradient-to-r from-orange-500 to-orange-600 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-300"></div>
+        <div className="absolute -inset-1 bg-linear-to-r from-orange-500 to-orange-600 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-300"></div>
         <img
           src={
             preview ||
@@ -32,7 +32,7 @@ export default function ProfileImageUploader({
         />
       </div>
       <div className="text-center">
-        <label className="cursor-pointer inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium px-6 py-3 rounded-lg transition-all shadow-md hover:shadow-lg">
+        <label className="cursor-pointer inline-flex items-center gap-2 bg-linear-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium px-6 py-3 rounded-lg transition-all shadow-md hover:shadow-lg">
           <Upload className="w-4 h-4" />
           Upload New Photo
           <input

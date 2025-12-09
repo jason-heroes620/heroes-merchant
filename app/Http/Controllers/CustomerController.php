@@ -4,13 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\User;
-use App\Models\CustomerWallet;
-use App\Models\WalletCreditGrant;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
-use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class CustomerController extends Controller

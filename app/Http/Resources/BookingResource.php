@@ -14,7 +14,8 @@ class BookingResource extends JsonResource
 
         return [
             'id' => (string) $this->id,
-            'booking_id' => (string) $this->id, 
+            'booking_id' => (string) $this->id,
+            'booking_code' => (string) $this->booking_code, 
             'status' => $this->status,
             'quantity' => $this->quantity,
             'booked_at' => $this->booked_at?->setTimezone('Asia/Kuala_Lumpur')->toIso8601String(),

@@ -5,11 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\{
     Customer,
     Event,
-    EventMedia,
-    EventPrice,
-    EventAgeGroup,
-    EventFrequency,
-    EventLocation
 };
 use App\Services\ConversionService;
 use Illuminate\Support\Facades\Auth;
@@ -29,18 +24,52 @@ class MobileEventController extends Controller
      */
     public function index(Request $request)
     {
+        $today = now('Asia/Kuala_Lumpur'); 
+
         $events = Event::with([
             'location',
             'prices',
             'ageGroups',
             'frequencies',
-            'slots' => fn($q) => $q->whereDate('date', '>=', now())->orderBy('date'),
+            'slots' => fn($q) =>
+                $q->whereDate('date', '>=', $today->toDateString()) 
+                ->orderBy('date'),
             'media',
-        ])->where('status', 'active')
+        ])
+        ->where('status', 'active')
+        ->where(function ($query) use ($today) {
+
+            // --- Non-recurring events ---
+            $query->where(function ($q) use ($today) {
+                $q->where('is_recurring', false)
+                ->whereHas('dates', function ($dateQ) use ($today) {
+                    $dateQ->whereDate('end_date', '>=', $today->toDateString());
+                });
+            })
+
+            // --- Recurring events ---
+            ->orWhere(function ($q) use ($today) {
+                $q->where('is_recurring', true)
+                ->whereHas('slots', function ($slotQ) use ($today) {
+                    $slotQ->where(function ($q) use ($today) {
+
+                        // future slots (date is after today)
+                        $q->whereDate('date', '>', $today->toDateString())
+
+                        // OR today's slot but end_time is still upcoming
+                        ->orWhere(function ($q2) use ($today) {
+                            $q2->whereDate('date', '=', $today->toDateString())
+                            ->whereTime('end_time', '>=', $today->format('H:i:s'));
+                        });
+                    });
+                });
+            });
+        })
         ->orderByDesc('featured')
         ->orderBy('created_at', 'desc')
         ->get();
 
+        // --- Transform events ---
         $events->transform(function ($event) {
             $event->slots->transform(function ($slot) {
                 $slot->available_seats = $slot->is_unlimited
@@ -52,7 +81,7 @@ class MobileEventController extends Controller
             $event->slotPrices = $event->slots->flatMap(fn($slot) => $slot->prices)->values();
 
             $event->media->transform(function ($media) {
-                $media->file_path = $media->url; 
+                $media->file_path = $media->url;
                 return $media;
             });
 
@@ -78,7 +107,20 @@ class MobileEventController extends Controller
             'slots.prices',
             'frequencies',
             'media',
+            'dates',
         ]);
+
+        $now = now()->setTimezone('Asia/Kuala_Lumpur');
+
+        $filteredSlots = $event->slots->filter(function ($slot) use ($now, $event) {
+
+            $slotEnd = $slot->display_end; 
+
+            return $slotEnd && $slotEnd->gte($now);
+
+        })->values();
+
+        $event->setRelation('slots', $filteredSlots);
 
         $event->slots->transform(function ($slot) {
             $slot->available_seats = $slot->is_unlimited
@@ -92,24 +134,27 @@ class MobileEventController extends Controller
             return $media;
         });
 
-        $dates = collect();
 
         if ($event->is_recurring) {
-            // Use slot dates for recurring events
             $dates = $event->slots->map(function ($slot) {
                 return [
                     'start_date' => $slot->date,
                     'end_date'   => $slot->date,
                 ];
-            })->unique();
+            })->unique('start_date')->values();
         } else {
-            // Use event dates for one-time events
-            $dates = $event->dates->map(function ($date) {
+            $dates = $event->dates->filter(function ($date) use ($event, $now) {
+                return $event->slots->contains(function ($slot) use ($date, $now) {
+                    return $slot->event_date_id === $date->id
+                        && $slot->display_end
+                        && $slot->display_end->gte($now);
+                });
+            })->map(function ($date) {
                 return [
                     'start_date' => $date->start_date,
                     'end_date'   => $date->end_date,
                 ];
-            });
+            })->values();
         }
 
         $slotPrices = $event->slots->flatMap(fn($slot) => $slot->prices)->values();

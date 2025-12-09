@@ -130,8 +130,8 @@ class MerchantPayoutService
             throw new \Exception("Cannot determine slot end for slot $slotId");
         }
 
-        $dateStr = $date instanceof \Carbon\Carbon ? $date->format('Y-m-d') : $date;
-        $endTimeStr = $endTime instanceof \Carbon\Carbon ? $endTime->format('H:i:s') : $endTime;
+        $dateStr = $date instanceof Carbon ? $date->format('Y-m-d') : $date;
+        $endTimeStr = $endTime instanceof Carbon ? $endTime->format('H:i:s') : $endTime;
         $slotEnd = Carbon::parse("$dateStr $endTimeStr", 'Asia/Kuala_Lumpur');
 
         Log::info('Slot end calculated', ['slot_id' => $slotId, 'slotEnd' => $slotEnd]);

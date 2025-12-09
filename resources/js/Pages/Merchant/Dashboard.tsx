@@ -7,6 +7,7 @@ import RevenueCard from "../../components/dashboard/RevenueCard";
 import StatsGrid from "../../components/dashboard/StatsGrid";
 import UpcomingEventsGrid from "../../components/dashboard/UpcomingEventsGrid";
 import type { EventType } from "../../types/events";
+import AuthenticatedLayout from "../../AuthenticatedLayout";
 
 interface BookingType {
     id: number;
@@ -84,58 +85,64 @@ const MerchantDashboard: React.FC<DashboardProps> = ({
     }, [weekBookings]);
 
     return (
-        <DashboardLayout title="Dashboard" userRole="merchant">
-            {/* Revenue Section */}
-            <RevenueCard
-                weeklySales={weeklySales}
-                monthlySales={monthlySales}
-                weeklyPercentage={weeklyPercentageIncrease ?? 0}
-                monthlyPercentage={monthlyPercentageIncrease ?? 0}
-            />
+        <AuthenticatedLayout>
+            <DashboardLayout title="Dashboard" userRole="merchant">
+                {/* Revenue Section */}
+                <RevenueCard
+                    weeklySales={weeklySales}
+                    monthlySales={monthlySales}
+                    weeklyPercentage={weeklyPercentageIncrease ?? 0}
+                    monthlyPercentage={monthlyPercentageIncrease ?? 0}
+                />
 
-            {/* Stats Section */}
-            <StatsGrid
-                activeEvents={activeEvents.length}
-                todayBookings={todayBookings.length}
-                attendeesToday={todayBookings.reduce(
-                    (s, b) => s + (b.quantity || 0),
-                    0
-                )}
-                availablePayouts={availablePayouts}
-                pendingPayouts={pendingPayouts}
-                onEventsClick={() => router.visit("/merchant/events")}
-                onBookingsClick={() => router.visit("/merchant/bookings")}
-                onPayoutClick={() => router.visit("/merchant/payouts")}
-            />
+                {/* Stats Section */}
+                <StatsGrid
+                    activeEvents={activeEvents.length}
+                    todayBookings={todayBookings.length}
+                    attendeesToday={todayBookings.reduce(
+                        (s, b) => s + (b.quantity || 0),
+                        0
+                    )}
+                    availablePayouts={availablePayouts}
+                    pendingPayouts={pendingPayouts}
+                    onEventsClick={() => router.visit("/merchant/events")}
+                    onBookingsClick={() => router.visit("/merchant/bookings")}
+                    onPayoutClick={() => router.visit("/merchant/payouts")}
+                />
 
-            {/* Quick Actions */}
-            <QuickActions
-                availablePayouts={availablePayouts}
-                activeEventsCount={activeEvents.length}
-                pastEventsCount={pastEvents.length}
-                onCreateEvent={() => router.visit("/merchant/events/create")}
-                onRequestPayout={() => router.visit("/merchant/payouts")}
-                onViewEvents={() => router.visit("/merchant/events")}
-            />
+                {/* Quick Actions */}
+                <QuickActions
+                    availablePayouts={availablePayouts}
+                    activeEventsCount={activeEvents.length}
+                    pastEventsCount={pastEvents.length}
+                    onCreateEvent={() =>
+                        router.visit("/merchant/events/create")
+                    }
+                    onRequestPayout={() => router.visit("/merchant/payouts")}
+                    onViewEvents={() => router.visit("/merchant/events")}
+                />
 
-            {/* Upcoming Events */}
-            <UpcomingEventsGrid
-                events={activeEvents}
-                userRole="merchant"
-                onEventClick={(id) => router.visit(`/merchant/events/${id}`)}
-            />
+                {/* Upcoming Events */}
+                <UpcomingEventsGrid
+                    events={activeEvents}
+                    userRole="merchant"
+                    onEventClick={(id) =>
+                        router.visit(`/merchant/events/${id}`)
+                    }
+                />
 
-            {/* Bookings */}
-            <BookingsSection
-                todayBookings={todayBookings}
-                weekBookings={weekBookings}
-                monthBookings={monthBookings}
-                userRole="merchant"
-                onBookingClick={(id) =>
-                    router.visit(`/merchant/bookings/${id}`)
-                }
-            />
-        </DashboardLayout>
+                {/* Bookings */}
+                <BookingsSection
+                    todayBookings={todayBookings}
+                    weekBookings={weekBookings}
+                    monthBookings={monthBookings}
+                    userRole="merchant"
+                    onBookingClick={(id) =>
+                        router.visit(`/merchant/bookings/${id}`)
+                    }
+                />
+            </DashboardLayout>
+        </AuthenticatedLayout>
     );
 };
 

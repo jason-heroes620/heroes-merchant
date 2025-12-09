@@ -82,7 +82,7 @@ const BasicInfoSection: React.FC<{
                 <div className="p-6">
                     <div className="grid grid-cols-3 gap-3 mb-6">
                         <div className="p-3 bg-gray-50 rounded-lg flex items-center gap-2.5">
-                            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center shrink-0">
                                 <Layers className="w-5 h-5 text-orange-600" />
                             </div>
                             <div className="min-w-0 flex-1">
@@ -96,7 +96,7 @@ const BasicInfoSection: React.FC<{
                         </div>
 
                         <div className="p-3 bg-gray-50 rounded-lg flex items-center gap-2.5">
-                            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center shrink-0">
                                 <Tag className="w-5 h-5 text-orange-600" />
                             </div>
                             <div className="min-w-0 flex-1">
@@ -110,7 +110,7 @@ const BasicInfoSection: React.FC<{
                         </div>
 
                         <div className="p-3 bg-gray-50 rounded-lg flex items-center gap-2.5">
-                            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center shrink-0">
                                 <UsersIcon className="w-5 h-5 text-orange-600" />
                             </div>
                             <div className="min-w-0 flex-1">

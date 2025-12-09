@@ -4,7 +4,7 @@ import EntityList from "./EntityList";
 
 export default function MerchantList() {
     const { merchants } = usePage<PageProps>().props;
-    
+
     return (
         <EntityList
             type="merchant"
@@ -14,4 +14,3 @@ export default function MerchantList() {
         />
     );
 }
-

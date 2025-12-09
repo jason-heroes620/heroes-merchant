@@ -1,6 +1,7 @@
 import { usePage } from "@inertiajs/react";
 import EntityProfileForm from "./EntityProfileForm";
 import type { PageProps } from "../../types";
+import AuthenticatedLayout from "@/AuthenticatedLayout";
 
 export default function ViewCustomerProfile() {
     const { customer } = usePage<PageProps>().props;
@@ -9,10 +10,12 @@ export default function ViewCustomerProfile() {
     const entity = customer as PageProps["customers"][number];
 
     return (
-        <EntityProfileForm
-            entity={entity}
-            type="customer"
-            updateRoute="admin.customers.update"
-        />
+        <AuthenticatedLayout>
+            <EntityProfileForm
+                entity={entity}
+                type="customer"
+                updateRoute="admin.customers.update"
+            />
+        </AuthenticatedLayout>
     );
 }

@@ -20,6 +20,7 @@ import EventModesSection from "../../components/events/show/EventModesSection";
 import BasicInfoSection from "../../components/events/show/BasicInfoSection";
 import PricingSection from "../../components/events/show/PricingSection";
 import BookingInfoSection from "../../components/events/show/BookingInfoSection";
+import AuthenticatedLayout from "@/AuthenticatedLayout";
 
 interface EventDisplayData {
     event: Event;
@@ -85,46 +86,48 @@ const EventDisplayPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-            <div className="max-w-7xl mx-auto">
-                <EventHeader
-                    event={eventData.event}
-                    userRole={userRole}
-                    conversion={eventData.conversion}
-                    onStatusUpdate={handleStatusUpdate}
-                />
+        <AuthenticatedLayout>
+            <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+                <div className="max-w-7xl mx-auto">
+                    <EventHeader
+                        event={eventData.event}
+                        userRole={userRole}
+                        conversion={eventData.conversion}
+                        onStatusUpdate={handleStatusUpdate}
+                    />
 
-                <BasicInfoSection
-                    event={eventData.event}
-                    media={eventData.media}
-                    ageGroups={eventData.ageGroups}
-                    location={eventData.location}
-                />
+                    <BasicInfoSection
+                        event={eventData.event}
+                        media={eventData.media}
+                        ageGroups={eventData.ageGroups}
+                        location={eventData.location}
+                    />
 
-                <PricingSection
-                    prices={eventData.prices}
-                    ageGroups={eventData.ageGroups}
-                    userRole={userRole}
-                    conversion={eventData.conversion}
-                />
+                    <PricingSection
+                        prices={eventData.prices}
+                        ageGroups={eventData.ageGroups}
+                        userRole={userRole}
+                        conversion={eventData.conversion}
+                    />
 
-                <EventModesSection
-                    event={eventData.event}
-                    slots={eventData.slots}
-                    ageGroups={eventData.ageGroups}
-                    bookings={eventData.bookings}
-                    frequency={eventData.frequency}
-                    dates={eventData.dates}
-                    userRole={userRole}
-                />
+                    <EventModesSection
+                        event={eventData.event}
+                        slots={eventData.slots}
+                        ageGroups={eventData.ageGroups}
+                        bookings={eventData.bookings}
+                        frequency={eventData.frequency}
+                        dates={eventData.dates}
+                        userRole={userRole}
+                    />
 
-                <BookingInfoSection
-                    event={eventData.event}
-                    slots={eventData.slots}
-                    bookings={eventData.bookings}
-                />
+                    <BookingInfoSection
+                        event={eventData.event}
+                        slots={eventData.slots}
+                        bookings={eventData.bookings}
+                    />
+                </div>
             </div>
-        </div>
+        </AuthenticatedLayout>
     );
 };
 

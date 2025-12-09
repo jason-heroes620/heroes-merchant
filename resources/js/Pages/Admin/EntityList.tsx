@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Inertia } from "@inertiajs/inertia";
 import { Search, Eye, Users, Wallet, TrendingUp } from "lucide-react";
 import type { User } from "../../types/index";
+import AuthenticatedLayout from "@/AuthenticatedLayout";
 
 interface BaseEntity {
     id: string;
@@ -97,281 +98,294 @@ export default function EntityList({
             : "Search by name, email, or referral code...";
 
     return (
-        <div className="min-h-screen bg-gray-50 py-8 px-4">
-            <div className="max-w-7xl mx-auto">
-                <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                    {/* Header */}
-                    <div className="bg-linear-to-r from-orange-500 to-orange-600 px-8 py-6">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <Users className="text-white" size={32} />
-                                <div>
-                                    <h1 className="text-3xl font-bold text-white">
-                                        {title}
-                                    </h1>
-                                    <p className="text-orange-100 mt-1">
-                                        {subtitle}
+        <AuthenticatedLayout>
+            <div className="min-h-screen bg-gray-50 py-8 px-4">
+                <div className="max-w-7xl mx-auto">
+                    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                        {/* Header */}
+                        <div className="bg-linear-to-r from-orange-500 to-orange-600 px-8 py-6">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <Users className="text-white" size={32} />
+                                    <div>
+                                        <h1 className="text-3xl font-bold text-white">
+                                            {title}
+                                        </h1>
+                                        <p className="text-orange-100 mt-1">
+                                            {subtitle}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() =>
+                                        Inertia.get(route(createRoute))
+                                    }
+                                    className="bg-white text-orange-600 px-6 py-2.5 rounded-lg font-semibold hover:bg-orange-50 transition-all"
+                                >
+                                    + Add {title.slice(0, -1)}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Filters and Search */}
+                        <div className="p-6 bg-gray-50 border-b border-gray-200">
+                            <div className="flex flex-col md:flex-row gap-4">
+                                <div className="grow relative">
+                                    <Search
+                                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                                        size={20}
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder={placeholder}
+                                        value={searchTerm}
+                                        onChange={(e) =>
+                                            setSearchTerm(e.target.value)
+                                        }
+                                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                    />
+                                </div>
+
+                                {type === "merchant" && (
+                                    <select
+                                        value={filterStatus}
+                                        onChange={(e) =>
+                                            setFilterStatus(e.target.value)
+                                        }
+                                        className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                    >
+                                        <option value="all">
+                                            All Status ({getStatusCount("all")})
+                                        </option>
+                                        <option value="verified">
+                                            Verified (
+                                            {getStatusCount("verified")})
+                                        </option>
+                                        <option value="pending_verification">
+                                            Pending (
+                                            {getStatusCount(
+                                                "pending_verification"
+                                            )}
+                                            )
+                                        </option>
+                                        <option value="rejected">
+                                            Rejected (
+                                            {getStatusCount("rejected")})
+                                        </option>
+                                    </select>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Table */}
+                        <div className="overflow-x-auto">
+                            {filteredData.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <Users
+                                        className="mx-auto text-gray-400 mb-4"
+                                        size={48}
+                                    />
+                                    <p className="text-gray-500 text-lg">
+                                        No {title.toLowerCase()} found
+                                    </p>
+                                    <p className="text-gray-400 text-sm mt-1">
+                                        Try adjusting your search or filters
                                     </p>
                                 </div>
-                            </div>
-                            <button
-                                onClick={() => Inertia.get(route(createRoute))}
-                                className="bg-white text-orange-600 px-6 py-2.5 rounded-lg font-semibold hover:bg-orange-50 transition-all"
-                            >
-                                + Add {title.slice(0, -1)}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Filters and Search */}
-                    <div className="p-6 bg-gray-50 border-b border-gray-200">
-                        <div className="flex flex-col md:flex-row gap-4">
-                            <div className="grow relative">
-                                <Search
-                                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                                    size={20}
-                                />
-                                <input
-                                    type="text"
-                                    placeholder={placeholder}
-                                    value={searchTerm}
-                                    onChange={(e) =>
-                                        setSearchTerm(e.target.value)
-                                    }
-                                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            {type === "merchant" && (
-                                <select
-                                    value={filterStatus}
-                                    onChange={(e) =>
-                                        setFilterStatus(e.target.value)
-                                    }
-                                    className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                >
-                                    <option value="all">
-                                        All Status ({getStatusCount("all")})
-                                    </option>
-                                    <option value="verified">
-                                        Verified ({getStatusCount("verified")})
-                                    </option>
-                                    <option value="pending_verification">
-                                        Pending (
-                                        {getStatusCount("pending_verification")}
-                                        )
-                                    </option>
-                                    <option value="rejected">
-                                        Rejected ({getStatusCount("rejected")})
-                                    </option>
-                                </select>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Table */}
-                    <div className="overflow-x-auto">
-                        {filteredData.length === 0 ? (
-                            <div className="text-center py-12">
-                                <Users
-                                    className="mx-auto text-gray-400 mb-4"
-                                    size={48}
-                                />
-                                <p className="text-gray-500 text-lg">
-                                    No {title.toLowerCase()} found
-                                </p>
-                                <p className="text-gray-400 text-sm mt-1">
-                                    Try adjusting your search or filters
-                                </p>
-                            </div>
-                        ) : (
-                            <table className="w-full">
-                                <thead className="bg-gray-50 border-b border-gray-200">
-                                    <tr>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Full Name
-                                        </th>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Email
-                                        </th>
-                                        {type === "merchant" ? (
+                            ) : (
+                                <table className="w-full">
+                                    <thead className="bg-gray-50 border-b border-gray-200">
+                                        <tr>
                                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                                Company
+                                                Full Name
                                             </th>
-                                        ) : (
-                                            <>
-                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                                    Age
-                                                </th>
-                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                                    Referral Code
-                                                </th>
-                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                                    Wallet & Transaction
-                                                </th>
-                                            </>
-                                        )}
-                                        {type === "merchant" && (
-                                            <>
-                                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                                    Status
-                                                </th>
-                                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                                    Payout Status
-                                                </th>
-                                            </>
-                                        )}
-                                        <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Actions
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200">
-                                    {filteredData.map((item: any) => (
-                                        <tr
-                                            key={item.id}
-                                            className="hover:bg-gray-50 transition-colors"
-                                        >
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="flex items-center gap-3">
-                                                    {item.user
-                                                        ?.profile_picture ? (
-                                                        <img
-                                                            src={`/storage/${item.user?.profile_picture}`}
-                                                            alt={
-                                                                item.user
-                                                                    .full_name
-                                                            }
-                                                            className="w-10 h-10 rounded-full object-cover border"
-                                                        />
-                                                    ) : (
-                                                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-sm">
-                                                            {item.user?.full_name
-                                                                ?.charAt(0)
-                                                                ?.toUpperCase() ??
-                                                                "?"}
-                                                        </div>
-                                                    )}
-                                                    <div className="font-medium text-gray-900">
-                                                        {item.user?.full_name ??
-                                                            "User"}
-                                                    </div>
-                                                </div>
-                                            </td>
-
-                                            <td className="px-6 py-4 text-gray-600">
-                                                {item.user.email}
-                                            </td>
-
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                                Email
+                                            </th>
                                             {type === "merchant" ? (
-                                                <td className="px-6 py-4 font-medium text-gray-900">
-                                                    {item.company_name}
-                                                </td>
+                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                                    Company
+                                                </th>
                                             ) : (
                                                 <>
-                                                    <td className="px-6 py-4 text-gray-900 font-medium">
-                                                        {item.age ?? "-"}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-gray-900 font-medium">
-                                                        <button
-                                                            onClick={() =>
-                                                                Inertia.get(
-                                                                    route(
-                                                                        "admin.customers.referrals",
-                                                                        item.id
-                                                                    )
-                                                                )
-                                                            }
-                                                            className="inline-flex items-center justify-center gap-2 bg-gray-100 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-200 transition-all font-medium text-sm"
-                                                        >
-                                                            <TrendingUp
-                                                                size={16}
-                                                            />
-                                                            View Referrals
-                                                        </button>
-                                                    </td>
-
-                                                    <td className="px-6 py-4 text-center">
-                                                        <button
-                                                            onClick={() =>
-                                                                Inertia.get(
-                                                                    route(
-                                                                        "admin.customers.wallet",
-                                                                        item.id
-                                                                    )
-                                                                )
-                                                            }
-                                                            className="inline-flex items-center gap-2 bg-blue-800 text-white px-4 py-2 rounded-lg hover:bg-blue-900 transition-all font-medium"
-                                                        >
-                                                            <Wallet size={16} />
-                                                            View
-                                                        </button>
-                                                    </td>
+                                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                                        Age
+                                                    </th>
+                                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                                        Referral Code
+                                                    </th>
+                                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                                        Wallet & Transaction
+                                                    </th>
                                                 </>
                                             )}
-
                                             {type === "merchant" && (
                                                 <>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <span
-                                                            className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(
-                                                                item.business_status
-                                                            )}`}
-                                                        >
-                                                            {(
-                                                                item.business_status ||
-                                                                "N/A"
-                                                            )
-                                                                .replace(
-                                                                    "_",
-                                                                    " "
-                                                                )
-                                                                .toUpperCase()}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <span
-                                                            className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border`}
-                                                        >
-                                                            <Eye size={16} />
-                                                        </span>
-                                                    </td>
+                                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                                        Status
+                                                    </th>
+                                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                                        Payout Status
+                                                    </th>
                                                 </>
                                             )}
-
-                                            <td className="px-6 py-4 text-center">
-                                                <button
-                                                    onClick={() =>
-                                                        Inertia.get(
-                                                            route(
-                                                                showRoute,
-                                                                item.id
-                                                            )
-                                                        )
-                                                    }
-                                                    className="inline-flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-all font-medium"
-                                                >
-                                                    <Eye size={16} />
-                                                    View/Edit Profile
-                                                </button>
-                                            </td>
+                                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                                Actions
+                                            </th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                        {filteredData.map((item: any) => (
+                                            <tr
+                                                key={item.id}
+                                                className="hover:bg-gray-50 transition-colors"
+                                            >
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="flex items-center gap-3">
+                                                        {item.user
+                                                            ?.profile_picture ? (
+                                                            <img
+                                                                src={`/storage/${item.user?.profile_picture}`}
+                                                                alt={
+                                                                    item.user
+                                                                        .full_name
+                                                                }
+                                                                className="w-10 h-10 rounded-full object-cover border"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-sm">
+                                                                {item.user?.full_name
+                                                                    ?.charAt(0)
+                                                                    ?.toUpperCase() ??
+                                                                    "?"}
+                                                            </div>
+                                                        )}
+                                                        <div className="font-medium text-gray-900">
+                                                            {item.user
+                                                                ?.full_name ??
+                                                                "User"}
+                                                        </div>
+                                                    </div>
+                                                </td>
+
+                                                <td className="px-6 py-4 text-gray-600">
+                                                    {item.user.email}
+                                                </td>
+
+                                                {type === "merchant" ? (
+                                                    <td className="px-6 py-4 font-medium text-gray-900">
+                                                        {item.company_name}
+                                                    </td>
+                                                ) : (
+                                                    <>
+                                                        <td className="px-6 py-4 text-gray-900 font-medium">
+                                                            {item.age ?? "-"}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-gray-900 font-medium">
+                                                            <button
+                                                                onClick={() =>
+                                                                    Inertia.get(
+                                                                        route(
+                                                                            "admin.customers.referrals",
+                                                                            item.id
+                                                                        )
+                                                                    )
+                                                                }
+                                                                className="inline-flex items-center justify-center gap-2 bg-gray-100 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-200 transition-all font-medium text-sm"
+                                                            >
+                                                                <TrendingUp
+                                                                    size={16}
+                                                                />
+                                                                View Referrals
+                                                            </button>
+                                                        </td>
+
+                                                        <td className="px-6 py-4 text-center">
+                                                            <button
+                                                                onClick={() =>
+                                                                    Inertia.get(
+                                                                        route(
+                                                                            "admin.customers.wallet",
+                                                                            item.id
+                                                                        )
+                                                                    )
+                                                                }
+                                                                className="inline-flex items-center gap-2 bg-blue-800 text-white px-4 py-2 rounded-lg hover:bg-blue-900 transition-all font-medium"
+                                                            >
+                                                                <Wallet
+                                                                    size={16}
+                                                                />
+                                                                View
+                                                            </button>
+                                                        </td>
+                                                    </>
+                                                )}
+
+                                                {type === "merchant" && (
+                                                    <>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <span
+                                                                className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(
+                                                                    item.business_status
+                                                                )}`}
+                                                            >
+                                                                {(
+                                                                    item.business_status ||
+                                                                    "N/A"
+                                                                )
+                                                                    .replace(
+                                                                        "_",
+                                                                        " "
+                                                                    )
+                                                                    .toUpperCase()}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <span
+                                                                className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border`}
+                                                            >
+                                                                <Eye
+                                                                    size={16}
+                                                                />
+                                                            </span>
+                                                        </td>
+                                                    </>
+                                                )}
+
+                                                <td className="px-6 py-4 text-center">
+                                                    <button
+                                                        onClick={() =>
+                                                            Inertia.get(
+                                                                route(
+                                                                    showRoute,
+                                                                    item.id
+                                                                )
+                                                            )
+                                                        }
+                                                        className="inline-flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-all font-medium"
+                                                    >
+                                                        <Eye size={16} />
+                                                        View/Edit Profile
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+
+                        {filteredData.length > 0 && (
+                            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                                <p className="text-sm text-gray-600">
+                                    Showing {filteredData.length} of{" "}
+                                    {data.length} {title.toLowerCase()}
+                                </p>
+                            </div>
                         )}
                     </div>
-
-                    {filteredData.length > 0 && (
-                        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-                            <p className="text-sm text-gray-600">
-                                Showing {filteredData.length} of {data.length}{" "}
-                                {title.toLowerCase()}
-                            </p>
-                        </div>
-                    )}
                 </div>
             </div>
-        </div>
+        </AuthenticatedLayout>
     );
 }

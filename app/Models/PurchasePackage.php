@@ -42,4 +42,10 @@ class PurchasePackage extends Model
     {
         return $this->hasMany(CustomerCreditTransaction::class, 'purchase_package_id');
     }
+
+    public function purchaseTransactions()
+    {
+        return $this->hasMany(CustomerCreditTransaction::class, 'purchase_package_id')
+            ->where('type', 'purchase');
+    }
 }

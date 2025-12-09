@@ -6,7 +6,6 @@ use Illuminate\Http\Request;
 use App\Services\BookingService;
 use App\Http\Resources\BookingResource;
 use App\Models\Booking;
-use App\Models\Event;
 use App\Models\EventSlot;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -89,7 +88,7 @@ class BookingController extends Controller
         }
 
         return response()->json([
-            'qr_url' => asset("storage/{$booking->qr_code_path}")
+            'qr_url' => asset($booking->qr_code_path)
         ]);
     }
 

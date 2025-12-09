@@ -205,6 +205,7 @@ export interface BookingItem {
 
 export interface Booking {
     id: string;
+    booking_code: string;
     booking_id?: string;
     status: string;
     quantity: number;

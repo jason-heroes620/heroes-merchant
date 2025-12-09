@@ -24,6 +24,7 @@ class MerchantDashboardController extends Controller
         // Active & Past Events
         // -----------------------------
         $events = Event::where('merchant_id', $merchant->id)
+            ->where('status', 'active')
             ->with(['dates', 'media', 'slots', 'ageGroups', 'location'])
             ->orderBy('created_at', 'desc')
             ->get();

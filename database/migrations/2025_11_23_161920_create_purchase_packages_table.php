@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('purchase_packages', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('name'); // Free Registration
+            $table->string('name'); 
             $table->decimal('price_in_rm', 10, 2)->nullable();
             $table->integer('paid_credits')->nullable(); 
             $table->integer('free_credits')->nullable();

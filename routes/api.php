@@ -6,9 +6,11 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\WalletController;
 use App\Http\Controllers\MobileEventController;
+use App\Http\Controllers\MerchantEventController;
+use App\Http\Controllers\MerchantBookingController;
 use App\Http\Controllers\EventLikeController;
 use App\Http\Controllers\BookingController;
-use App\Http\Controllers\MerchantBookingController;
+use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PurchasePackageController;
 
@@ -17,6 +19,8 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/password/forgot', [AuthController::class, 'sendResetLinkEmail']);
 Route::post('/password/reset', [AuthController::class, 'resetPassword']);
+Route::post('/merchant/login', [AuthController::class, 'merchantLogin']);
+
 
 Route::get('/packages', [PurchasePackageController::class, 'index']);
 
@@ -47,13 +51,18 @@ Route::middleware('auth:sanctum')->group(function () {
     // Booking
     Route::get('/bookings', [BookingController::class, 'index']);
     Route::post('/bookings', [BookingController::class, 'book']);
-    Route::get('/bookings', [BookingController::class, 'index']);
     Route::get('/bookings/{booking}', [BookingController::class, 'show']);
     Route::get('bookings/{booking}/qr', [BookingController::class, 'qr']);
     Route::patch('/bookings/{booking}/cancel', [BookingController::class, 'cancel']);
-    Route::post('/scan-qr', [MerchantBookingController::class, 'scanQr']);
-
     Route::post('/notifications/token', [NotificationController::class, 'saveToken']);
+});
+
+Route::middleware('auth:sanctum')->prefix('merchant')->group(function () {
+    Route::get('/events', [MerchantEventController::class, 'merchantEvents']);
+    Route::get('/events/{event}', [MerchantEventController::class, 'showMerchantEvent']); 
+    Route::post('/scan-qr', [AttendanceController::class, 'scanQr']);
+    Route::get('/bookings/event/{eventId}', [MerchantBookingController::class, 'apiBookingsByEvent']);
+    Route::get('/attendances/{slotId}', [AttendanceController::class, 'getAttendances']);  
 });
 
 //Public Events
