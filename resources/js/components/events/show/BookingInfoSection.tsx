@@ -5,7 +5,8 @@ const BookingInfoSection: React.FC<{
     event: Event;
     slots: EventSlot[];
     bookings: Booking[];
-}> = ({ event, slots, bookings }) => {
+    userRole: "admin" | "merchant";
+}> = ({ event, slots, bookings, userRole }) => {
     const confirmedBookings = bookings.filter((b) => b.status === "confirmed");
     const totalBookings = confirmedBookings.reduce(
         (sum, b) => sum + b.quantity,
@@ -16,6 +17,11 @@ const BookingInfoSection: React.FC<{
         0
     );
     const hasUnlimited = slots.some((s) => s.is_unlimited);
+
+    const bookingUrl =
+        userRole === "admin"
+            ? `/admin/bookings/event/${event.id}`
+            : `/merchant/bookings/event/${event.id}`;
 
     return (
         <div className="bg-white rounded-xl border-2 border-gray-200 overflow-hidden">
@@ -130,7 +136,7 @@ const BookingInfoSection: React.FC<{
                             cancellations
                         </p>
                         <a
-                            href={`/bookings/event/${event.id}`}
+                            href={bookingUrl}
                             className="inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors"
                         >
                             Go to Booking Page

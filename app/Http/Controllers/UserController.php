@@ -34,7 +34,11 @@ class UserController extends Controller
             'password'  => 'required|string|min:8|confirmed',
             'role'      => 'required|in:admin,merchant,customer',
             'contact_number' => 'nullable|string|max:20',
-            'address' => 'nullable|string|max:255',
+            'street_name' => 'nullable|string|max:255',
+            'postcode'    => 'nullable|integer',
+            'city'        => 'nullable|string|max:255',
+            'state'       => 'nullable|string|max:255',
+            'country'     => 'nullable|string|max:255',
             'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
@@ -49,7 +53,11 @@ class UserController extends Controller
             'password'  => Hash::make($request->password),
             'role'      => $request->role,
             'contact_number' => $request->contact_number,
-            'address' => $request->address,
+            'street_name' => $request->street_name,
+            'postcode' => $request->postcode,
+            'city'=> $request->city,
+            'state'=> $request->state,
+            'country'=> $request->country,
             'profile_picture' => $profilePicturePath,
         ]);
 
@@ -84,13 +92,17 @@ class UserController extends Controller
             'full_name' => 'nullable|string|max:255',
             'email' => 'nullable|string|email|max:255|unique:users,email,' . $user->id,
             'contact_number' => 'nullable|string|max:20',
-            'address' => 'nullable|string|max:255',
+            'street_name' => 'nullable|string|max:255',
+            'postcode'    => 'nullable|integer',
+            'city'        => 'nullable|string|max:255',
+            'state'       => 'nullable|string|max:255',
+            'country'     => 'nullable|string|max:255',
             'status' => 'nullable|string|in:active,inactive',
             'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         // Update basic info
-        $data = $request->only(['full_name', 'email', 'contact_number', 'address', 'status']);
+        $data = $request->only(['full_name', 'email', 'contact_number', 'street_name', 'postcode', 'city', 'state', 'country', 'status']);
         $user->update($data);
 
         // Handle image upload

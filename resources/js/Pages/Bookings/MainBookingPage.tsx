@@ -7,7 +7,6 @@ import {
     MapPin,
     Calendar,
     XCircle,
-    Hash,
     TrendingUp,
     CheckCircle,
     Phone,
@@ -30,6 +29,8 @@ interface MainBookingProps {
 }
 
 const MainBookingPage: React.FC<MainBookingProps> = ({ bookings }) => {
+    
+
     const [statusFilter, setStatusFilter] = useState<
         "all" | "upcoming" | "completed" | "cancelled"
     >("all");
@@ -73,8 +74,7 @@ const MainBookingPage: React.FC<MainBookingProps> = ({ bookings }) => {
                 b.customer?.email?.toLowerCase().includes(search) ||
                 b.customer?.phone?.toLowerCase().includes(search);
             const matchesBookingId =
-                b.booking_id?.toLowerCase().includes(search) ||
-                `BKG-${b.id}`.toLowerCase().includes(search);
+                b.booking_code?.toLowerCase().includes(search);
             const matchesEvent = b.event?.title?.toLowerCase().includes(search);
 
             return matchesCustomer || matchesBookingId || matchesEvent;
@@ -457,18 +457,11 @@ const MainBookingPage: React.FC<MainBookingProps> = ({ bookings }) => {
 
                                                                         {/* Booking ID */}
                                                                         <div className="flex items-center gap-2 text-sm">
-                                                                            <Hash
-                                                                                size={
-                                                                                    14
-                                                                                }
-                                                                                className="text-gray-500"
-                                                                            />
                                                                             <span className="text-gray-600">
-                                                                                ID:
+                                                                                Booking Code:
                                                                             </span>
                                                                             <span className="font-mono font-semibold text-gray-900">
-                                                                                {b.booking_code ||
-                                                                                    `BKG-${b.id}`}
+                                                                                {b.booking_code}
                                                                             </span>
                                                                         </div>
 

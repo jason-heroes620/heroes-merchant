@@ -21,12 +21,16 @@ class CustomerController extends Controller
     // 🔹 Store new customer
     public function store(Request $request, WalletService $walletService)
     {
-        $request->validate([
+        $validated = $request->validate([
             'full_name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email',
             'password' => 'required|string|min:8|confirmed',
             'contact_number' => 'nullable|string|max:20',
-            'address' => 'nullable|string|max:255',
+            'street_name' => 'nullable|string|max:255',
+            'postcode'    => 'nullable|integer',
+            'city'        => 'nullable|string|max:255',
+            'state'       => 'nullable|string|max:255',
+            'country'     => 'nullable|string|max:255',
             'date_of_birth' => 'nullable|date',
             'device_id' => 'nullable|string|unique:customers,device_id,',
         ]);
@@ -38,7 +42,11 @@ class CustomerController extends Controller
             'password' => Hash::make($request->password),
             'role' => 'customer',
             'contact_number' => $request->contact_number,
-            'address' => $request->address,
+            'street_name'    => $request->street_name,
+            'postcode'       => $request->postcode,
+            'city'           => $request->city,
+            'state'          => $request->state,
+            'country'        => $request->country,
         ]);
 
         // Create customer profile
@@ -97,7 +105,11 @@ class CustomerController extends Controller
             ],
             'password' => 'nullable|string|min:8|confirmed',
             'contact_number' => 'nullable|string|max:20',
-            'address' => 'nullable|string|max:255',
+            'street_name' => 'nullable|string|max:255',
+            'postcode'    => 'nullable|integer',
+            'city'        => 'nullable|string|max:255',
+            'state'       => 'nullable|string|max:255',
+            'country'     => 'nullable|string|max:255',
         ]);
 
         // Update user information
@@ -105,7 +117,11 @@ class CustomerController extends Controller
             'full_name' => $request->full_name,
             'email' => $request->email,
             'contact_number' => $request->contact_number,
-            'address' => $request->address,
+            'street_name'    => $validated['street_name'] ?? null,
+            'postcode'       => $validated['postcode'] ?? null,
+            'city'           => $validated['city'] ?? null,
+            'state'          => $validated['state'] ?? null,
+            'country'        => $validated['country'] ?? null,
         ];
 
         // Only update password if provided

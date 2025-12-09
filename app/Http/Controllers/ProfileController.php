@@ -30,7 +30,11 @@ class ProfileController extends Controller
         $details = [
             'email' => $user->email,
             'contact_number' => $user->contact_number,
-            'address' => $user->address,
+            'street_name'    => $user->street_name,
+            'postcode'       => $user->postcode,
+            'city'           => $user->city,
+            'state'          => $user->state,
+            'country'        => $user->country,
             'role' => $user->role,
             'merchant' => $user->merchant,
             'customer' => $user->customer,
@@ -61,7 +65,11 @@ class ProfileController extends Controller
         $validated = $request->validate([
             'full_name' => 'nullable|string|max:255',
             'contact_number' => 'nullable|string|max:20',
-            'address' => 'nullable|string|max:255',
+            'street_name' => 'nullable|string|max:255',
+            'postcode'    => 'nullable|integer',
+            'city'        => 'nullable|string|max:255',
+            'state'       => 'nullable|string|max:255',
+            'country'     => 'nullable|string|max:255',
             'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'company_name' => 'nullable|string|max:255',
             'business_registration_number' => 'nullable|string|max:255',
@@ -84,7 +92,11 @@ class ProfileController extends Controller
             $user->fill([
                 'full_name' => $validated['full_name'] ?? $user->full_name,
                 'contact_number' => $validated['contact_number'] ?? $user->contact_number,
-                'address' => $validated['address'] ?? $user->address,
+                'street_name' => $validated['street_name'] ?? $user->street_name,
+                'postcode' => $validated['postcode'] ?? $user->postcode,
+                'city' => $validated['city'] ?? $user->city,
+                'state'  => $validated['state'] ?? $user->state,
+                'country' => $validated['country'] ?? $user->country,
             ])->save();
 
             // Update merchant details

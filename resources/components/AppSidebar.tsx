@@ -60,6 +60,7 @@ type SidebarGroupType = {
 export function AppSidebar() {
     const { state } = useSidebar();
     const { url, props } = usePage();
+    console.log(props);
     const user = props?.auth?.user;
     console.log(user?.role);
 

@@ -29,7 +29,6 @@ class BookingController extends Controller
         if (! $customer) {
             return response()->json(['message' => 'Customer record not found.'], 404);
         }
-        
         $status = $request->query('status', 'upcoming'); 
         $perPage = (int) $request->query('per_page', 12);
         $now = Carbon::now('Asia/Kuala_Lumpur');
@@ -40,16 +39,31 @@ class BookingController extends Controller
 
         switch ($status) {
             case 'upcoming':
+                \Log::info('Filtering: upcoming');
                 $query->whereNotIn('status', ['cancelled', 'refunded'])
-                    ->whereHas('slot', function($q) use ($now) {
-                        $q->whereRaw("STR_TO_DATE(CONCAT(date, ' ', start_time), '%Y-%m-%d %H:%i:%s') >= ?", [$now]);
+                    ->where(function($q) use ($now) {
+                        // Recurring slots
+                        $q->whereHas('slot', function($sq) use ($now) {
+                            $sq->whereRaw("STR_TO_DATE(CONCAT(date, ' ', start_time), '%Y-%m-%d %H:%i:%s') >= ?", [$now]);
+                        })
+                        // One-time events
+                        ->orWhereHas('event.dates', function($dq) use ($now) {
+                            $dq->whereRaw("STR_TO_DATE(end_date, '%Y-%m-%d') >= ?", [$now->format('Y-m-d')]);
+                        });
                     });
                 break;
 
             case 'completed':
                 $query->whereNotIn('status', ['cancelled', 'refunded'])
-                    ->whereHas('slot', function($q) use ($now) {
-                        $q->whereRaw("STR_TO_DATE(CONCAT(date, ' ', end_time), '%Y-%m-%d %H:%i:%s') < ?", [$now]);
+                    ->where(function($q) use ($now) {
+                        // Recurring slots
+                        $q->whereHas('slot', function($sq) use ($now) {
+                            $sq->whereRaw("STR_TO_DATE(CONCAT(date, ' ', end_time), '%Y-%m-%d %H:%i:%s') < ?", [$now]);
+                        })
+                        // One-time events
+                        ->orWhereHas('event.dates', function($dq) use ($now) {
+                            $dq->whereRaw("STR_TO_DATE(end_date, '%Y-%m-%d') < ?", [$now->format('Y-m-d')]);
+                        });
                     });
                 break;
 

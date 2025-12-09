@@ -9,7 +9,11 @@ interface BaseUser {
     full_name: string;
     email: string;
     contact_number: string;
-    address: string;
+    street_name?: string;
+    postcode?: number;
+    city?: string;
+    state?: string;
+    country?: string;
 }
 
 interface BaseEntity {
@@ -50,7 +54,11 @@ export default function EntityProfileForm({
         full_name: entity.user.full_name || "",
         email: entity.user.email || "",
         contact_number: entity.user.contact_number || "",
-        address: entity.user.address || "",
+        street_name: entity.user.street_name || "",
+        postcode: entity.user.postcode || "",
+        city: entity.user.city || "",
+        state: entity.user.state || "",
+        country: entity.user.country || "",
         password: "",
         password_confirmation: "",
 
@@ -188,9 +196,37 @@ export default function EntityProfileForm({
                                     disabled={isSubmitting}
                                 />
                                 <TextInput
-                                    name="address"
-                                    label="Address"
-                                    value={form.address}
+                                    name="street_name"
+                                    label="Street Name"
+                                    value={form.street_name}
+                                    onChange={handleChange}
+                                    disabled={isSubmitting}
+                                />
+                                <TextInput
+                                    name="postcode"
+                                    label="Postcode"
+                                    value={form.postcode}
+                                    onChange={handleChange}
+                                    disabled={isSubmitting}
+                                />
+                                <TextInput
+                                    name="city"
+                                    label="City"
+                                    value={form.city}
+                                    onChange={handleChange}
+                                    disabled={isSubmitting}
+                                />
+                                <TextInput
+                                    name="state"
+                                    label="State"
+                                    value={form.state}
+                                    onChange={handleChange}
+                                    disabled={isSubmitting}
+                                />
+                                <TextInput
+                                    name="country"
+                                    label="Country"
+                                    value={form.country}
                                     onChange={handleChange}
                                     disabled={isSubmitting}
                                 />
@@ -305,7 +341,7 @@ const TextInput = ({
 }: {
     name: string;
     label: string;
-    value: string;
+    value: string | number;
     onChange: React.ChangeEventHandler<
         HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     >;

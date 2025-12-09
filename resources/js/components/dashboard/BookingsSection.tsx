@@ -4,12 +4,12 @@ import FilterButton from "./FilterButton";
 
 interface BookingType {
     id: number;
+    booking_code: string;
     booked_at?: string;
     created_at?: string;
     customer?: { user?: { full_name?: string; email?: string } };
     event?: { title?: string };
     quantity?: number;
-    total_amount?: number;
 }
 
 interface Props {
@@ -119,7 +119,7 @@ const BookingsSection: React.FC<Props> = ({
                 <div className="relative">
                     <input
                         type="text"
-                        placeholder="Search by customer name, email, or booking ID..."
+                        placeholder="Search by customer name, email, or booking code..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white text-sm"
@@ -164,10 +164,7 @@ const BookingsSection: React.FC<Props> = ({
 
                             <div className="flex items-center justify-between pt-3 border-t border-gray-200">
                                 <div className="text-xs text-gray-500 font-mono">
-                                    #{b.id}
-                                </div>
-                                <div className="text-sm font-bold text-gray-900">
-                                    RM {(b.total_amount ?? 0).toFixed(2)}
+                                    BOOKING CODE: {b.booking_code}
                                 </div>
                             </div>
                         </div>

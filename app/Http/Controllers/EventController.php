@@ -193,7 +193,7 @@ class EventController extends Controller
             'dates' => $dates,
             'slots' => $event->slots,
             'slotPrices' => $event->slots->flatMap(fn($slot) => $slot->prices)->values(),
-            'bookings' => [], 
+            'bookings' => $event->bookings, 
             'conversion' => $activeConversion, 
             'location' => $event->location,
         ];

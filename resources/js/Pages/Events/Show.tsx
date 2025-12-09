@@ -124,6 +124,7 @@ const EventDisplayPage: React.FC = () => {
                         event={eventData.event}
                         slots={eventData.slots}
                         bookings={eventData.bookings}
+                        userRole={userRole}
                     />
                 </div>
             </div>

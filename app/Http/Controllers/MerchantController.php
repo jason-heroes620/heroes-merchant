@@ -24,7 +24,11 @@ class MerchantController extends Controller
             'email' => 'required|string|email|max:255|unique:users,email',
             'password' => 'required|string|min:8|confirmed',
             'contact_number' => 'nullable|string|max:20',
-            'address' => 'nullable|string|max:255',
+            'street_name' => 'nullable|string|max:255',
+            'postcode'    => 'nullable|integer',
+            'city'        => 'nullable|string|max:255',
+            'state'       => 'nullable|string|max:255',
+            'country'     => 'nullable|string|max:255',
             'company_name' => 'required|string|max:255',
             'business_registration_number' => 'nullable|string|max:255',
             'company_details' => 'nullable|string',
@@ -37,7 +41,11 @@ class MerchantController extends Controller
             'password' => Hash::make($request->password),
             'role' => 'merchant',
             'contact_number' => $request->contact_number,
-            'address' => $request->address,
+            'street_name'    => $request->street_name,
+            'postcode'       => $request->postcode,
+            'city'           => $request->city,
+            'state'          => $request->state,
+            'country'        => $request->country,
         ]);
 
         // Create merchant profile
@@ -87,7 +95,11 @@ class MerchantController extends Controller
             ],
             'password' => 'nullable|string|min:8|confirmed',
             'contact_number' => 'nullable|string|max:20',
-            'address' => 'nullable|string|max:255',
+            'street_name' => 'nullable|string|max:255',
+            'postcode'    => 'nullable|integer',
+            'city'        => 'nullable|string|max:255',
+            'state'       => 'nullable|string|max:255',
+            'country'     => 'nullable|string|max:255',
             'company_name' => 'required|string|max:255',
             'business_registration_number' => 'nullable|string|max:255',
             'company_details' => 'nullable|string',
@@ -100,7 +112,11 @@ class MerchantController extends Controller
             'full_name' => $request->full_name,
             'email' => $request->email,
             'contact_number' => $request->contact_number,
-            'address' => $request->address,
+            'street_name'    => $request->street_name,
+            'postcode'       => $request->postcode,
+            'city'           => $request->city,
+            'state'          => $request->state,
+            'country'        => $request->country,
         ];
 
         // Only update password if provided

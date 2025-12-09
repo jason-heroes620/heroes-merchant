@@ -4,6 +4,7 @@ interface Props {
     label: string;
     value: string;
     onChange: (e: any) => void;
+    autoComplete?: string;
     error?: string;
     type?: string;
     rows?: number;
@@ -14,6 +15,7 @@ export default function UserBaseForm({
     label,
     value,
     onChange,
+    autoComplete,
     error,
     type = "text",
     rows,
@@ -32,6 +34,7 @@ export default function UserBaseForm({
                 rows={isTextarea ? rows : undefined}
                 value={value}
                 onChange={onChange}
+                autoComplete={autoComplete}
                 className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all ${
                     error ? "border-red-300 bg-red-50" : "border-gray-300 bg-white"
                 }`}

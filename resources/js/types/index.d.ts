@@ -4,7 +4,11 @@ export interface User {
     email: string;
     role: "admin" | "merchant" | "customer";
     contact_number?: string;
-    address?: string;
+    street_name?: string;
+    postcode?: number;      
+    city?: string;
+    state?: string;
+    country?: string;
     profile_picture?: string;
     merchant?: Merchant;
 }

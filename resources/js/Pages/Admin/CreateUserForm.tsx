@@ -9,7 +9,11 @@ interface BaseForm {
     password: string;
     password_confirmation: string;
     contact_number: string;
-    address: string;
+    street_name?: string;
+    postcode?: number;
+    city?: string;
+    state?: string;
+    country?: string;
 }
 
 interface MerchantFields {
@@ -37,7 +41,11 @@ export default function CreateUserForm({ type }: Props) {
         password: "",
         password_confirmation: "",
         contact_number: "",
-        address: "",
+        street_name: undefined,
+        postcode: undefined,
+        city: undefined,
+        state: undefined,
+        country: undefined,
         ...(type === "merchant"
             ? {
                   company_name: "",
@@ -122,12 +130,62 @@ export default function CreateUserForm({ type }: Props) {
                                         disabled={processing}
                                     />
                                     <FormField
-                                        label="Address"
-                                        value={data.address}
+                                        label="Street Address"
+                                        value={data.street_name || ""}
                                         onChange={(e) =>
-                                            setData("address", e.target.value)
+                                            setData(
+                                                "street_name",
+                                                e.target.value
+                                            )
                                         }
-                                        error={errors.address}
+                                        autoComplete="address-line1"
+                                        error={errors.street_name}
+                                        disabled={processing}
+                                    />
+                                    <FormField
+                                        label="Postcode"
+                                        value={data.postcode?.toString() || ""}
+                                        onChange={(e) =>
+                                            setData(
+                                                "postcode",
+                                                e.target.value === ""
+                                                    ? undefined
+                                                    : Number(e.target.value)
+                                            )
+                                        }
+                                        autoComplete="postal-code"
+                                        error={errors.postcode}
+                                        disabled={processing}
+                                    />
+
+                                    <FormField
+                                        label="City"
+                                        value={data.city || ""}
+                                        onChange={(e) =>
+                                            setData("city", e.target.value)
+                                        }
+                                        autoComplete="address-level2"
+                                        error={errors.city}
+                                        disabled={processing}
+                                    />
+                                    <FormField
+                                        label="State/Province"
+                                        value={data.state || ""}
+                                        onChange={(e) =>
+                                            setData("state", e.target.value)
+                                        }
+                                        autoComplete="address-level1"
+                                        error={errors.state}
+                                        disabled={processing}
+                                    />
+                                    <FormField
+                                        label="Country"
+                                        value={data.country || ""}
+                                        onChange={(e) =>
+                                            setData("country", e.target.value)
+                                        }
+                                        autoComplete="country"
+                                        error={errors.country}
                                         disabled={processing}
                                     />
                                 </div>

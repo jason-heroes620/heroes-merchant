@@ -17,49 +17,93 @@ class MerchantBookingController extends Controller
         $perPage = (int) $request->query('per_page', 12);
         $status = $request->query('status');
         $now = Carbon::now('Asia/Kuala_Lumpur');
+
         $query = Booking::with([
-            'slot', 
-            'slot.date', 
-            'event.location', 
-            'event.media', 
-            'items.ageGroup', 
-            'transactions', 
+            'slot',
+            'slot.date',
+            'event.location',
+            'event.media',
+            'items.ageGroup',
+            'transactions',
             'customer.user',
             'attendances'
         ]);
 
+        // Merchant filter
         if ($user->role === 'merchant') {
             $query->whereHas('event', fn($q) => $q->where('merchant_id', $user->merchant->id));
         }
 
-        switch ($status) {
-            case 'upcoming':
-                $query->whereNotIn('status', ['cancelled', 'refunded'])
-                    ->whereHas('slot', function($q) use ($now) {
-                    $q->whereRaw("
-                            STR_TO_DATE(CONCAT(date, ' ', start_time, ':00'), '%Y-%m-%d %H:%i:%s') >= ?
-                        ", [$now]);
-                    });
-                break;
+        \Log::info('Merchant bookings query debug', [
+            'user_id' => $user->id,
+            'role' => $user->role,
+            'status' => $status,
+            'bookings_count' => $query->count(),
+            'sample_bookings' => $query->take(5)->get()->map(function ($b) {
+                return [
+                    'booking_id' => $b->id,
+                    'status' => $b->status,
+                    'customer_id' => $b->customer?->id,
+                    'customer_name' => $b->customer?->user?->full_name,
+                    'slot_display_start' => $b->slot?->display_start?->toDateTimeString(),
+                    'slot_display_end' => $b->slot?->display_end?->toDateTimeString(),
+                    'event_id' => $b->event_id,
+                ];
+            }),
+        ]);
 
-            case 'completed':
-                $query->whereNotIn('status', ['cancelled', 'refunded'])
-                    ->whereHas('slot', function($q) use ($now) {
-                        $q->whereRaw("
-                            STR_TO_DATE(CONCAT(date, ' ', end_time, ':00'), '%Y-%m-%d %H:%i:%s') < ?
-                        ", [$now]);
-                    });
-                break;
+        // Status filters
+        if ($status) {
+            switch ($status) {
+                case 'upcoming':
+                    $query->whereNotIn('status', ['cancelled', 'refunded'])
+                        ->where(function ($q) use ($now) {
+                            $q->whereHas('slot', fn($sq) => 
+                                $sq->whereRaw("STR_TO_DATE(CONCAT(date, ' ', start_time), '%Y-%m-%d %H:%i:%s') >= ?", [$now])
+                            )
+                            ->orWhereHas('event.dates', fn($dq) => 
+                                $dq->whereRaw("STR_TO_DATE(end_date, '%Y-%m-%d') >= ?", [$now->format('Y-m-d')])
+                            );
+                        });
+                    break;
 
-            case 'cancelled':
-                $query->whereIn('status', ['cancelled', 'refunded']);
-                break;
+                case 'completed':
+                    $query->whereNotIn('status', ['cancelled', 'refunded'])
+                        ->where(function ($q) use ($now) {
+                            $q->whereHas('slot', fn($sq) => 
+                                $sq->whereRaw("STR_TO_DATE(CONCAT(date, ' ', end_time), '%Y-%m-%d %H:%i:%s') < ?", [$now])
+                            )
+                            ->orWhereHas('event.dates', fn($dq) => 
+                                $dq->whereRaw("STR_TO_DATE(end_date, '%Y-%m-%d') < ?", [$now->format('Y-m-d')])
+                            );
+                        });
+                    break;
 
-            default:
-                break;
+                case 'cancelled':
+                    $query->whereIn('status', ['cancelled', 'refunded']);
+                    break;
+            }
         }
 
         $page = $query->orderBy('booked_at', 'desc')->paginate($perPage)->withQueryString();
+
+        \Log::info('Merchant bookings after status filter', [
+            'user_id' => $user->id,
+            'role' => $user->role,
+            'status_filter' => $status,
+            'bookings_count' => $page->total(),
+            'sample_bookings' => $page->take(5)->map(function ($b) {
+                return [
+                    'booking_id' => $b->id,
+                    'status' => $b->status,
+                    'customer_id' => $b->customer?->id,
+                    'customer_name' => $b->customer?->user?->full_name,
+                    'slot_display_start' => $b->slot?->display_start?->toDateTimeString(),
+                    'slot_display_end' => $b->slot?->display_end?->toDateTimeString(),
+                    'event_id' => $b->event_id,
+                ];
+            }),
+        ]);
 
         return Inertia::render('Bookings/MainBookingPage', [
             'bookings' => BookingAdminResource::collection($page),
@@ -95,15 +139,29 @@ class MerchantBookingController extends Controller
             switch ($status) {
                 case 'upcoming':
                     $query->whereNotIn('status', ['cancelled', 'refunded'])
-                        ->whereHas('slot', function($q) use ($now) {
-                            $q->whereRaw("STR_TO_DATE(CONCAT(date, ' ', start_time), '%Y-%m-%d %H:%i:%s') >= ?", [$now]);
+                        ->where(function($q) use ($now) {
+                            // Recurring slots
+                            $q->whereHas('slot', function($sq) use ($now) {
+                                $sq->whereRaw("STR_TO_DATE(CONCAT(date, ' ', start_time), '%Y-%m-%d %H:%i:%s') >= ?", [$now]);
+                            })
+                            // One-time events
+                            ->orWhereHas('event.dates', function($dq) use ($now) {
+                                $dq->whereRaw("STR_TO_DATE(end_date, '%Y-%m-%d') >= ?", [$now->format('Y-m-d')]);
+                            });
                         });
                     break;
 
                 case 'completed':
                     $query->whereNotIn('status', ['cancelled', 'refunded'])
-                        ->whereHas('slot', function($q) use ($now) {
-                            $q->whereRaw("STR_TO_DATE(CONCAT(date, ' ', end_time), '%Y-%m-%d %H:%i:%s') < ?", [$now]);
+                        ->where(function($q) use ($now) {
+                            // Recurring slots
+                            $q->whereHas('slot', function($sq) use ($now) {
+                                $sq->whereRaw("STR_TO_DATE(CONCAT(date, ' ', end_time), '%Y-%m-%d %H:%i:%s') < ?", [$now]);
+                            })
+                            // One-time events
+                            ->orWhereHas('event.dates', function($dq) use ($now) {
+                                $dq->whereRaw("STR_TO_DATE(end_date, '%Y-%m-%d') < ?", [$now->format('Y-m-d')]);
+                            });
                         });
                     break;
 

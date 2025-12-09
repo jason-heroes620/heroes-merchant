@@ -301,8 +301,7 @@ const EventBookingPage: React.FC<EventBookingProps> = ({ event, bookings }) => {
                                                                     ID:
                                                                 </span>
                                                                 <span className="font-mono font-semibold text-gray-600">
-                                                                    {b.booking_id ||
-                                                                        `BKG-${b.id}`}
+                                                                    {b.booking_code}
                                                                 </span>
                                                             </div>
 

@@ -21,7 +21,11 @@ class User extends Authenticatable
         'password',
         'role',
         'contact_number',
-        'address',
+        'street_name',
+        'postcode',
+        'city',
+        'state',
+        'country',
         'status',
         'profile_picture'
     ];
