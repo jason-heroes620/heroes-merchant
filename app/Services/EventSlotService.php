@@ -164,31 +164,32 @@ class EventSlotService
         $ageGroups = $event->ageGroups;
 
         if (in_array($pricingType, ['age_based', 'mixed']) && $ageGroups->count()) {
+            // Only create the relevant price per slot based on day type
             foreach ($ageGroups as $ageGroup) {
-            $weekday = $event->prices()
-                ->where('event_age_group_id', $ageGroup->id)
-                ->value('weekday_price_in_rm') ?? 0;
+                $priceRow = $event->prices()
+                    ->where('event_age_group_id', $ageGroup->id)
+                    ->first();
 
-            $weekend = $event->prices()
-                ->where('event_age_group_id', $ageGroup->id)
-                ->value('weekend_price_in_rm') ?? 0;
+                if (!$priceRow) continue;
 
-            // 1️⃣ Weekday price row
-            EventSlotPrice::create([
-                'event_slot_id' => $slot->id,
-                'event_age_group_id' => $ageGroup->id,
-                'price_in_rm' => $weekday,
-            ]);
+                $price = match($pricingType) {
+                    'age_based' => $isWeekend
+                        ? ($priceRow->weekend_price_in_rm ?? 0)
+                        : ($priceRow->weekday_price_in_rm ?? 0),
+                    'mixed' => $isWeekend
+                        ? ($priceRow->weekend_price_in_rm ?? $priceRow->fixed_price_in_rm ?? 0)
+                        : ($priceRow->weekday_price_in_rm ?? $priceRow->fixed_price_in_rm ?? 0),
+                    default => 0,
+                };
 
-            // 2️⃣ Weekend price row
-            EventSlotPrice::create([
-                'event_slot_id' => $slot->id,
-                'event_age_group_id' => $ageGroup->id,
-                'price_in_rm' => $weekend,
-            ]);
-        }
-
+                EventSlotPrice::create([
+                    'event_slot_id' => $slot->id,
+                    'event_age_group_id' => $ageGroup->id,
+                    'price_in_rm' => $price,
+                ]);
+            }
         } else {
+            // Fixed or day_type pricing without age groups
             $price = $this->resolvePrice($event, $isWeekend, null);
             EventSlotPrice::create([
                 'event_slot_id' => $slot->id,

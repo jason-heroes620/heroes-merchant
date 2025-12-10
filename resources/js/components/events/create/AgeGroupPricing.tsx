@@ -39,7 +39,7 @@ export default function AgeGroupPricing({
                 {/* Header */}
                 <div className="flex items-center justify-between pb-4 border-b-2 border-gray-200">
                     <div className="flex items-center gap-3">
-                        <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
+                        <div className="p-3 bg-linear-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
                             <Users size={24} className="text-white" />
                         </div>
                         <div>
@@ -58,14 +58,14 @@ export default function AgeGroupPricing({
                     <button
                         type="button"
                         onClick={addAgeGroup}
-                        className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg hover:shadow-xl font-semibold transform hover:scale-105 active:scale-95"
+                        className="flex items-center gap-2 px-6 py-3 bg-linear-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg hover:shadow-xl font-semibold transform hover:scale-105 active:scale-95"
                     >
                         <Plus size={20} /> Add Group
                     </button>
                 </div>
 
                 {ageGroups.length === 0 ? (
-                    <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100">
+                    <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-xl bg-linear-to-br from-gray-50 to-gray-100">
                         <div className="inline-flex p-6 bg-white rounded-full shadow-lg mb-4">
                             <Users className="h-10 w-10 text-gray-300" />
                         </div>
@@ -78,7 +78,7 @@ export default function AgeGroupPricing({
                         <button
                             type="button"
                             onClick={addAgeGroup}
-                            className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
+                            className="inline-flex items-center gap-2 px-8 py-4 bg-linear-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
                         >
                             <Plus size={20} /> Create First Age Group
                         </button>
@@ -93,11 +93,11 @@ export default function AgeGroupPricing({
                             return (
                                 <div key={groupIndex} className="relative">
                                     {/* Badge Number */}
-                                    <div className="absolute -top-2 -left-2 w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-lg z-10">
+                                    <div className="absolute -top-2 -left-2 w-8 h-8 bg-linear-to-br from-orange-500 to-orange-600 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-lg z-10">
                                         {groupIndex + 1}
                                     </div>
                                     <div
-                                        className={`p-6 bg-gradient-to-br from-orange-50 to-orange-100 border-2 rounded-xl transition-all ${
+                                        className={`p-6 bg-linear-to-br from-orange-50 to-orange-100 border-2 rounded-xl transition-all ${
                                             hasErrors
                                                 ? "border-red-300"
                                                 : "border-orange-200"
@@ -111,7 +111,7 @@ export default function AgeGroupPricing({
 
                                             {/* Age Display */}
                                             <div className="mt-4">
-                                                <span className="bg-gradient-to-br from-orange-500 to-orange-600 text-white font-bold uppercase text-sm px-4 py-1 rounded-full inline-block">
+                                                <span className="bg-linear-to-br from-orange-500 to-orange-600 text-white font-bold uppercase text-sm px-4 py-1 rounded-full inline-block">
                                                     {group.label}{" "}
                                                     {group.min_age != null &&
                                                     group.max_age != null

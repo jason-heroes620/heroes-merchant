@@ -44,7 +44,7 @@ export default function BasicDetailsTab({
             {/* Category */}
             <div className="bg-white rounded-2xl shadow-lg p-8 border-2 border-orange-100">
                 <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-orange-100">
-                    <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
+                    <div className="p-3 bg-linear-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
                         <Tag className="text-white" size={24} />
                     </div>
                     <div>
@@ -66,7 +66,7 @@ export default function BasicDetailsTab({
             <div className="bg-white rounded-2xl shadow-lg p-8 border-2 border-orange-100">
                 <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-orange-100">
                     <div className="flex items-center gap-3">
-                        <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
+                        <div className="p-3 bg-linear-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
                             <User className="text-white" size={24} />
                         </div>
                         <div>
@@ -186,7 +186,7 @@ export default function BasicDetailsTab({
             {/* Media Section */}
             <div className="bg-white rounded-2xl shadow-lg p-8 border-2 border-orange-100">
                 <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-orange-100">
-                    <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
+                    <div className="p-3 bg-linear-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
                         <FileText className="text-white" size={24} />
                     </div>
                     <div>

@@ -42,6 +42,8 @@ export interface EventSlot {
     booked_quantity?: number | null;
     available_seats?: number | null;
     prices?: EventSlotPrice[];
+    display_start?: string;
+    display_end?: string;
 }
 
 export interface EventSlotPrice {
@@ -216,7 +218,7 @@ export interface Booking {
     items: BookingItem[];
     transactions?: Transaction[] | null;
     customer?: Customer | null;
-    attendance?: Attendance[];
+    attendance?: BookingAttendance;
 }
 
 export interface Transaction {
@@ -227,16 +229,41 @@ export interface Transaction {
     created_at: string;
 }
 
-export interface Attendance {
+export type BookingAttendance = {
+    summary: AttendanceSummary;
+    list: Attendance[];
+};
+
+export type AttendanceSummary = {
+    total: number;
+    attended: number;
+    pending: number;
+    absent: number;
+};
+
+export type Attendance = {
     id: string;
     booking_id: string;
     slot_id: string;
     event_id: string;
     customer_id: string;
-    status: string;
-    scanned_at: string;
-    total_attendees: number;
-    attended_count: number;
-    pending_count: number;
-    absent_count: number;
+    status: "pending" | "attended" | "absent";
+    scanned_at?: string | null;
+    created_at: string;
+    updated_at: string;
+};
+
+interface BookingType {
+    id: number;
+    booking_code: string;
+    customer?: {
+        user?: { full_name: string; email: string };
+    };
+    event?: { title: string };
+    quantity?: number;
+    total_amount?: number;
+    attendance_status?: "pending" | "attended" | "absent";
+    slot?: EventSlot;
+    booked_at: string;
+    created_at: string;
 }

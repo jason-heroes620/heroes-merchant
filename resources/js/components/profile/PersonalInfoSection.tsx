@@ -31,14 +31,14 @@ export default function PersonalInfoSection({
                     label="Contact Number"
                     type="tel"
                     value={data.contact_number}
-                    onChange={(e) => setData("contact_number", e.target.value)}
+                    onChange={(value) => setData("contact_number", value)}
                     placeholder="Enter your contact number"
                     error={errors.contact_number}
                 />
                 <InputField
                     label="Street Address"
                     value={data.street_name}
-                    onChange={(e) => setData("street_name", e.target.value)}
+                    onChange={(value) => setData("street_name", value)}
                     placeholder="Street Address"
                     autoComplete="address-line1"
                     error={errors.street_name}
@@ -49,7 +49,7 @@ export default function PersonalInfoSection({
                 <InputField
                     label="Postcode"
                     value={data.postcode}
-                    onChange={(e) => setData("postcode", e.target.value)}
+                    onChange={(value) => setData("postcode", value)}
                     placeholder="Enter your postal code"
                     autoComplete="postal-code"
                     error={errors.postcode}
@@ -57,7 +57,7 @@ export default function PersonalInfoSection({
                 <InputField
                     label="City"
                     value={data.city}
-                    onChange={(e) => setData("city", e.target.value)}
+                    onChange={(value) => setData("city", value)}
                     placeholder="City"
                     autoComplete="address-level2"
                     error={errors.city}
@@ -68,7 +68,7 @@ export default function PersonalInfoSection({
                 <InputField
                     label="State/Province"
                     value={data.state}
-                    onChange={(e) => setData("state", e.target.value)}
+                    onChange={(value) => setData("state", value)}
                     placeholder="State"
                     autoComplete="address-level1"
                     error={errors.state}
@@ -76,7 +76,7 @@ export default function PersonalInfoSection({
                 <InputField
                     label="Country"
                     value={data.country}
-                    onChange={(e) => setData("country", e.target.value)}
+                    onChange={(value) => setData("country", value)}
                     placeholder="Country"
                     autoComplete="country"
                     error={errors.country}

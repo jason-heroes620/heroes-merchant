@@ -134,17 +134,20 @@ const EventModesSection: React.FC<{
                                     </span>
                                 </h3>
                                 <div className="grid md:grid-cols-2 gap-4">
-                                    {slotsByDate[date].map((slot) => (
-                                        <SlotCard
-                                            key={slot.id}
-                                            slot={slot}
-                                            slotPrices={slot.prices ?? []}
-                                            ageGroups={ageGroups}
-                                            bookings={bookings}
-                                            userRole={userRole}
-                                            event={event}
-                                        />
-                                    ))}
+                                    {slotsByDate[date].map((slot) => {
+                                        console.log("Slot data:", slot);
+                                        return (
+                                            <SlotCard
+                                                key={slot.id}
+                                                slot={slot}
+                                                slotPrices={slot.prices ?? []}
+                                                ageGroups={ageGroups}
+                                                bookings={bookings}
+                                                userRole={userRole}
+                                                event={event}
+                                            />
+                                        );
+                                    })}
                                 </div>
                             </div>
                         ))}
@@ -155,17 +158,20 @@ const EventModesSection: React.FC<{
                             Available Time Slots
                         </h3>
                         <div className="grid md:grid-cols-2 gap-4">
-                            {slots.map((slot) => (
-                                <SlotCard
-                                    key={slot.id}
-                                    slot={slot}
-                                    slotPrices={slot.prices ?? []}
-                                    ageGroups={ageGroups}
-                                    bookings={bookings}
-                                    userRole={userRole}
-                                    event={event}
-                                />
-                            ))}
+                            {slots.map((slot) => {
+                                console.log("Slot data:", slot);
+                                return (
+                                    <SlotCard
+                                        key={slot.id}
+                                        slot={slot}
+                                        slotPrices={slot.prices ?? []}
+                                        ageGroups={ageGroups}
+                                        bookings={bookings}
+                                        userRole={userRole}
+                                        event={event}
+                                    />
+                                );
+                            })}
                         </div>
                     </div>
                 )}

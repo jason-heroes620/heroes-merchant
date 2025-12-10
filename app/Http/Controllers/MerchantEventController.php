@@ -103,14 +103,29 @@ class MerchantEventController extends Controller
 
         $event->setRelation('slots', $filteredSlots);
 
-        $event->slots->transform(function ($slot) {
+       $event->slots->transform(function ($slot) use ($event) {
             $slot->available_seats = $slot->is_unlimited
                 ? null
                 : $slot->capacity - $slot->booked_quantity;
+
+            if ($event->is_suitable_for_all_ages) {
+                $slot->booked_quantity_by_age_group = [
+                    'general' => $slot->booked_quantity ?? 0
+                ];
+            } else {
+                $slot->booked_quantity_by_age_group = $slot->prices
+                    ->groupBy('event_age_group_id')
+                    ->map(fn($prices, $ageGroupId) => $prices->sum('booked_quantity'))
+                    ->toArray();
+            }
+
             return $slot;
         });
 
-        $event->media->transform(fn($media) => $media->file_path = $media->url);
+        $event->media->transform(function ($media) {
+                $media->file_path = $media->url;
+                return $media;
+            });
 
         if ($event->is_recurring) {
             $dates = $filteredSlots->map(fn($slot) => [

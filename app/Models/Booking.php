@@ -129,7 +129,7 @@ class Booking extends Model
         return $this->slot?->end_at;
     }
 
-    public function attendances()
+    public function attendance()
     {
         return $this->hasMany(Attendance::class);
     }

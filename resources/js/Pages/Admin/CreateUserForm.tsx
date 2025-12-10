@@ -1,5 +1,5 @@
 import { useForm } from "@inertiajs/react";
-import { Loader2 } from "lucide-react";
+import { Loader2, User, Lock, Building2 } from "lucide-react";
 import FormField from "../../components/UserBaseForm";
 import AuthenticatedLayout from "@/AuthenticatedLayout";
 
@@ -93,9 +93,18 @@ export default function CreateUserForm({ type }: Props) {
                         <form onSubmit={handleSubmit} className="p-8 space-y-8">
                             {/* Personal Information */}
                             <div>
-                                <h2 className="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">
-                                    Personal Information
-                                </h2>
+                                <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-orange-100">
+                                    <div className="bg-linear-to-br from-orange-100 to-red-100 p-3 rounded-xl">
+                                        <User
+                                            className="text-orange-600"
+                                            size={24}
+                                        />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-gray-900">
+                                        Personal Information
+                                    </h3>
+                                </div>
+
                                 <div className="grid md:grid-cols-2 gap-6">
                                     <FormField
                                         label="Full Name"
@@ -193,9 +202,17 @@ export default function CreateUserForm({ type }: Props) {
 
                             {/* Security */}
                             <div>
-                                <h2 className="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">
-                                    Security
-                                </h2>
+                                <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-orange-100">
+                                    <div className="bg-linear-to-br from-purple-100 to-purple-100 p-3 rounded-xl">
+                                        <Lock
+                                            className="text-purple-600"
+                                            size={24}
+                                        />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-gray-900">
+                                        Security
+                                    </h3>
+                                </div>
                                 <div className="grid md:grid-cols-2 gap-6">
                                     <FormField
                                         label="Password"
@@ -226,9 +243,18 @@ export default function CreateUserForm({ type }: Props) {
                             {/* Conditional Section */}
                             {type === "merchant" ? (
                                 <div>
-                                    <h2 className="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">
-                                        Business Information
-                                    </h2>
+                                    <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-orange-100">
+                                        <div className="bg-linear-to-br from-green-100 to-emerald-100 p-3 rounded-xl">
+                                            <Building2
+                                                className="text-green-600"
+                                                size={24}
+                                            />
+                                        </div>
+                                        <h3 className="text-xl font-bold text-gray-900">
+                                            Business Information
+                                        </h3>
+                                    </div>
+
                                     <div className="space-y-6">
                                         <FormField
                                             label="Company Name"

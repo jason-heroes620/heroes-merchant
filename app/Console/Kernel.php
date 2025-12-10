@@ -17,6 +17,7 @@ class Kernel extends ConsoleKernel
         // Run hourly to pick up slots that have ended recently.
         // The service enforces available_at (72h) and will only create payouts when appropriate.
         $schedule->command('payouts:calculate')->hourly();
+        $schedule->command('attendance:update-status')->everyFiveMinutes();
     }
 
     protected function commands()

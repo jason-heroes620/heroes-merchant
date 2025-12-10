@@ -6,20 +6,8 @@ import QuickActions from "../../components/dashboard/QuickActions";
 import RevenueCard from "../../components/dashboard/RevenueCard";
 import StatsGrid from "../../components/dashboard/StatsGrid";
 import UpcomingEventsGrid from "../../components/dashboard/UpcomingEventsGrid";
-import type { EventType } from "../../types/events";
+import type { EventType, BookingType } from "../../types/events";
 import AuthenticatedLayout from "../../AuthenticatedLayout";
-
-interface BookingType {
-    id: number;
-    customer?: {
-        user?: { full_name: string; email: string };
-    };
-    event?: { title: string };
-    quantity?: number;
-    total_amount?: number;
-    booked_at: string;
-    created_at: string;
-}
 
 interface DashboardProps {
     activeEvents: EventType[];
@@ -67,11 +55,10 @@ const MerchantDashboard: React.FC<DashboardProps> = ({
         });
     }, [allBookings]);
 
-    // Calculate weekly sales from backend data
     const weeklySales = useMemo(() => {
         const now = new Date();
         const weekStart = new Date(now);
-        weekStart.setDate(now.getDate() - now.getDay()); // Start of week (Sunday)
+        weekStart.setDate(now.getDate() - now.getDay());
         weekStart.setHours(0, 0, 0, 0);
 
         const weekEnd = new Date(weekStart);

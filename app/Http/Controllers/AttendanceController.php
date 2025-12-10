@@ -27,12 +27,15 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Invalid QR code'], 422);
         }
 
-        $booking = Booking::where('id', $payload['booking_id'])
-            ->where('merchant_id', $merchant->id)
-            ->first();
-
+        // Fetch booking
+        $booking = Booking::with('event')->find($payload['booking_id']);
         if (!$booking) {
-            return response()->json(['message' => 'Booking not found for this merchant'], 404);
+            return response()->json(['message' => 'Booking not found'], 404);
+        }
+
+        // Ensure booking belongs to this merchant
+        if (!$booking->event || $booking->event->merchant_id !== $merchant->id) {
+            return response()->json(['message' => 'Booking does not belong to this merchant'], 403);
         }
 
         // Update or create attendance
@@ -47,7 +50,7 @@ class AttendanceController extends Controller
         );
 
         // Fetch all attendances for this slot
-        $attendances = Attendance::with(['customer'])
+        $attendances = Attendance::with('customer')
             ->where('slot_id', $booking->slot_id)
             ->orderBy('scanned_at', 'asc')
             ->get();
@@ -64,7 +67,7 @@ class AttendanceController extends Controller
         ]);
     }
 
-    public function getAttendances(Request $request, $slotId)
+    public function markAttendance(Request $request, $bookingId)
     {
         $user = $request->user();
         $merchant = $user->merchant ?? null;
@@ -73,24 +76,60 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Merchant record not found'], 404);
         }
 
-        // Ensure this slot belongs to this merchant
-        $slot = EventSlot::where('id', $slotId)
-            ->whereHas('event', fn($q) => $q->where('merchant_id', $merchant->id))
-            ->firstOrFail();
+        $booking = Booking::with('slot.event')->find($bookingId);
 
-        $attendances = Attendance::with('customer')
-            ->where('slot_id', $slot->id)
-            ->orderBy('scanned_at', 'asc')
-            ->get();
+        if (!$booking || $booking->event->merchant_id !== $merchant->id) {
+            return response()->json(['message' => 'Booking not found or unauthorized'], 404);
+        }
+
+        $status = $request->input('status'); // e.g., 'present' or 'absent'
+
+        $attendance = $booking->attendance()->firstOrCreate([
+            'booking_id' => $booking->id,
+        ]);
+
+        $attendance->status = $status;
+        $attendance->scanned_at = now();
+        $attendance->save();
 
         return response()->json([
             'success' => true,
+            'data' => $attendance,
+        ]);
+    }
+
+    public function getAttendances(Request $request)
+    {
+        $user = $request->user();
+        $merchant = $user->merchant ?? null;
+
+        if (!$merchant) {
+            return response()->json(['message' => 'Merchant record not found'], 404);
+        }
+
+        $slots = EventSlot::whereHas('event', fn($q) => $q->where('merchant_id', $merchant->id))
+            ->with(['event', 'bookings.attendance.customer'])
+            ->get();
+
+        $grouped = $slots->map(fn($slot) => [
+            'event_id' => $slot->event->id,
+            'event_title' => $slot->event->title,
             'slot_id' => $slot->id,
-            'attendances' => $attendances->map(fn($a) => [
-                'customer_name' => $a->customer->full_name,
-                'status' => $a->status,
-                'scanned_at' => $a->scanned_at,
-            ]),
+            'slot_start' => optional($slot->display_start)?->setTimezone('Asia/Kuala_Lumpur')->toDateTimeString(),
+            'slot_end' => optional($slot->display_end)?->setTimezone('Asia/Kuala_Lumpur')->toDateTimeString(),
+            'attendance' => $slot->bookings->flatMap(fn($booking) => $booking->attendance)
+                ->sortBy('scanned_at')
+                ->map(fn($a) => [
+                    'customer_name' => $a->customer->user->full_name,
+                    'status' => $a->status,
+                    'scanned_at' => optional($a->scanned_at)?->setTimezone('Asia/Kuala_Lumpur')->toDateTimeString(),
+                ])
+                ->values(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => $grouped,
         ]);
     }
 }

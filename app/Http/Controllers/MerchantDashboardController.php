@@ -88,9 +88,27 @@ class MerchantDashboardController extends Controller
 
         $allBookings = Booking::where('status', 'confirmed')
             ->whereHas('slot', fn($q) => $q->whereIn('event_id', $merchantEventIds))
-            ->with(['event.media', 'slot', 'customer.user', 'event.ageGroups'])
+            ->with(['event.media', 'attendance.customer', 'customer.user', 'event.ageGroups', 'slot'])
             ->orderBy('booked_at', 'desc')
             ->get();
+
+        $allBookings->transform(function ($booking) {
+            $attendance = $booking->attendance
+                ->firstWhere('customer_id', $booking->customer_id);
+            $booking->attendance_status = $attendance->status ?? 'pending';
+            return $booking;
+        });
+
+        $allBookings->transform(function ($booking) {
+            $slot = $booking->slot;
+
+            if ($slot) {
+                $booking->slot_start = optional($slot->display_start)->toDateTimeString();
+                $booking->slot_end = optional($slot->display_end)->toDateTimeString();
+            }
+
+            return $booking;
+        });
 
         $todayBookings = $allBookings->filter(function($b) use ($startOfToday, $endOfToday) {
             $bookedAt = Carbon::parse($b->booked_at);
@@ -101,7 +119,7 @@ class MerchantDashboardController extends Controller
             $bookedAt = Carbon::parse($b->booked_at);
             return $bookedAt->between($startOfWeek, $endOfToday);
         })->values();
-        
+
         // -----------------------------
         // Payouts
         // -----------------------------

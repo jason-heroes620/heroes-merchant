@@ -121,44 +121,15 @@ const BasicInfoSection: React.FC<{
                                     {event.is_suitable_for_all_ages
                                         ? "All Ages"
                                         : ageGroups
-                                              .map((ag) => ag.label)
+                                              .map(
+                                                  (ag) =>
+                                                      `${ag.label} (${ag.min_age} - ${ag.max_age})`
+                                              )
                                               .join(", ")}
                                 </p>
                             </div>
                         </div>
                     </div>
-
-                    {/* Age Group Details */}
-                    {!event.is_suitable_for_all_ages &&
-                        ageGroups.length > 0 && (
-                            <div className="mb-6">
-                                <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide flex items-center gap-1.5">
-                                    <UsersIcon className="w-4 h-4 text-orange-600" />
-                                    Age Group Details
-                                </h3>
-                                <div className="grid grid-cols-2 gap-3">
-                                    {ageGroups.map((ag) => (
-                                        <div
-                                            key={ag.id}
-                                            className="p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-center gap-3"
-                                        >
-                                            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-                                                <UsersIcon className="w-5 h-5 text-orange-600" />
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-sm text-gray-900">
-                                                    {ag.label}
-                                                </p>
-                                                <p className="text-xs text-gray-600">
-                                                    {ag.min_age} - {ag.max_age}{" "}
-                                                    years
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
 
                     {/* Media Gallery */}
                     {media.length > 0 && (

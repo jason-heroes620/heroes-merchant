@@ -20,63 +20,28 @@ class MerchantBookingController extends Controller
 
         $query = Booking::with([
             'slot',
-            'slot.date',
             'event.location',
             'event.media',
             'items.ageGroup',
             'transactions',
             'customer.user',
-            'attendances'
+            'attendance',
         ]);
 
-        // Merchant filter
         if ($user->role === 'merchant') {
             $query->whereHas('event', fn($q) => $q->where('merchant_id', $user->merchant->id));
         }
 
-        \Log::info('Merchant bookings query debug', [
-            'user_id' => $user->id,
-            'role' => $user->role,
-            'status' => $status,
-            'bookings_count' => $query->count(),
-            'sample_bookings' => $query->take(5)->get()->map(function ($b) {
-                return [
-                    'booking_id' => $b->id,
-                    'status' => $b->status,
-                    'customer_id' => $b->customer?->id,
-                    'customer_name' => $b->customer?->user?->full_name,
-                    'slot_display_start' => $b->slot?->display_start?->toDateTimeString(),
-                    'slot_display_end' => $b->slot?->display_end?->toDateTimeString(),
-                    'event_id' => $b->event_id,
-                ];
-            }),
-        ]);
-
-        // Status filters
         if ($status) {
             switch ($status) {
                 case 'upcoming':
                     $query->whereNotIn('status', ['cancelled', 'refunded'])
-                        ->where(function ($q) use ($now) {
-                            $q->whereHas('slot', fn($sq) => 
-                                $sq->whereRaw("STR_TO_DATE(CONCAT(date, ' ', start_time), '%Y-%m-%d %H:%i:%s') >= ?", [$now])
-                            )
-                            ->orWhereHas('event.dates', fn($dq) => 
-                                $dq->whereRaw("STR_TO_DATE(end_date, '%Y-%m-%d') >= ?", [$now->format('Y-m-d')])
-                            );
-                        });
+                        ->whereHas('slot', fn($q) => $q->where('display_start', '>=', $now));
                     break;
 
                 case 'completed':
                     $query->whereNotIn('status', ['cancelled', 'refunded'])
-                        ->where(function ($q) use ($now) {
-                            $q->whereHas('slot', fn($sq) => 
-                                $sq->whereRaw("STR_TO_DATE(CONCAT(date, ' ', end_time), '%Y-%m-%d %H:%i:%s') < ?", [$now])
-                            )
-                            ->orWhereHas('event.dates', fn($dq) => 
-                                $dq->whereRaw("STR_TO_DATE(end_date, '%Y-%m-%d') < ?", [$now->format('Y-m-d')])
-                            );
-                        });
+                        ->whereHas('slot', fn($q) => $q->where('display_end', '<', $now));
                     break;
 
                 case 'cancelled':
@@ -87,23 +52,23 @@ class MerchantBookingController extends Controller
 
         $page = $query->orderBy('booked_at', 'desc')->paginate($perPage)->withQueryString();
 
-        \Log::info('Merchant bookings after status filter', [
-            'user_id' => $user->id,
-            'role' => $user->role,
-            'status_filter' => $status,
-            'bookings_count' => $page->total(),
-            'sample_bookings' => $page->take(5)->map(function ($b) {
-                return [
-                    'booking_id' => $b->id,
-                    'status' => $b->status,
-                    'customer_id' => $b->customer?->id,
-                    'customer_name' => $b->customer?->user?->full_name,
-                    'slot_display_start' => $b->slot?->display_start?->toDateTimeString(),
-                    'slot_display_end' => $b->slot?->display_end?->toDateTimeString(),
-                    'event_id' => $b->event_id,
-                ];
-            }),
-        ]);
+        // Stats calculation using display_start / display_end
+        $allBookings = Booking::with('slot')->get();
+
+        $stats = [
+            'total' => $allBookings->count(),
+            'upcoming' => $allBookings->filter(fn($b) =>
+                $b->slot && !in_array($b->status, ['cancelled', 'refunded']) &&
+                $b->slot->display_start?->gte($now)
+            )->count(),
+            'completed' => $allBookings->filter(fn($b) =>
+                $b->slot && !in_array($b->status, ['cancelled', 'refunded']) &&
+                $b->slot->display_end?->lt($now)
+            )->count(),
+            'cancelled' => $allBookings->filter(fn($b) =>
+                in_array($b->status, ['cancelled', 'refunded'])
+            )->count(),
+        ];
 
         return Inertia::render('Bookings/MainBookingPage', [
             'bookings' => BookingAdminResource::collection($page),
@@ -113,6 +78,7 @@ class MerchantBookingController extends Controller
                 'per_page' => $page->perPage(),
                 'total' => $page->total(),
             ],
+            'stats' => $stats,
         ]);
     }
 
@@ -128,7 +94,7 @@ class MerchantBookingController extends Controller
             'items.ageGroup',
             'customer.user',
             'transactions',
-            'attendances'
+            'attendance'
         ])->whereHas('slot', function($q) use ($eventId) {
             $q->where('event_id', $eventId);
         });

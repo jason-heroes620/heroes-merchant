@@ -1,44 +1,58 @@
-declare const google: any;
-
 import { useEffect, useRef, useState } from "react";
 import { MapPin, Map } from "lucide-react";
+
+declare const google: any;
 
 export default function LocationSection({ setData, data }: any) {
     const inputRef = useRef<HTMLInputElement | null>(null);
     const mapRef = useRef<HTMLDivElement | null>(null);
     const mapInstance = useRef<any>(null);
     const markerInstance = useRef<any>(null);
+    const autocompleteRef = useRef<any>(null);
 
     const location = data.location || {};
     const [mapsReady, setMapsReady] = useState(false);
 
-    function loadGoogleMaps(src: string) {
-        if (window.google && window.google.maps) {
-            return Promise.resolve();
+    // Log only when location_name changes
+    useEffect(() => {
+        console.log("🔄 location_name changed", location.location_name);
+    }, [location.location_name]);
+
+    // Log only when latitude or longitude changes (marker/map)
+    useEffect(() => {
+        if (location.latitude && location.longitude) {
+            console.log("🗺️ Location coordinates updated", {
+                lat: location.latitude,
+                lng: location.longitude,
+            });
         }
+    }, [location.latitude, location.longitude]);
+
+    // Load Google Maps script
+    function loadGoogleMaps(src: string) {
+        if (window.google && window.google.maps) return Promise.resolve();
 
         if ((window as any)._googleMapsLoadingPromise) {
             return (window as any)._googleMapsLoadingPromise;
         }
 
-        const promise = new Promise((resolve, reject) => {
+        const promise = new Promise<void>((resolve, reject) => {
             const existing = document.querySelector(`script[src="${src}"]`);
             if (existing) {
-                existing.addEventListener("load", resolve);
-                existing.addEventListener("error", reject);
+                existing.addEventListener("load", () => resolve());
+                existing.addEventListener("error", () => reject());
                 return;
             }
 
             const script = document.createElement("script");
             script.src = src;
             script.async = true;
-            script.onload = resolve;
-            script.onerror = reject;
+            script.onload = () => resolve();
+            script.onerror = () => reject();
             document.body.appendChild(script);
         });
 
         (window as any)._googleMapsLoadingPromise = promise;
-
         return promise;
     }
 
@@ -47,13 +61,18 @@ export default function LocationSection({ setData, data }: any) {
             `https://maps.googleapis.com/maps/api/js?key=${
                 import.meta.env.GOOGLE_MAPS_API_KEY
             }&libraries=places`
-        ).then(() => setMapsReady(true));
+        ).then(() => {
+            console.log("✅ Google Maps script loaded");
+            setMapsReady(true);
+        });
     }, []);
 
-    useEffect(() => {
-        if (!mapsReady || !inputRef.current) return;
+    // Initialize autocomplete only when user focuses input
+    const handleLocationInputFocus = () => {
+        if (!mapsReady || !inputRef.current || autocompleteRef.current) return;
 
-        const autocomplete = new google.maps.places.Autocomplete(
+        console.log("📌 Initializing autocomplete");
+        autocompleteRef.current = new google.maps.places.Autocomplete(
             inputRef.current,
             {
                 fields: [
@@ -66,9 +85,11 @@ export default function LocationSection({ setData, data }: any) {
             }
         );
 
-        autocomplete.addListener("place_changed", () => {
-            const place = autocomplete.getPlace();
+        autocompleteRef.current.addListener("place_changed", () => {
+            const place = autocompleteRef.current.getPlace();
             if (!place.geometry) return;
+
+            console.log("✏️ Autocomplete place selected", place);
 
             const viewport = place.geometry.viewport
                 ? {
@@ -89,9 +110,9 @@ export default function LocationSection({ setData, data }: any) {
                 raw_place: place,
             });
         });
-        console.log(autocomplete);
-    }, [mapsReady, setData, data.location]);
+    };
 
+    // Initialize map and marker
     useEffect(() => {
         if (
             !mapsReady ||
@@ -102,6 +123,7 @@ export default function LocationSection({ setData, data }: any) {
             return;
 
         if (!mapInstance.current) {
+            console.log("🗺️ Initializing map");
             mapInstance.current = new google.maps.Map(mapRef.current, {
                 center: { lat: location.latitude, lng: location.longitude },
                 zoom: 15,
@@ -109,25 +131,28 @@ export default function LocationSection({ setData, data }: any) {
         }
 
         if (!markerInstance.current) {
+            console.log("📍 Initializing marker");
             markerInstance.current = new google.maps.Marker({
                 map: mapInstance.current,
                 draggable: true,
             });
 
-            markerInstance.current.addListener("dragend", async () => {
+            markerInstance.current.addListener("dragend", () => {
                 const pos = markerInstance.current.getPosition();
                 if (!pos) return;
 
                 const lat = pos.lat();
                 const lng = pos.lng();
 
-                const geocoder = new google.maps.Geocoder();
+                console.log("📌 Marker dragged", { lat, lng });
 
+                const geocoder = new google.maps.Geocoder();
                 geocoder.geocode(
                     { location: { lat, lng } },
                     (results: any[], status: string) => {
                         if (status === "OK" && results.length > 0) {
                             const place = results[0];
+                            console.log("🏷️ Geocoded place from marker", place);
 
                             setData("location", {
                                 ...location,
@@ -153,7 +178,6 @@ export default function LocationSection({ setData, data }: any) {
             lat: location.latitude,
             lng: location.longitude,
         });
-
         mapInstance.current.setCenter({
             lat: location.latitude,
             lng: location.longitude,
@@ -191,13 +215,13 @@ export default function LocationSection({ setData, data }: any) {
                             location_name: e.target.value,
                         })
                     }
+                    onFocus={handleLocationInputFocus} // only init autocomplete on focus
                     className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm transition-all"
                     placeholder="Start typing to search for a place..."
                 />
             </div>
 
             {/* Map */}
-
             {location.location_name && (
                 <div className="mt-6">
                     <label className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide flex items-center gap-2">
@@ -233,7 +257,6 @@ export default function LocationSection({ setData, data }: any) {
             )}
 
             {/* How to get there */}
-
             <div>
                 <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
                     How to Get There

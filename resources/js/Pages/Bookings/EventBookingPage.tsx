@@ -15,13 +15,20 @@ import {
     Search,
 } from "lucide-react";
 import AuthenticatedLayout from "@/AuthenticatedLayout";
+import { usePage } from "@inertiajs/react";
+import type { PageProps } from "../../types/index";
 
-interface EventBookingProps {
+type EventBookingPageProps = PageProps & {
     event: Event;
     bookings: Booking[];
-}
+};
 
-const EventBookingPage: React.FC<EventBookingProps> = ({ event, bookings }) => {
+const EventBookingPage: React.FC = () => {
+    const { props } = usePage<EventBookingPageProps>();
+
+    const event = props.event;
+    const bookings = props.bookings ?? [];
+
     const getEventTypeLabel = (type: string) => {
         const labels: Record<string, string> = {
             event: "Event",
@@ -107,12 +114,7 @@ const EventBookingPage: React.FC<EventBookingProps> = ({ event, bookings }) => {
             (b) => b.status === "cancelled" || b.status === "refunded"
         ).length,
         totalAttendees: bookings.reduce((sum, b) => {
-            if (!b.attendance || !Array.isArray(b.attendance)) return sum;
-            const bookingAttended = b.attendance.reduce(
-                (subSum, a) => subSum + (a.attended_count ?? 0),
-                0
-            );
-            return sum + bookingAttended;
+            return sum + (b.attendance?.summary?.attended ?? 0);
         }, 0),
     };
 
@@ -298,10 +300,12 @@ const EventBookingPage: React.FC<EventBookingProps> = ({ event, bookings }) => {
                                                                     className="text-gray-500"
                                                                 />
                                                                 <span className="text-gray-900">
-                                                                    ID:
+                                                                    BOOKING CODE:
                                                                 </span>
                                                                 <span className="font-mono font-semibold text-gray-600">
-                                                                    {b.booking_code}
+                                                                    {
+                                                                        b.booking_code
+                                                                    }
                                                                 </span>
                                                             </div>
 
@@ -551,6 +555,89 @@ const EventBookingPage: React.FC<EventBookingProps> = ({ event, bookings }) => {
                                                                     )}
                                                                 </div>
                                                             )}
+                                                        {/* ATTENDANCE SECTION */}
+                                                        {b.attendance?.list &&
+                                                        b.attendance.list
+                                                            .length > 0 ? (
+                                                            b.attendance.list.map(
+                                                                (a) => {
+                                                                    const scanned =
+                                                                        a.scanned_at
+                                                                            ? new Date(
+                                                                                  a.scanned_at
+                                                                              ).toLocaleString(
+                                                                                  "en-MY"
+                                                                              )
+                                                                            : null;
+
+                                                                    return (
+                                                                        <div
+                                                                            key={
+                                                                                a.id
+                                                                            }
+                                                                            className="bg-white rounded-lg p-3 space-y-2 border"
+                                                                        >
+                                                                            <div className="flex items-center gap-2">
+                                                                                {a.status ===
+                                                                                "attended" ? (
+                                                                                    <CheckCircle
+                                                                                        className="text-green-600"
+                                                                                        size={
+                                                                                            16
+                                                                                        }
+                                                                                    />
+                                                                                ) : (
+                                                                                    <XCircle
+                                                                                        className="text-red-500"
+                                                                                        size={
+                                                                                            16
+                                                                                        }
+                                                                                    />
+                                                                                )}
+                                                                                <span className="text-sm font-semibold">
+                                                                                    {a.status
+                                                                                        .charAt(
+                                                                                            0
+                                                                                        )
+                                                                                        .toUpperCase() +
+                                                                                        a.status.slice(
+                                                                                            1
+                                                                                        )}
+                                                                                </span>
+                                                                            </div>
+
+                                                                            <div className="text-xs text-gray-500">
+                                                                                Scanned
+                                                                                at:{" "}
+                                                                                {scanned ? (
+                                                                                    <span>
+                                                                                        {new Date(
+                                                                                            scanned
+                                                                                        ).toLocaleTimeString(
+                                                                                            "en-MY",
+                                                                                            {
+                                                                                                hour: "2-digit",
+                                                                                                minute: "2-digit",
+                                                                                            }
+                                                                                        )}{" "}
+                                                                                    </span>
+                                                                                ) : (
+                                                                                    <span className="text-gray-400">
+                                                                                        Not
+                                                                                        scanned
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                            )
+                                                        ) : (
+                                                            <div>
+                                                                No attendance
+                                                                recorded
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

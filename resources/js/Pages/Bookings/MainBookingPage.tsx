@@ -1,111 +1,93 @@
 import { useState } from "react";
-import {
-    DollarSign,
-    Gift,
-    CalendarClock,
-    User,
-    MapPin,
-    Calendar,
-    XCircle,
-    TrendingUp,
-    CheckCircle,
-    Phone,
-    Mail,
-    Search,
-} from "lucide-react";
+import { router, usePage } from "@inertiajs/react";
+import type { PageProps } from "../../types/index";
 import type { Booking } from "../../types/events";
 import AuthenticatedLayout from "@/AuthenticatedLayout";
+import CustomerDetails from "@/components/bookings/CustomerDetails";
+import BookingDetails from "@/components/bookings/BookingDetails";
+import AttendanceDetails from "@/components/bookings/AttendanceDetails";
+import {
+    Calendar,
+    CalendarClock,
+    TrendingUp,
+    CheckCircle,
+    XCircle,
+    Search,
+    MapPin,
+} from "lucide-react";
 
-interface PaginatedBookings {
-    data: Booking[];
-    current_page: number;
-    last_page: number;
-    per_page: number;
-    total: number;
-}
+type PaginatedBookings = PageProps & {
+    bookings: {
+        data: Booking[];
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    };
+    stats: {
+        total: number;
+        upcoming: number;
+        completed: number;
+        cancelled: number;
+    };
+};
 
-interface MainBookingProps {
-    bookings: PaginatedBookings;
-}
-
-const MainBookingPage: React.FC<MainBookingProps> = ({ bookings }) => {
-    
+const MainBookingPage: React.FC = () => {
+    const { props } = usePage<PaginatedBookings>();
+    const { bookings, stats } = props;
 
     const [statusFilter, setStatusFilter] = useState<
         "all" | "upcoming" | "completed" | "cancelled"
-    >("all");
-    const [searchTerm, setSearchTerm] = useState("");
+    >((props.status as any) || "all");
+    const [searchTerm, setSearchTerm] = useState(
+        (props.search as string) || ""
+    );
 
-    const now = new Date();
+    // --- Handle tab click ---
+    const handleStatusChange = (
+        status: "all" | "upcoming" | "completed" | "cancelled"
+    ) => {
+        setStatusFilter(status);
 
-    const getEventTypeLabel = (type: string) => {
-        const labels: Record<string, string> = {
-            event: "Event",
-            trial_class: "Trial Class",
-            location_based: "Field Trip",
-        };
-        return labels[type] || type;
+        router.get(
+            route("bookings.index"),
+            {
+                ...(status !== "all" && { status }),
+                ...(searchTerm.trim() && { search: searchTerm }),
+            },
+            { preserveState: true, replace: true }
+        );
     };
 
-    const filteredBookings = bookings.data.filter((b) => {
-        if (statusFilter === "all") {
-        } else if (statusFilter === "cancelled") {
-            if (!(b.status === "cancelled" || b.status === "refunded"))
-                return false;
-        } else if (statusFilter === "upcoming") {
-            if (!b.slot) return false;
-            if (["cancelled", "refunded"].includes(b.status)) return false;
+    // --- Handle search input ---
+    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setSearchTerm(value);
 
-            const slotStart = new Date(`${b.slot.date}T${b.slot.start_time}`);
-            if (slotStart < now) return false;
-        } else if (statusFilter === "completed") {
-            if (!b.slot) return false;
-            if (["cancelled", "refunded"].includes(b.status)) return false;
+        router.get(
+            route("bookings.index"),
+            {
+                ...(statusFilter !== "all" && { status: statusFilter }),
+                ...(value.trim() && { search: value }),
+            },
+            { preserveState: true, replace: true }
+        );
+    };
 
-            const slotEnd = new Date(`${b.slot.date}T${b.slot.end_time}`);
-            if (slotEnd >= now) return false;
-        }
-
-        // Search filter
-        if (searchTerm.trim()) {
-            const search = searchTerm.toLowerCase();
-            const matchesCustomer =
-                b.customer?.name?.toLowerCase().includes(search) ||
-                b.customer?.email?.toLowerCase().includes(search) ||
-                b.customer?.phone?.toLowerCase().includes(search);
-            const matchesBookingId =
-                b.booking_code?.toLowerCase().includes(search);
-            const matchesEvent = b.event?.title?.toLowerCase().includes(search);
-
-            return matchesCustomer || matchesBookingId || matchesEvent;
-        }
-
-        return true;
+    // --- Group bookings by date and slot ---
+    const bookingsByDateAndSlot: Record<string, Record<string, Booking[]>> = {};
+    bookings.data.forEach((b) => {
+        const date = b.slot?.date ?? "Unknown";
+        const slotKey = `${b.slot?.start_time ?? "Unknown"} - ${
+            b.slot?.end_time ?? "Unknown"
+        }`;
+        if (!bookingsByDateAndSlot[date]) bookingsByDateAndSlot[date] = {};
+        if (!bookingsByDateAndSlot[date][slotKey])
+            bookingsByDateAndSlot[date][slotKey] = [];
+        bookingsByDateAndSlot[date][slotKey].push(b);
     });
 
-    // Calculate stats
-    const stats = {
-        total: bookings.data.length,
-        upcoming: bookings.data.filter((b) => {
-            if (!b.slot) return false;
-            const slotStart = new Date(`${b.slot.date}T${b.slot.start_time}`);
-            return (
-                !["cancelled", "refunded"].includes(b.status) &&
-                slotStart >= now
-            );
-        }).length,
-        completed: bookings.data.filter((b) => {
-            if (!b.slot) return false;
-            const slotEnd = new Date(`${b.slot.date}T${b.slot.end_time}`);
-            return (
-                !["cancelled", "refunded"].includes(b.status) && slotEnd < now
-            );
-        }).length,
-        cancelled: bookings.data.filter(
-            (b) => b.status === "cancelled" || b.status === "refunded"
-        ).length,
-    };
-
+    // --- Stats cards ---
     const cards = [
         {
             label: "Total Bookings",
@@ -137,15 +119,14 @@ const MainBookingPage: React.FC<MainBookingProps> = ({ bookings }) => {
         },
     ];
 
-    const bookingsByDateAndSlot: Record<string, Record<string, Booking[]>> = {};
-    filteredBookings.forEach((b) => {
-        const date = b.slot?.date ?? "Unknown";
-        const slotKey = `${b.slot?.start_time} - ${b.slot?.end_time}`;
-        if (!bookingsByDateAndSlot[date]) bookingsByDateAndSlot[date] = {};
-        if (!bookingsByDateAndSlot[date][slotKey])
-            bookingsByDateAndSlot[date][slotKey] = [];
-        bookingsByDateAndSlot[date][slotKey].push(b);
-    });
+    const getEventTypeLabel = (type: string) => {
+        const labels: Record<string, string> = {
+            event: "Event",
+            trial_class: "Trial Class",
+            location_based: "Field Trip",
+        };
+        return labels[type] || type;
+    };
 
     return (
         <AuthenticatedLayout>
@@ -185,7 +166,7 @@ const MainBookingPage: React.FC<MainBookingProps> = ({ bookings }) => {
                         ))}
                     </div>
 
-                    {/* Search Bar */}
+                    {/* Search */}
                     <div className="mb-6 bg-white p-2 rounded-xl shadow-sm border border-orange-100">
                         <div className="relative">
                             <Search
@@ -194,21 +175,21 @@ const MainBookingPage: React.FC<MainBookingProps> = ({ bookings }) => {
                             />
                             <input
                                 type="text"
-                                placeholder="Search by customer name, email, phone, booking ID, or event title..."
+                                placeholder="Search by customer, booking ID, or event title..."
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={handleSearch}
                                 className="w-full pl-12 pr-4 py-3 rounded-lg border-none focus:outline-none focus:ring-2 focus:ring-orange-300 text-gray-700"
                             />
                         </div>
                     </div>
 
-                    {/* Filter Buttons - Full Width */}
+                    {/* Filter Buttons */}
                     <div className="grid grid-cols-4 gap-3 mb-8 bg-white p-2 rounded-xl shadow-sm border border-orange-100">
                         {["all", "upcoming", "completed", "cancelled"].map(
                             (s) => (
                                 <button
                                     key={s}
-                                    onClick={() => setStatusFilter(s as any)}
+                                    onClick={() => handleStatusChange(s as any)}
                                     className={`px-6 py-2.5 rounded-lg font-medium transition-all ${
                                         statusFilter === s
                                             ? "bg-linear-to-r from-orange-500 to-red-500 text-white shadow-md"
@@ -254,7 +235,6 @@ const MainBookingPage: React.FC<MainBookingProps> = ({ bookings }) => {
                                                             className="bg-white border border-orange-100 rounded-2xl shadow-sm hover:shadow-lg transition-all overflow-hidden"
                                                         >
                                                             <div className="flex gap-15 p-6">
-                                                                {/* LEFT SIDE: Event Details */}
                                                                 <div className="flex-1 space-y-4 max-w-[300px]">
                                                                     {/* Event Media */}
                                                                     {b.event
@@ -280,7 +260,7 @@ const MainBookingPage: React.FC<MainBookingProps> = ({ bookings }) => {
                                                                         </div>
                                                                     )}
 
-                                                                    {/* Event Title & Details */}
+                                                                    {/* Event Title + Labels */}
                                                                     <div className="flex-1 space-y-3">
                                                                         <h3 className="text-2xl font-bold text-gray-900">
                                                                             {b
@@ -288,8 +268,6 @@ const MainBookingPage: React.FC<MainBookingProps> = ({ bookings }) => {
                                                                                 ?.title ??
                                                                                 "Untitled Event"}
                                                                         </h3>
-
-                                                                        {/* Type & Category */}
                                                                         <div className="flex items-center gap-3">
                                                                             {b
                                                                                 .event
@@ -314,8 +292,6 @@ const MainBookingPage: React.FC<MainBookingProps> = ({ bookings }) => {
                                                                                 </span>
                                                                             )}
                                                                         </div>
-
-                                                                        {/* Location */}
                                                                         {b.event
                                                                             ?.location && (
                                                                             <div className="flex items-center gap-2 text-gray-600">
@@ -337,254 +313,28 @@ const MainBookingPage: React.FC<MainBookingProps> = ({ bookings }) => {
                                                                     </div>
                                                                 </div>
 
+                                                                {/* Customer + Booking + Attendance */}
                                                                 <div className="flex-1 space-y-4 max-w-[800px]">
-                                                                    {b.customer && (
-                                                                        <div className="bg-orange-50 rounded-xl p-4 space-y-3">
-                                                                            <div className="text-sm font-bold text-gray-700">
-                                                                                Customer
-                                                                                Details
-                                                                            </div>
-
-                                                                            {/* Customer Profile */}
-                                                                            <div className="flex items-center gap-3">
-                                                                                {b
-                                                                                    .customer
-                                                                                    .profile_picture ? (
-                                                                                    <img
-                                                                                        src={`/storage/${b.customer.profile_picture}`}
-                                                                                        alt={
-                                                                                            b
-                                                                                                .customer
-                                                                                                .name
-                                                                                        }
-                                                                                        className="w-12 h-12 rounded-full object-cover border-2 border-orange-200"
-                                                                                    />
-                                                                                ) : (
-                                                                                    <div className="w-12 h-12 rounded-full bg-orange-200 flex items-center justify-center">
-                                                                                        <User
-                                                                                            size={
-                                                                                                20
-                                                                                            }
-                                                                                            className="text-orange-600"
-                                                                                        />
-                                                                                    </div>
-                                                                                )}
-                                                                                <div>
-                                                                                    <div className="font-semibold text-gray-900">
-                                                                                        {
-                                                                                            b
-                                                                                                .customer
-                                                                                                .name
-                                                                                        }
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-
-                                                                            {/* Email */}
-                                                                            <div className="bg-white rounded-lg p-3 flex items-center justify-between gap-3">
-                                                                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                                                    <Mail
-                                                                                        size={
-                                                                                            14
-                                                                                        }
-                                                                                        className="text-gray-500 shrink-0"
-                                                                                    />
-                                                                                    <span className="text-xs text-gray-700 truncate">
-                                                                                        {
-                                                                                            b
-                                                                                                .customer
-                                                                                                .email
-                                                                                        }
-                                                                                    </span>
-                                                                                </div>
-                                                                                <a
-                                                                                    href={`mailto:${b.customer.email}`}
-                                                                                    className="p-1.5 bg-orange-100 hover:bg-orange-200 rounded-lg transition-colors shrink-0"
-                                                                                    title="Send email"
-                                                                                >
-                                                                                    <Mail
-                                                                                        size={
-                                                                                            14
-                                                                                        }
-                                                                                        className="text-orange-600"
-                                                                                    />
-                                                                                </a>
-                                                                            </div>
-
-                                                                            {/* Phone */}
-                                                                            {b
-                                                                                .customer
-                                                                                .phone && (
-                                                                                <div className="bg-white rounded-lg p-3 flex items-center justify-between gap-3">
-                                                                                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                                                        <Phone
-                                                                                            size={
-                                                                                                14
-                                                                                            }
-                                                                                            className="text-gray-500 shrink-0"
-                                                                                        />
-                                                                                        <span className="text-xs text-gray-700 truncate">
-                                                                                            {
-                                                                                                b
-                                                                                                    .customer
-                                                                                                    .phone
-                                                                                            }
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    <a
-                                                                                        href={`tel:${b.customer.phone}`}
-                                                                                        className="p-1.5 bg-orange-100 hover:bg-orange-200 rounded-lg transition-colors shrink-0"
-                                                                                        title="Call customer"
-                                                                                    >
-                                                                                        <Phone
-                                                                                            size={
-                                                                                                14
-                                                                                            }
-                                                                                            className="text-orange-600"
-                                                                                        />
-                                                                                    </a>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-
-                                                                    {/* Booking Details */}
-                                                                    <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-                                                                        <div className="text-sm font-bold text-gray-700">
-                                                                            Booking
-                                                                            Details
-                                                                        </div>
-
-                                                                        {/* Booking ID */}
-                                                                        <div className="flex items-center gap-2 text-sm">
-                                                                            <span className="text-gray-600">
-                                                                                Booking Code:
-                                                                            </span>
-                                                                            <span className="font-mono font-semibold text-gray-900">
-                                                                                {b.booking_code}
-                                                                            </span>
-                                                                        </div>
-
-                                                                        {/* Quantity & Items */}
-                                                                        <div className="space-y-2">
-                                                                            <div className="flex items-center gap-2">
-                                                                                <span className="text-sm text-gray-600">
-                                                                                    Quantity:
-                                                                                </span>
-                                                                                <span className="font-bold text-orange-600 text-lg">
-                                                                                    {
-                                                                                        b.quantity
-                                                                                    }
-                                                                                </span>
-                                                                            </div>
-                                                                            {b.items &&
-                                                                                b
-                                                                                    .items
-                                                                                    .length >
-                                                                                    0 && (
-                                                                                    <div className="flex flex-wrap gap-2">
-                                                                                        {b.items.map(
-                                                                                            (
-                                                                                                i
-                                                                                            ) => (
-                                                                                                <span
-                                                                                                    key={
-                                                                                                        i.age_group_label
-                                                                                                    }
-                                                                                                    className="px-2 py-1 bg-white text-orange-700 text-xs font-semibold rounded-lg border border-orange-200"
-                                                                                                >
-                                                                                                    {
-                                                                                                        i.age_group_label
-                                                                                                    }{" "}
-                                                                                                    ×{" "}
-                                                                                                    {
-                                                                                                        i.quantity
-                                                                                                    }
-                                                                                                </span>
-                                                                                            )
-                                                                                        )}
-                                                                                    </div>
-                                                                                )}
-                                                                        </div>
-                                                                    </div>
-
-                                                                    {/* Transactions */}
-                                                                    {b.transactions &&
-                                                                        b
-                                                                            .transactions
-                                                                            .length >
-                                                                            0 && (
-                                                                            <div className="bg-blue-50 rounded-xl p-4 space-y-2">
-                                                                                <div className="text-sm font-bold text-gray-700 mb-2">
-                                                                                    Transactions
-                                                                                </div>
-                                                                                {b.transactions.map(
-                                                                                    (
-                                                                                        t
-                                                                                    ) => {
-                                                                                        const isRefund =
-                                                                                            t.type ===
-                                                                                            "refund";
-                                                                                        return (
-                                                                                            <div
-                                                                                                key={
-                                                                                                    t.id
-                                                                                                }
-                                                                                                className="bg-white rounded-lg p-3 space-y-1"
-                                                                                            >
-                                                                                                <div
-                                                                                                    className={`flex items-center gap-2 text-xs font-bold ${
-                                                                                                        isRefund
-                                                                                                            ? "text-red-600"
-                                                                                                            : "text-green-600"
-                                                                                                    }`}
-                                                                                                >
-                                                                                                    {isRefund
-                                                                                                        ? "REFUND"
-                                                                                                        : "BOOKING"}
-                                                                                                </div>
-                                                                                                <div className="flex items-center gap-3">
-                                                                                                    <div className="flex items-center gap-1 text-sm">
-                                                                                                        <Gift
-                                                                                                            size={
-                                                                                                                12
-                                                                                                            }
-                                                                                                            className="text-gray-500"
-                                                                                                        />
-                                                                                                        <span className="font-medium text-gray-700">
-                                                                                                            {Math.abs(
-                                                                                                                t.delta_free
-                                                                                                            )}
-                                                                                                        </span>
-                                                                                                        free
-                                                                                                        credits
-                                                                                                    </div>
-                                                                                                    <div className="flex items-center gap-1 text-sm">
-                                                                                                        <DollarSign
-                                                                                                            size={
-                                                                                                                12
-                                                                                                            }
-                                                                                                            className="text-gray-500"
-                                                                                                        />
-                                                                                                        <span className="font-medium text-gray-700">
-                                                                                                            {Math.abs(
-                                                                                                                t.delta_paid
-                                                                                                            )}
-                                                                                                        </span>
-                                                                                                        paid
-                                                                                                        credits
-                                                                                                    </div>
-                                                                                                    <span className="text-gray-400 text-xs ml-auto">
-                                                                                                        {
-                                                                                                            t.created_at
-                                                                                                        }
-                                                                                                    </span>
-                                                                                                </div>
-                                                                                            </div>
-                                                                                        );
-                                                                                    }
-                                                                                )}
-                                                                            </div>
+                                                                    <CustomerDetails
+                                                                        customer={
+                                                                            b.customer
+                                                                        }
+                                                                    />
+                                                                    <BookingDetails
+                                                                        booking={
+                                                                            b
+                                                                        }
+                                                                    />
+                                                                    {(statusFilter ===
+                                                                        "completed" ||
+                                                                        statusFilter ===
+                                                                            "all") &&
+                                                                        b.attendance && (
+                                                                            <AttendanceDetails
+                                                                                attendance={
+                                                                                    b.attendance
+                                                                                }
+                                                                            />
                                                                         )}
                                                                 </div>
                                                             </div>

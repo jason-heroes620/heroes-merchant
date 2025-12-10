@@ -6,8 +6,10 @@ use Illuminate\Http\Request;
 use App\Services\BookingService;
 use App\Http\Resources\BookingResource;
 use App\Models\Booking;
+use App\Models\Attendance;
 use App\Models\EventSlot;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 class BookingController extends Controller
@@ -145,6 +147,14 @@ class BookingController extends Controller
 
         try {
             $booking = $this->bookingService->bookSlot($customer, $slot, $quantitiesByAgeGroup, $allowFallback);
+            Attendance::create([
+                'id' => Str::uuid(),
+                'booking_id' => $booking->id,
+                'slot_id' => $slot->id,
+                'event_id' => $slot->event_id,
+                'customer_id' => $customer->id,
+                'status' => 'pending',
+            ]);
             return response()->json($booking, 201);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 400);
@@ -183,6 +193,8 @@ class BookingController extends Controller
             }
 
             Log::info("Cancel result prepared", ['result' => $result]);
+
+            Attendance::where('booking_id', $booking->id)->delete();
 
             return response()->json($result, 200);
         } catch (\Exception $e) {
