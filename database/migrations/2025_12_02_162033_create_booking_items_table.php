@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignUuid('booking_id')->constrained('bookings')->onDelete('cascade');
             $table->foreignUuid('age_group_id')->nullable()->constrained('event_age_groups')->onDelete('set null');
             $table->integer('quantity')->default(1);
+            $table->integer('quantity_attended')->default(1);
             $table->integer('free_credits')->default(0);
             $table->integer('paid_credits')->default(0);
             $table->timestamps();

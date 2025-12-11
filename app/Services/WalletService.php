@@ -125,6 +125,7 @@ class WalletService
         if ($allowFallback && $wallet->cached_paid_credits >= $totalPaid + $shortfall) {
             return true; // enough paid credits to cover remaining free
         }
+        
 
         // Not enough free, fallback not allowed or paid insufficient
         throw new \Exception("Insufficient free credits. You can use paid credits to cover missing free credits.");

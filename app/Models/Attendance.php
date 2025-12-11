@@ -12,6 +12,7 @@ class Attendance extends Model
 
     protected $fillable = [
         'booking_id',
+        'booking_item_id',
         'slot_id',
         'event_id',
         'customer_id',
@@ -28,6 +29,11 @@ class Attendance extends Model
     public function booking()
     {
         return $this->belongsTo(Booking::class);
+    }
+
+    public function bookingItem()
+    {
+        return $this->belongsTo(BookingItem::class);
     }
 
     public function slot()

@@ -115,7 +115,7 @@ class MerchantEventController extends Controller
             } else {
                 $slot->booked_quantity_by_age_group = $slot->prices
                     ->groupBy('event_age_group_id')
-                    ->map(fn($prices, $ageGroupId) => $prices->sum('booked_quantity'))
+                    ->map(fn($prices) => $prices->sum('booked_quantity'))
                     ->toArray();
             }
 

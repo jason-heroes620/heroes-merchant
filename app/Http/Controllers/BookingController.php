@@ -147,14 +147,17 @@ class BookingController extends Controller
 
         try {
             $booking = $this->bookingService->bookSlot($customer, $slot, $quantitiesByAgeGroup, $allowFallback);
-            Attendance::create([
-                'id' => Str::uuid(),
-                'booking_id' => $booking->id,
-                'slot_id' => $slot->id,
-                'event_id' => $slot->event_id,
-                'customer_id' => $customer->id,
-                'status' => 'pending',
-            ]);
+            foreach ($booking->items as $item) {
+                Attendance::create([
+                    'id' => Str::uuid(),
+                    'booking_id' => $booking->id,
+                    'booking_item_id' => $item->id,
+                    'slot_id' => $slot->id,
+                    'event_id' => $slot->event_id,
+                    'customer_id' => $customer->id,
+                    'status' => 'pending',
+                ]);
+            }
             return response()->json($booking, 201);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 400);

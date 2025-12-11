@@ -64,6 +64,7 @@ Route::middleware('auth:sanctum')->prefix('merchant')->group(function () {
     Route::get('/bookings/event/{eventId}', [MerchantBookingController::class, 'apiBookingsByEvent']);
     Route::get('/attendances', [AttendanceController::class, 'getAttendances']);  
     Route::post('/attendances/{bookingId}/mark', [AttendanceController::class, 'markAttendance']); 
+    Route::get('/attendances/slot/{slotId}', [AttendanceController::class, 'getSlotAttendances']);
 });
 
 //Public Events

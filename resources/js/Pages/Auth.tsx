@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from "react";
-import { Inertia } from "@inertiajs/inertia";
-import { Head, usePage } from "@inertiajs/react";
+import { Head, usePage, useForm } from "@inertiajs/react";
 
 const Auth: React.FC = () => {
     const { errors } = usePage().props as { errors?: Record<string, string> };
+    const { post, data, setData } = useForm({
+        full_name: "",
+        email: "",
+        password: "",
+        password_confirmation: "",
+        company_name: "",
+    });
 
     const queryParams = new URLSearchParams(window.location.search);
     const isRegisterMode = queryParams.get("mode") === "register";
 
     const [isLogin, setIsLogin] = useState(!isRegisterMode);
-    const [fullName, setFullName] = useState("");
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [passwordConfirmation, setPasswordConfirmation] = useState("");
-    const [companyName, setCompanyName] = useState("");
     const [loading, setLoading] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
 
@@ -27,41 +28,41 @@ const Auth: React.FC = () => {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!email || !password) {
+        if (!data.email || !data.password) {
             alert("Please fill in all required fields.");
             return;
         }
 
         if (!isLogin) {
-            if (!fullName || !companyName) {
+            if (!data.full_name || !data.company_name) {
                 alert("Please fill in your full name and company name.");
                 return;
             }
 
-            if (password !== passwordConfirmation) {
+            if (data.password !== data.password_confirmation) {
                 alert("Passwords do not match!");
                 return;
             }
 
-            if (password.length < 8) {
+            if (data.password.length < 8) {
                 alert("Password must be at least 8 characters long.");
                 return;
             }
         }
 
-        const data: Record<string, string> = { email, password };
+        // const data: Record<string, string> = { email, password };
 
-        if (!isLogin) {
-            data.full_name = fullName;
-            data.company_name = companyName;
-            data.password_confirmation = passwordConfirmation;
-        }
+        // if (!isLogin) {
+        //     data.full_name = fullName;
+        //     data.company_name = companyName;
+        //     data.password_confirmation = passwordConfirmation;
+        // }
 
         const route = isLogin ? "/login" : "/register";
 
         setLoading(true);
 
-        Inertia.post(route, data, {
+        post(route, {
             onError: (err) => {
                 setLoading(false);
                 console.error("Validation error:", err);
@@ -144,9 +145,9 @@ const Auth: React.FC = () => {
                                     <input
                                         type="text"
                                         placeholder="Your Full Name"
-                                        value={fullName}
+                                        value={data.full_name}
                                         onChange={(e) =>
-                                            setFullName(e.target.value)
+                                            setData("full_name", e.target.value)
                                         }
                                         className="border border-gray-300 p-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                                         required
@@ -159,9 +160,12 @@ const Auth: React.FC = () => {
                                     <input
                                         type="text"
                                         placeholder="Your Company"
-                                        value={companyName}
+                                        value={data.company_name}
                                         onChange={(e) =>
-                                            setCompanyName(e.target.value)
+                                            setData(
+                                                "company_name",
+                                                e.target.value
+                                            )
                                         }
                                         className="border border-gray-300 p-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                                         required
@@ -177,8 +181,10 @@ const Auth: React.FC = () => {
                             <input
                                 type="email"
                                 placeholder="youremail@example.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                value={data.email}
+                                onChange={(e) =>
+                                    setData("email", e.target.value)
+                                }
                                 className="border border-gray-300 p-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                                 required
                             />
@@ -196,8 +202,10 @@ const Auth: React.FC = () => {
                             <input
                                 type="password"
                                 placeholder="••••••••"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
+                                value={data.password}
+                                onChange={(e) =>
+                                    setData("password", e.target.value)
+                                }
                                 className="border border-gray-300 p-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                                 required
                             />
@@ -216,9 +224,12 @@ const Auth: React.FC = () => {
                                 <input
                                     type="password"
                                     placeholder="••••••••"
-                                    value={passwordConfirmation}
+                                    value={data.password_confirmation}
                                     onChange={(e) =>
-                                        setPasswordConfirmation(e.target.value)
+                                        setData(
+                                            "password_confirmation",
+                                            e.target.value
+                                        )
                                     }
                                     className="border border-gray-300 p-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                                     required

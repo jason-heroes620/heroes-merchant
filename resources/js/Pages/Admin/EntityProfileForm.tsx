@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Inertia } from "@inertiajs/inertia";
 import toast from "react-hot-toast";
 import { User, Lock, Building2, FileText, Gift, Loader2 } from "lucide-react";
+import { router, useForm } from "@inertiajs/react";
 
 type EntityType = "merchant" | "customer";
 
@@ -48,9 +48,7 @@ export default function EntityProfileForm({
     entity,
     updateRoute,
 }: Props) {
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    const [form, setForm] = useState({
+    const { post, data, setData } = useForm({
         full_name: entity.user.full_name || "",
         email: entity.user.email || "",
         contact_number: entity.user.contact_number || "",
@@ -79,6 +77,8 @@ export default function EntityProfileForm({
                   referral_code: (entity as Customer).referral_code || "",
               }),
     });
+    console.log("data =>", data);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleChange = (
         e: React.ChangeEvent<
@@ -86,14 +86,14 @@ export default function EntityProfileForm({
         >
     ) => {
         const { name, value } = e.target;
-        setForm((prev) => ({ ...prev, [name]: value }));
+        setData((prev) => ({ ...prev, [name]: value }));
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
 
-        Inertia.post(route(updateRoute, entity.id), form, {
+        post(route(updateRoute, entity.id), {
             onSuccess: () => {
                 toast.success(
                     `${
@@ -101,7 +101,7 @@ export default function EntityProfileForm({
                     } updated successfully!`
                 );
                 setTimeout(() => {
-                    Inertia.visit(
+                    router.visit(
                         route(
                             type === "merchant"
                                 ? "admin.merchants.index"
@@ -157,13 +157,13 @@ export default function EntityProfileForm({
                             </h1>
                             <p className="text-orange-100 mt-1">{subtitle}</p>
                         </div>
-                        {type === "merchant" && "business_status" in form && (
+                        {type === "merchant" && "business_status" in data && (
                             <div
                                 className={`px-4 py-2 rounded-lg border-2 font-semibold ${getStatusBadgeClass(
-                                    form.business_status
+                                    data.business_status
                                 )}`}
                             >
-                                {getStatusLabel(form.business_status)}
+                                {getStatusLabel(data.business_status)}
                             </div>
                         )}
                     </div>
@@ -176,7 +176,7 @@ export default function EntityProfileForm({
                                 <TextInput
                                     name="full_name"
                                     label="Full Name"
-                                    value={form.full_name}
+                                    value={data.full_name}
                                     onChange={handleChange}
                                     disabled={isSubmitting}
                                 />
@@ -184,18 +184,19 @@ export default function EntityProfileForm({
                                     name="email"
                                     label="Email"
                                     type="email"
-                                    value={form.email}
+                                    value={data.email}
                                     onChange={handleChange}
                                     disabled={isSubmitting}
                                 />
                                 <TextInput
                                     name="contact_number"
                                     label="Contact Number"
-                                    value={form.contact_number}
+                                    value={data.contact_number}
                                     onChange={handleChange}
                                     disabled={isSubmitting}
                                 />
                                 <TextInput
+<<<<<<< HEAD
                                     name="street_name"
                                     label="Street Name"
                                     value={form.street_name}
@@ -227,6 +228,11 @@ export default function EntityProfileForm({
                                     name="country"
                                     label="Country"
                                     value={form.country}
+=======
+                                    name="address"
+                                    label="Address"
+                                    value={data.address}
+>>>>>>> 7d50367a0e002dd43a3a6e0a9fbc1dfd2adf2dbe
                                     onChange={handleChange}
                                     disabled={isSubmitting}
                                 />
@@ -244,7 +250,7 @@ export default function EntityProfileForm({
                                     name="password"
                                     label="New Password"
                                     type="password"
-                                    value={form.password}
+                                    value={data.password}
                                     onChange={handleChange}
                                     disabled={isSubmitting}
                                 />
@@ -252,7 +258,7 @@ export default function EntityProfileForm({
                                     name="password_confirmation"
                                     label="Confirm New Password"
                                     type="password"
-                                    value={form.password_confirmation}
+                                    value={data.password_confirmation}
                                     onChange={handleChange}
                                     disabled={isSubmitting}
                                 />
@@ -262,13 +268,13 @@ export default function EntityProfileForm({
                         {/* Conditional Sections */}
                         {type === "merchant" ? (
                             <MerchantFields
-                                form={form}
+                                data={data}
                                 handleChange={handleChange}
                                 isSubmitting={isSubmitting}
                             />
                         ) : (
                             <CustomerFields
-                                form={form}
+                                data={data}
                                 handleChange={handleChange}
                                 isSubmitting={isSubmitting}
                             />
@@ -363,20 +369,21 @@ const TextInput = ({
     </div>
 );
 
-const MerchantFields = ({ form, handleChange, isSubmitting }: any) => (
+const MerchantFields = ({ data, handleChange, isSubmitting }: any) => (
     <>
+        {console.log("merchant =>", data)}
         <Section title="Company Information" icon={Building2}>
             <TextInput
                 name="company_name"
                 label="Company Name"
-                value={form.company_name}
+                value={data.company_name}
                 onChange={handleChange}
                 disabled={isSubmitting}
             />
             <TextInput
                 name="business_registration_number"
                 label="Business Registration Number"
-                value={form.business_registration_number}
+                value={data.business_registration_number}
                 onChange={handleChange}
                 disabled={isSubmitting}
             />
@@ -386,7 +393,7 @@ const MerchantFields = ({ form, handleChange, isSubmitting }: any) => (
                 </label>
                 <textarea
                     name="company_details"
-                    value={form.company_details}
+                    value={data.company_details}
                     onChange={handleChange}
                     disabled={isSubmitting}
                     rows={4}
@@ -398,7 +405,7 @@ const MerchantFields = ({ form, handleChange, isSubmitting }: any) => (
         <Section title="Verification Status" icon={FileText}>
             <select
                 name="business_status"
-                value={form.business_status}
+                value={data.business_status}
                 onChange={handleChange}
                 disabled={isSubmitting}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
@@ -410,14 +417,14 @@ const MerchantFields = ({ form, handleChange, isSubmitting }: any) => (
                 <option value="rejected">Rejected</option>
             </select>
 
-            {form.business_status === "rejected" && (
+            {data.business_status === "rejected" && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
                     <label className="block text-sm font-medium text-red-900 mb-2">
                         Rejection Reason
                     </label>
                     <textarea
                         name="rejection_reason"
-                        value={form.rejection_reason}
+                        value={data.rejection_reason}
                         onChange={handleChange}
                         disabled={isSubmitting}
                         rows={3}
@@ -430,27 +437,27 @@ const MerchantFields = ({ form, handleChange, isSubmitting }: any) => (
     </>
 );
 
-const CustomerFields = ({ form, handleChange, isSubmitting }: any) => (
+const CustomerFields = ({ data, handleChange, isSubmitting }: any) => (
     <Section title="Customer Details" icon={Gift}>
         <TextInput
             name="date_of_birth"
             label="Date of Birth"
             type="date"
-            value={form.date_of_birth}
+            value={data.date_of_birth}
             onChange={handleChange}
             disabled={isSubmitting}
         />
         <TextInput
             name="device_id"
             label="Device ID"
-            value={form.device_id}
+            value={data.device_id}
             onChange={handleChange}
             disabled={isSubmitting}
         />
         <TextInput
             name="referral_code"
             label="Referral Code"
-            value={form.referral_code}
+            value={data.referral_code}
             onChange={handleChange}
             disabled={isSubmitting}
         />

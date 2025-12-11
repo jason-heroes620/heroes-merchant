@@ -3,6 +3,8 @@
 namespace App\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 
 class BookingResource extends JsonResource
 {
@@ -22,14 +24,14 @@ class BookingResource extends JsonResource
             'cancelled_at' => $this->cancelled_at?->setTimezone('Asia/Kuala_Lumpur')->toIso8601String(),
             'qr_url' => $this->qr_url,
 
-            'slot' => $slot ? [
+            'slot' => ($slot && $slot instanceof Model) ? [
                 'id' => (string) $slot->id,
                 'date' => $slot->date,
                 'start_time' => $slot->display_start?->toIso8601String(),
                 'end_time' => $slot->display_end?->toIso8601String(),
             ] : null,
 
-            'event' => $event ? [
+            'event' => ($event && $event instanceof Model) ? [
                 'id' => (string) $event->id,
                 'title' => $event->title,
                 'type' => $event->type,
@@ -38,11 +40,11 @@ class BookingResource extends JsonResource
                 'media' => $event->media?->first()?->url ?? null,
             ] : null,
 
-            'items' => $items ? $items->map(function ($it) use ($slot) {
+            'items' => ($items && $items instanceof Collection) ? $items->map(function ($it) use ($slot) {
                 $label = $it->ageGroup?->label;
 
                 if (!$label && $it->age_group_id === null) {
-                    $slotPrice = $slot?->prices()->first();
+                    $slotPrice = $slot?->prices?->first();
                     $label = $slotPrice?->ageGroup?->label ?? 'General';
                 }
 
@@ -65,7 +67,7 @@ class BookingResource extends JsonResource
                     'before_paid_credits' => $t->before_paid_credits,
                     'delta_free' => $t->delta_free,
                     'delta_paid' => $t->delta_paid,   
-                    'created_at' => $t->created_at->toIso8601String(),
+                    'created_at' => $t->created_at?->toIso8601String(),
                 ]);
             }),
         ];
