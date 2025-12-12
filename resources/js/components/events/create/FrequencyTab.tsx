@@ -158,7 +158,7 @@ export default function FrequencyTab({
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
             <div className="p-8 space-y-6">
                 {/* Recurring Toggle */}
-                <div className="flex items-center gap-4 p-6 bg-gradient-to-r from-orange-50 via-orange-100 to-orange-50 border-2 border-orange-200 rounded-xl shadow-sm">
+                <div className="flex items-center gap-4 p-6 bg-linear-to-r from-orange-50 via-orange-100 to-orange-50 border-2 border-orange-200 rounded-xl shadow-sm">
                     <label className="flex items-center gap-4 cursor-pointer flex-1">
                         <div className="relative">
                             <input
@@ -169,7 +169,7 @@ export default function FrequencyTab({
                                 }
                                 className="sr-only peer"
                             />
-                            <div className="w-16 h-9 bg-gray-300 rounded-full peer-checked:bg-gradient-to-r peer-checked:from-orange-500 peer-checked:to-orange-600 transition-all shadow-inner"></div>
+                            <div className="w-16 h-9 bg-gray-300 rounded-full peer-checked:bg-linear-to-r peer-checked:from-orange-500 peer-checked:to-orange-600 transition-all shadow-inner"></div>
                             <div className="absolute left-1 top-1 w-7 h-7 bg-white rounded-full transition-all peer-checked:translate-x-7 shadow-md flex items-center justify-center">
                                 {data.is_recurring && (
                                     <Check
@@ -342,10 +342,10 @@ export default function FrequencyTab({
                                     {getSlots(0).map((slot, slotIndex) => (
                                         <div
                                             key={slotIndex}
-                                            className="p-5 bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-200 rounded-xl"
+                                            className="p-5 bg-linear-to-br from-orange-50 to-orange-100 border-2 border-orange-200 rounded-xl"
                                         >
                                             <div className="flex items-center gap-4 mb-4">
-                                                <div className="flex-shrink-0 w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                                                <div className="shrink-0 w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold text-sm">
                                                     {slotIndex + 1}
                                                 </div>
                                                 <h5 className="font-bold text-gray-800">
@@ -505,14 +505,14 @@ export default function FrequencyTab({
                             <button
                                 type="button"
                                 onClick={addFrequency}
-                                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg hover:shadow-xl font-bold transform hover:scale-105"
+                                className="flex items-center gap-2 px-6 py-3 bg-linear-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg hover:shadow-xl font-bold transform hover:scale-105"
                             >
                                 <Plus size={20} /> Add Schedule
                             </button>
                         </div>
 
                         {frequencies.length === 0 ? (
-                            <div className="text-center py-20 border-2 border-dashed border-gray-300 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100">
+                            <div className="text-center py-20 border-2 border-dashed border-gray-300 rounded-2xl bg-linear-to-br from-gray-50 to-gray-100">
                                 <Calendar className="mx-auto h-20 w-20 text-gray-300 mb-4" />
                                 <p className="text-gray-600 font-bold text-lg mb-2">
                                     No recurring schedules defined
@@ -533,7 +533,7 @@ export default function FrequencyTab({
                                     return (
                                         <div
                                             key={index}
-                                            className="p-8 border-2 border-gray-200 rounded-2xl bg-gradient-to-br from-white to-gray-50 hover:border-orange-300 hover:shadow-xl transition-all"
+                                            className="p-8 border-2 border-gray-200 rounded-2xl bg-linear-to-br from-white to-gray-50 hover:border-orange-300 hover:shadow-xl transition-all"
                                         >
                                             <div className="space-y-6">
                                                 {/* Header */}
@@ -635,7 +635,7 @@ export default function FrequencyTab({
                                                                             }
                                                                             className={`px-6 py-3 rounded-lg font-bold transition-all ${
                                                                                 isSelected
-                                                                                    ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md"
+                                                                                    ? "bg-linear-to-r from-orange-500 to-orange-600 text-white shadow-md"
                                                                                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                                                                             }`}
                                                                         >
@@ -807,10 +807,10 @@ export default function FrequencyTab({
                                                                         key={
                                                                             slotIndex
                                                                         }
-                                                                        className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-200 rounded-lg"
+                                                                        className="p-4 bg-linear-to-br from-orange-50 to-orange-100 border-2 border-orange-200 rounded-lg"
                                                                     >
                                                                         <div className="flex items-center gap-3 mb-3">
-                                                                            <div className="flex-shrink-0 w-7 h-7 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold text-xs">
+                                                                            <div className="shrink-0 w-7 h-7 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold text-xs">
                                                                                 {slotIndex +
                                                                                     1}
                                                                             </div>

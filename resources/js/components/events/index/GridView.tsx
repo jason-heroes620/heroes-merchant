@@ -1,9 +1,15 @@
-import { Calendar, MapPin, DollarSign, Eye, Edit, BadgeX } from "lucide-react";
+import {
+    Calendar,
+    MapPin,
+    DollarSign,
+    Eye,
+    Edit,
+    BadgeX,
+    Heart,
+} from "lucide-react";
 import type {
     EventType,
     AgeGroup,
-    EventSlot,
-    EventDate,
     EventSlotPrice,
 } from "../../../types/events";
 import { router } from "@inertiajs/react";
@@ -28,8 +34,7 @@ interface GridViewProps {
         eventStatus?: string
     ) => React.ReactNode | string;
     getFrequencyLabel: (event?: any) => string;
-    formatDate: (date: string) => string;
-    formatTime: (time: string) => string;
+    tab: "upcoming" | "past";
 }
 
 export default function GridView({
@@ -41,8 +46,7 @@ export default function GridView({
     getEventTypeLabel,
     getPriceRange,
     getFrequencyLabel,
-    formatDate,
-    formatTime,
+    tab,
 }: GridViewProps) {
     return (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -58,7 +62,7 @@ export default function GridView({
                         className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all transform hover:scale-105"
                     >
                         {/* Image */}
-                        <div className="relative h-48 bg-linear-to-br from-orange-400 to-red-400">
+                        <div className="relative h-80 bg-linear-to-br from-orange-400 to-red-400">
                             {event.media?.[0] ? (
                                 <img
                                     src={event.media[0].file_path}
@@ -110,27 +114,29 @@ export default function GridView({
                             )}
 
                             {/* Age Groups */}
-                            <div className="space-y-2 my-4">
+                            <div className="my-4">
                                 {event.is_suitable_for_all_ages ? (
-                                    <span className="inline-block px-2 py-1 bg-orange-50 text-orange-700 rounded text-xs font-medium">
+                                    <span className="inline-block px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs font-medium">
                                         All Ages
                                     </span>
                                 ) : event.age_groups &&
                                   event.age_groups.length > 0 ? (
-                                    event.age_groups.map(
-                                        (group: AgeGroup, idx: number) => (
-                                            <span
-                                                key={idx}
-                                                className="inline-block px-2 py-1 bg-orange-50 text-orange-700 rounded text-xs font-medium"
-                                            >
-                                                {group.label &&
-                                                    `${group.label}`}
-                                                {group.min_age != null &&
-                                                    group.max_age != null &&
-                                                    ` (${group.min_age}-${group.max_age})`}
-                                            </span>
-                                        )
-                                    )
+                                    <div className="flex flex-wrap gap-2">
+                                        {event.age_groups.map(
+                                            (group: AgeGroup, id: number) => (
+                                                <span
+                                                    key={id}
+                                                    className="inline-block px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium"
+                                                >
+                                                    {group.label &&
+                                                        `${group.label}`}
+                                                    {group.min_age != null &&
+                                                        group.max_age != null &&
+                                                        ` (${group.min_age}-${group.max_age})`}
+                                                </span>
+                                            )
+                                        )}
+                                    </div>
                                 ) : (
                                     <span className="text-xs text-gray-400">
                                         No age groups
@@ -163,12 +169,22 @@ export default function GridView({
                                 </div>
                             </div>
 
-                            {/* Upcoming Dates */}
-                            {(
-                                (event.is_recurring
-                                    ? event.slots
-                                    : event.dates) ?? []
-                            ).length > 0 && (
+                            <div className="flex items-center gap-4 mb-4 text-sm text-gray-600">
+                                <div className="flex items-center gap-1">
+                                    <Eye size={14} className="text-gray-400" />
+                                    <span>{event.click_count || 0}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <Heart
+                                        size={14}
+                                        className="text-gray-400"
+                                    />
+                                    <span>{event.like_count || 0}</span>
+                                </div>
+                            </div>
+
+                            {/* Dates */}
+                            {(event.all_slots ?? []).length > 0 && (
                                 <div className="mb-4 p-3 bg-orange-50 rounded-lg border border-orange-200 text-sm text-gray-600">
                                     {/* Frequency label */}
                                     <p className="text-xs font-semibold text-orange-800 mb-2">
@@ -176,62 +192,138 @@ export default function GridView({
                                     </p>
 
                                     <div className="space-y-1">
-                                        {(
-                                            (event.is_recurring
-                                                ? event.slots
-                                                : event.dates) ?? []
-                                        )
-                                            .slice(0, 3)
-                                            .map(
-                                                (
-                                                    slot: EventSlot | EventDate,
-                                                    idx: number
-                                                ) => {
-                                                    const dateDisplay =
-                                                        "start_date" in slot &&
-                                                        slot.start_date
-                                                            ? slot.start_date ===
-                                                              slot.end_date
-                                                                ? formatDate(
-                                                                      slot.start_date
-                                                                  )
-                                                                : `${formatDate(
-                                                                      slot.start_date
-                                                                  )} - ${formatDate(
-                                                                      slot.end_date
-                                                                  )}`
-                                                            : "date" in slot &&
-                                                              slot.date
-                                                            ? formatDate(
-                                                                  slot.date
-                                                              )
-                                                            : "Date TBD";
+                                        {event.all_slots && (
+                                            <>
+                                                {event.all_slots
+                                                    .filter((slot) => {
+                                                        const end = new Date(
+                                                            slot.display_end
+                                                        );
+                                                        const now = new Date();
+                                                        return tab ===
+                                                            "upcoming"
+                                                            ? end >= now
+                                                            : end < now;
+                                                    })
+                                                    .slice(0, 3)
+                                                    .map((slot, idx) => {
+                                                        const start = new Date(
+                                                            slot.display_start
+                                                        );
+                                                        const end = new Date(
+                                                            slot.display_end
+                                                        );
 
-                                                    const timeDisplay =
-                                                        "start_time" in slot &&
-                                                        slot.start_time
-                                                            ? ` • ${formatTime(
-                                                                  slot.start_time
-                                                              )}${
-                                                                  slot.end_time
-                                                                      ? ` - ${formatTime(
-                                                                            slot.end_time
-                                                                        )}`
-                                                                      : ""
-                                                              }`
-                                                            : "";
+                                                        const sameDate =
+                                                            start.toDateString() ===
+                                                            end.toDateString();
 
-                                                    return (
-                                                        <p
-                                                            key={idx}
-                                                            className="text-xs text-gray-700"
-                                                        >
-                                                            {dateDisplay}
-                                                            {timeDisplay}
-                                                        </p>
-                                                    );
-                                                }
-                                            )}
+                                                        const dateStr =
+                                                            start.toLocaleDateString(
+                                                                "en-MY",
+                                                                {
+                                                                    day: "2-digit",
+                                                                    month: "short",
+                                                                    year: "numeric",
+                                                                }
+                                                            );
+
+                                                        const startTimeStr =
+                                                            start.toLocaleTimeString(
+                                                                "en-MY",
+                                                                {
+                                                                    hour: "2-digit",
+                                                                    minute: "2-digit",
+                                                                    hour12: false,
+                                                                }
+                                                            );
+
+                                                        const endTimeStr =
+                                                            end.toLocaleTimeString(
+                                                                "en-MY",
+                                                                {
+                                                                    hour: "2-digit",
+                                                                    minute: "2-digit",
+                                                                    hour12: false,
+                                                                }
+                                                            );
+
+                                                        const availability =
+                                                            slot.raw
+                                                                .is_unlimited
+                                                                ? " • Unlimited"
+                                                                : slot.raw
+                                                                      .capacity !=
+                                                                  null
+                                                                ? ` • ${
+                                                                      slot.raw
+                                                                          .capacity -
+                                                                      (slot.raw
+                                                                          .booked_quantity ||
+                                                                          0)
+                                                                  }/${
+                                                                      slot.raw
+                                                                          .capacity
+                                                                  } left`
+                                                                : "";
+
+                                                        return (
+                                                            <p
+                                                                key={idx}
+                                                                className="text-xs text-gray-700"
+                                                            >
+                                                                {sameDate
+                                                                    ? `${dateStr} • ${startTimeStr} - ${endTimeStr}`
+                                                                    : `${dateStr} - ${end.toLocaleDateString(
+                                                                          "en-MY",
+                                                                          {
+                                                                              day: "2-digit",
+                                                                              month: "short",
+                                                                              year: "numeric",
+                                                                          }
+                                                                      )} ${startTimeStr} -  ${endTimeStr}`}
+                                                                <span className="text-orange-600">
+                                                                    {
+                                                                        availability
+                                                                    }
+                                                                </span>
+                                                            </p>
+                                                        );
+                                                    })}
+
+                                                {event.all_slots.filter(
+                                                    (slot) => {
+                                                        const end = new Date(
+                                                            slot.display_end
+                                                        );
+                                                        const now = new Date();
+                                                        return tab ===
+                                                            "upcoming"
+                                                            ? end >= now
+                                                            : end < now;
+                                                    }
+                                                ).length > 3 && (
+                                                    <div className="text-xs text-gray-400">
+                                                        +{" "}
+                                                        {event.all_slots.filter(
+                                                            (slot) => {
+                                                                const end =
+                                                                    new Date(
+                                                                        slot.display_end
+                                                                    );
+                                                                const now =
+                                                                    new Date();
+                                                                return tab ===
+                                                                    "upcoming"
+                                                                    ? end >= now
+                                                                    : end < now;
+                                                            }
+                                                        ).length - 3}{" "}
+                                                        more
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             )}

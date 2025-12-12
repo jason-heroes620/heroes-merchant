@@ -27,7 +27,8 @@ class User extends Authenticatable
         'state',
         'country',
         'status',
-        'profile_picture'
+        'profile_picture',
+        'expo_push_token',
     ];
 
     protected $hidden = [

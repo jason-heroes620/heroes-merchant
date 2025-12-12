@@ -1,20 +1,42 @@
 <?php
 
 namespace App\Services;
-
+use Illuminate\Support\Facades\Log;
 use GuzzleHttp\Client;
 
-class PushService
+class PushNotificationService
 {
     public static function send(string $token, string $title, string $body, array $data = [])
     {
-        // If token looks like Expo push token  -> use Expo
-        if (str_starts_with($token, 'ExponentPushToken') || str_contains($token, 'ExpoPushToken')) {
-            return self::sendExpo($token, $title, $body, $data);
+        \Log::info('PushNotificationService::send called', compact('token','title','body','data'));
+
+        if (empty($token)) {
+            \Log::warning('No push token provided, skipping send');
+            return null;
         }
 
-        // Otherwise fallback to FCM (assume token is FCM)
-        return self::sendFcm($token, $title, $body, $data);
+        // Expo token
+        if (str_starts_with($token, 'ExponentPushToken') || str_contains($token, 'ExpoPushToken')) {
+            try {
+                return self::sendExpo($token, $title, $body, $data);
+            } catch (\Throwable $e) {
+                \Log::error('Expo push send failed', ['error' => $e->getMessage(), 'token' => $token]);
+                return null;
+            }
+        }
+
+        // FCM token
+        if (empty(config('services.fcm.server_key'))) {
+            \Log::warning('FCM server key not configured, skipping FCM push');
+            return null;
+        }
+
+        try {
+            return self::sendFcm($token, $title, $body, $data);
+        } catch (\Throwable $e) {
+            \Log::error('FCM push send failed', ['error' => $e->getMessage(), 'token' => $token]);
+            return null;
+        }
     }
 
     protected static function sendExpo(string $token, string $title, string $body, array $data = [])

@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { Inertia } from "@inertiajs/inertia";
 import { router } from "@inertiajs/react";
 import {
     Calendar,
@@ -101,7 +100,7 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
         )
             return;
 
-        Inertia.post(
+        router.post(
             "/merchant/payouts/request",
             {
                 payout_ids: selectedPayouts,
@@ -444,7 +443,7 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
                                     onClick={handleRequestPayout}
                                     className="bg-white text-orange-600 hover:bg-orange-50 px-8 py-4 rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-2xl hover:scale-105 flex items-center gap-2"
                                 >
-                                    <Sparkles size={20} />
+            
                                     Request Payout Now!
                                 </button>
                             </div>

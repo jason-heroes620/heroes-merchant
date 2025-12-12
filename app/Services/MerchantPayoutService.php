@@ -171,8 +171,8 @@ class MerchantPayoutService
 
         if (!$date || !$endTime) return false;
 
-        $dateStr = $date instanceof \Carbon\Carbon ? $date->format('Y-m-d') : $date;
-        $endTimeStr = $endTime instanceof \Carbon\Carbon ? $endTime->format('H:i:s') : $endTime;
+        $dateStr = $date instanceof Carbon ? $date->format('Y-m-d') : $date;
+        $endTimeStr = $endTime instanceof Carbon ? $endTime->format('H:i:s') : $endTime;
         $end = Carbon::parse("$dateStr $endTimeStr", 'Asia/Kuala_Lumpur');
 
         Log::info('slotHasEnded check', [

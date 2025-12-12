@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\{
+    User,
     Merchant,
     Event,
     EventMedia,
@@ -15,7 +16,6 @@ use App\Models\{
 };
 use App\Services\EventSlotService;
 use App\Services\ConversionService;
-use App\Notifications\EventStatusNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +23,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
+use App\Notifications\EventNotification;
+use App\Notifications\EventStatusNotification;
+use Carbon\Carbon;
 
 class EventController extends Controller
 {
@@ -52,78 +55,79 @@ class EventController extends Controller
             'media'
         ])->orderByDesc('created_at');
 
-        if ($user->role === 'admin') {
-            if ($request->merchant_id) {
-                Log::info('Applying merchant filter', [
-                    'merchant_id' => $request->merchant_id
-                ]);
-                $query->where('merchant_id', $request->merchant_id);
-            }
+        if ($user->role === 'admin' && $request->merchant_id) {
+            $query->where('merchant_id', $request->merchant_id);
         }
 
         if ($user->role === 'merchant') {
             $merchant = Merchant::where('user_id', $user->id)->firstOrFail();
-            Log::info('Merchant user detected', [
-                'merchant_id' => $merchant->id
-            ]);
             $query->where('merchant_id', $merchant->id);
         }
 
         $events = $query->paginate(15);
+        $now = Carbon::now('Asia/Kuala_Lumpur');
 
-        $events->getCollection()->transform(function ($event) {
-            $event->media->transform(function ($media) {
-                $media->file_path = $media->url;
-                return $media;
-            });
+        $events->getCollection()->transform(function ($event) use ($now) {
 
-            $event->slots->transform(function ($slot) {
-                $slot->available_seats = $slot->is_unlimited
-                    ? null
-                    : $slot->capacity - $slot->booked_quantity;
-                return $slot;
-            });
+            $event->media->transform(fn($m) => tap($m, fn() => $m->file_path = $m->url));
+
+            $event->slots->transform(fn($slot) => tap($slot, function($s) {
+                $s->available_seats = $s->is_unlimited ? null : $s->capacity - $s->booked_quantity;
+            }));
 
             $event->frequency = $event->frequencies->first();
             $event->slotPrices = $event->slots->flatMap(fn($slot) => $slot->prices)->values();
 
-            if ($event->is_recurring && $event->slots->count() > 0) {
-                $slot = $event->slots->sortBy('date')->first();
-                $event->slot = $slot; 
-            } else {
-                $date = $event->dates->first();
-                if ($date) {
-                    $event->slot = (object) [
-                        'date' => $date->start_date,
-                        'start_time' => $date->start_time ?? null,
-                        'end_time' => $date->end_date ?? null,
-                    ];
-                } else {
-                    $event->slot = null;
+            // ---------------------------
+            // Build all_slots for display
+            // ---------------------------
+            $all = $event->slots->map(function($s) {
+                $displayStart = $s->display_start;
+                $displayEnd = $s->display_end;
+
+                // Fallback for one-time events
+                if (!$displayStart || !$displayEnd) {
+                    $eventDate = $s->date; // related EventDate
+                    if ($eventDate) {
+                        $startDate = $eventDate->start_date?->format('Y-m-d');
+                        $endDate = $eventDate->end_date?->format('Y-m-d');
+
+                        $startTime = $s->start_time?->format('H:i:s') ?? '00:00:00';
+                        $endTime = $s->end_time?->format('H:i:s') ?? '23:59:59';
+
+                        $displayStart = $startDate ? Carbon::createFromFormat('Y-m-d H:i:s', "$startDate $startTime", 'Asia/Kuala_Lumpur') : null;
+                        $displayEnd = $endDate ? Carbon::createFromFormat('Y-m-d H:i:s', "$endDate $endTime", 'Asia/Kuala_Lumpur') : null;
+                    }
                 }
-            }
+
+                \Log::info('Slot All Slots', [
+                    'slot_id' => $s->id,
+                    'display_start' => $displayStart?->toDateTimeString(),
+                    'display_end' => $displayEnd?->toDateTimeString(),
+                ]);
+
+                return (object)[
+                    'display_start' => $displayStart,
+                    'display_end' => $displayEnd,
+                    'raw' => $s,
+                ];
+            });
+
+            // Filter out nulls and sort
+            $all = $all->filter(fn($s) => $s->display_start && $s->display_end)
+                    ->sortBy('display_start')
+                    ->values();
+
+            $event->all_slots = $all;
+            $event->next_active_slot = $all->first(fn($s) => $s->display_end->greaterThanOrEqualTo($now));
+
+            $event->is_upcoming = $event->next_active_slot !== null;
+            $event->is_past = $event->next_active_slot === null;
 
             return $event;
-        });
-
-        $sorted = $events->getCollection()->sortByDesc(function ($ev) {
-            return $ev->slot?->date ? strtotime($ev->slot->date) : 0;
-        });
-
-        $events->setCollection($sorted->values());
+        }); 
 
         $merchants = Merchant::select('id', 'company_name')->orderBy('company_name')->get();
-
-        Log::info('Loaded Merchants:', $merchants->toArray());
-
-        $first = $events->first();
-        if ($first) {
-            Log::info('First Event Merchant', [
-                'event_id' => $first->id,
-                'merchant_id' => $first->merchant_id,
-                'merchant_relation' => $first->merchant ? $first->merchant->toArray() : null,
-            ]);
-        }
 
         return Inertia::render('Events/Index', [
             'events' => $events,
@@ -132,6 +136,7 @@ class EventController extends Controller
             'selectedMerchant' => $request->merchant_id,
         ]);
     }
+
 
     /** Display a specific event */
     public function show(Event $event)
@@ -498,6 +503,11 @@ class EventController extends Controller
         }
             DB::commit();
 
+            $admins = User::where('role', 'admin')->get();
+            foreach ($admins as $admin) {
+                $admin->notify(new EventNotification($event, 'updated'));
+            }
+
             return redirect()->route('merchant.events.index')
                 ->with('success', 'Event created successfully!');
         } catch (\Throwable $e) {
@@ -757,6 +767,12 @@ class EventController extends Controller
 
             DB::commit();
 
+
+            $admins = User::where('role', 'admin')->get();
+            foreach ($admins as $admin) {
+                $admin->notify(new EventNotification($event, 'updated'));
+            }
+
             return redirect()->route('merchant.events.index')
                 ->with('success', 'Event updated successfully!');
         } catch (\Throwable $e) {
@@ -879,14 +895,7 @@ class EventController extends Controller
     public function updateStatus(Request $request, Event $event)
     {
         $user = Auth::user();
-        Log::info('updateStatus called', [
-        'user_id' => $user->id,
-        'user_role' => $user->role,
-        'event_id' => $event->id,
-        'current_status' => $event->status,
-        'request' => $request->all()
-    ]);
-
+        
         $validated = $request->validate([
             'status' => 'required|in:draft,pending,active,inactive,rejected',
             'rejected_reason' => 'nullable|string',
@@ -933,9 +942,10 @@ class EventController extends Controller
 
                 foreach ($validated['slot_prices'] as $sp) {
                     $slot = EventSlotPrice::find($sp['id']);
+                    $price = $slot->price_in_rm ? (float) $slot->price_in_rm : 0.00;
                     Log::info('Processing slot price', ['slot' => $slot->toArray(), 'submitted' => $sp]);
-
-                    $recommended = app(ConversionService::class)->calculateCredits($slot->price_in_rm, $conversion);
+            
+                    $recommended = app(ConversionService::class)->calculateCredits($price, $conversion);
 
                     if ($sp['paid_credits'] < $recommended['paid_credits']) {
                         throw new \Exception("Paid credits for slot #{$sp['id']} cannot be lower than minimum ({$recommended['paid_credits']}) to prevent loss.");
@@ -951,8 +961,23 @@ class EventController extends Controller
                 }
             }
 
-            if ($event->merchant) {
-                $event->merchant?->notify(new EventStatusNotification($event, $validated['status']));
+            if ($event->merchant && $event->merchant->user) {
+                $user = $event->merchant->user;
+
+                Log::info('Sending EventStatusNotification to merchant user', [
+                    'user_id' => $user->id,
+                    'expo_push_token' => $user->expo_push_token ?? null,
+                    'event_id' => $event->id,
+                ]);
+
+                $user->notify(
+                    (new EventStatusNotification($event, $validated['status']))->delay(now())
+                );
+
+                Log::info('Notification dispatched to merchant user');
+            } else {
+                $merchantId = $event->merchant->id ?? 'unknown';
+                Log::warning("Merchant {$merchantId} has no associated user");
             }
 
             DB::commit();

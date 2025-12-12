@@ -2,11 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\User;
 use App\Models\Customer;
 use App\Models\CustomerWallet;
 use App\Models\CustomerCreditTransaction;
 use App\Models\WalletCreditGrant;
 use App\Models\Booking;
+use Illuminate\Support\Facades\Notification;
+use App\Notifications\WalletTransactionNotification;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
@@ -44,13 +47,18 @@ class WalletService
         ]);
 
         // Record transaction
-        CustomerCreditTransaction::create([
+        $transaction = CustomerCreditTransaction::create([
             'wallet_id' => $wallet->id,
             'type' => 'bonus',
             'delta_free' => $deltaFree,
             'delta_paid' => 0,
             'description' => 'Free credits on registration',
         ]);
+
+        Notification::send(
+            User::where('role', 'admin')->get(),
+            new WalletTransactionNotification($transaction, $customer->user->full_name, $customer->id)
+        );
     }
 
     public function referralBonus(Customer $referredCustomer)
@@ -87,13 +95,18 @@ class WalletService
             'reference_id' => $referredCustomer->id,
         ]);
 
-        CustomerCreditTransaction::create([
+        $transaction = CustomerCreditTransaction::create([
             'wallet_id' => $wallet->id,
             'type' => 'bonus',
             'delta_free' => $freeBonus,
             'delta_paid' => $paidBonus,
             'description' => 'Referral bonus for 3 successful referrals',
         ]);
+
+        Notification::send(
+            User::where('role', 'admin')->get(),
+            new WalletTransactionNotification($transaction, $referrer->user->full_name, $referrer->id)
+        );
     }
 
     public function hasEnoughCredits(CustomerWallet $wallet, int $paidNeeded, int $freeNeeded = 0, int $quantity = 1): bool

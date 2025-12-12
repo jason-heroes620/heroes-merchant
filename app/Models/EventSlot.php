@@ -26,7 +26,7 @@ class EventSlot extends Model
         'duration' => 'integer',
         'capacity' => 'integer',
         'is_unlimited' => 'boolean',
-        'date' => 'date',
+        'date' => 'datetime',
         'start_time' => 'datetime:H:i',
         'end_time' => 'datetime:H:i',
     ];

@@ -375,7 +375,7 @@ const StatusToggleModal: React.FC<Props> = ({
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-gray-50 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-orange-500 to-red-500 px-6 py-5 text-white">
+                <div className="bg-linear-to-r from-orange-500 to-red-500 px-6 py-5 text-white">
                     <h3 className="text-2xl font-bold">Update Event Status</h3>
                     <p className="text-orange-100 text-sm mt-1">
                         Review and modify event status and credits
@@ -445,9 +445,9 @@ const StatusToggleModal: React.FC<Props> = ({
                     {isAdmin &&
                         newStatus === "active" &&
                         conversion && (
-                            <div className="bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-lg p-5">
+                            <div className="bg-linear-to-r from-orange-50 to-red-50 border border-orange-200 rounded-lg p-5">
                                 <div className="flex items-start gap-3">
-                                    <Info className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                                    <Info className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
                                     <div className="flex-1">
                                         <p className="text-sm font-semibold text-orange-900 mb-2">
                                             Credit Conversion Settings
@@ -519,7 +519,7 @@ const StatusToggleModal: React.FC<Props> = ({
                             </h4>
 
                             {/* Bulk Apply Section */}
-                            <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-5">
+                            <div className="bg-linear-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-5">
                                 <div className="flex items-center gap-2 mb-3">
                                     <input
                                         type="checkbox"
@@ -590,7 +590,7 @@ const StatusToggleModal: React.FC<Props> = ({
                                         </div>
                                         <button
                                             onClick={applyBulkCredits}
-                                            className="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-600 transition-colors flex items-center justify-center gap-2"
+                                            className="w-full px-4 py-2 bg-linear-to-r from-blue-500 to-purple-500 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-600 transition-colors flex items-center justify-center gap-2"
                                         >
                                             <Copy className="w-4 h-4" />
                                             Apply to All Slots
@@ -649,7 +649,7 @@ const StatusToggleModal: React.FC<Props> = ({
                     <button
                         onClick={handleConfirm}
                         disabled={newStatus === event.status}
-                        className="flex-1 px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg font-semibold hover:from-orange-600 hover:to-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg disabled:shadow-none"
+                        className="flex-1 px-6 py-3 bg-linear-to-r from-orange-500 to-red-500 text-white rounded-lg font-semibold hover:from-orange-600 hover:to-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg disabled:shadow-none"
                     >
                         Confirm Changes
                     </button>

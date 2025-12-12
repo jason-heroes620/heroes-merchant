@@ -29,10 +29,10 @@ export default function MediaUploader({
                 </span>
             </div>
 
-            <div className="border-2 border-dashed border-orange-200 rounded-xl p-8 text-center hover:border-orange-400 transition-all bg-gradient-to-br from-orange-50 to-transparent">
+            <div className="border-2 border-dashed border-orange-200 rounded-xl p-8 text-center hover:border-orange-400 transition-all bg-linear-to-br from-orange-50 to-transparent">
                 {mediaPreviews.length === 0 ? (
                     <div className="space-y-4">
-                        <div className="mx-auto w-20 h-20 bg-gradient-to-br from-orange-100 to-red-100 rounded-full flex items-center justify-center">
+                        <div className="mx-auto w-20 h-20 bg-linear-to-br from-orange-100 to-red-100 rounded-full flex items-center justify-center">
                             <Upload className="h-10 w-10 text-orange-600" />
                         </div>
                         <div>
@@ -88,7 +88,7 @@ export default function MediaUploader({
                                     />
                                 )}
 
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-end justify-center pb-4">
+                                <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-end justify-center pb-4">
                                     <button
                                         type="button"
                                         onClick={() => removeMedia(index)}

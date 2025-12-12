@@ -8,6 +8,10 @@ use App\Models\CustomerWallet;
 use App\Models\CustomerCreditTransaction;
 use App\Models\WalletCreditGrant;
 use App\Models\PurchasePackage;
+use App\Models\User;
+use Illuminate\Support\Facades\Notification;
+use App\Notifications\WalletTransactionNotification;
+
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
 
@@ -127,6 +131,11 @@ class WalletController extends Controller
                 ]);
             }
         });
+
+        Notification::send(
+            User::where('role', 'admin')->get(),
+            new WalletTransactionNotification($transaction, $user->full_name, $user->id)
+        );
 
         return response()->json([
             'message' => 'Wallet updated successfully',

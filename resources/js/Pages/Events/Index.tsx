@@ -38,10 +38,21 @@ export default function EventsIndexPage() {
     const [typeFilter, setTypeFilter] = useState("all");
     const [viewMode, setViewMode] = useState<"table" | "grid">("table");
 
+    const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
+    const upcomingEvents = events.data.filter((ev) => ev.is_upcoming);
+    const pastEvents = events.data.filter((ev) => ev.is_past);
+
     const filteredEvents = events.data.filter((event) => {
+        // Filter by tab first
+        const isTabMatch =
+            tab === "upcoming" ? event.is_upcoming : event.is_past;
+
+        // Filter by search query
         const matchesSearch =
             event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             event.category?.toLowerCase().includes(searchQuery.toLowerCase());
+
+        // Filter by merchant (admin only)
         const matchesMerchant =
             merchantQuery.trim() === "" ||
             (userRole === "admin" &&
@@ -49,41 +60,23 @@ export default function EventsIndexPage() {
                     ?.toLowerCase()
                     .includes(merchantQuery.toLowerCase()) ||
                     event.merchant?.id?.includes(merchantQuery)));
+
+        // Filter by status
         const matchesStatus =
             statusFilter === "all" || event.status === statusFilter;
+
+        // Filter by type
         const matchesType = typeFilter === "all" || event.type === typeFilter;
-        return matchesSearch && matchesMerchant && matchesStatus && matchesType;
+
+        // Return only if all match
+        return (
+            isTabMatch &&
+            matchesSearch &&
+            matchesMerchant &&
+            matchesStatus &&
+            matchesType
+        );
     });
-
-    const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
-
-    const now = new Date();
-
-    const upcomingEvents = filteredEvents.filter((event) =>
-        ((event.is_recurring ? event.slots : event.dates) ?? []).some(
-            (slot) => {
-                const slotDate =
-                    "start_date" in slot ? slot.start_date : slot.date;
-
-                if (!slotDate) return false;
-
-                return new Date(slotDate) >= now;
-            }
-        )
-    );
-
-    const pastEvents = filteredEvents.filter((event) =>
-        ((event.is_recurring ? event.slots : event.dates) ?? []).every(
-            (slot) => {
-                const slotDate =
-                    "start_date" in slot ? slot.start_date : slot.date;
-
-                if (!slotDate) return true; // treat missing date as "past"
-
-                return new Date(slotDate) < now;
-            }
-        )
-    );
 
     const statusColors = {
         active: {
@@ -168,10 +161,10 @@ export default function EventsIndexPage() {
     };
 
     const getFrequencyLabel = (event?: EventType) => {
-        if (!event?.is_recurring) return "One-Time Event";
+        if (!event?.is_recurring) return "Session";
 
         const freq = event.frequency?.[0];
-        if (!freq) return "Recurring Event";
+        if (!freq) return "Sessions";
 
         const labels: Record<string, string> = {
             daily: "Daily",
@@ -183,20 +176,6 @@ export default function EventsIndexPage() {
         };
 
         return labels[freq.type] ?? freq.type;
-    };
-
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString("en-MY", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-        });
-    };
-
-    const formatTime = (timeString: string) => {
-        if (!timeString) return "";
-        const [hours, minutes] = timeString.split(":");
-        return `${hours}:${minutes}`;
     };
 
     const handleDeactivate = (id: string) => {
@@ -286,99 +265,123 @@ export default function EventsIndexPage() {
                     </div>
 
                     {/* Filters */}
-                    <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-                        <div className="grid md:grid-cols-4 gap-4">
-                            <div className="relative">
-                                <Search
-                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-                                    size={20}
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="Search events..."
-                                    value={searchQuery}
-                                    onChange={(e) =>
-                                        setSearchQuery(e.target.value)
-                                    }
-                                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            {userRole === "admin" && (
-                                <div className="relative">
+                    <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 w-full">
+                        <div className="flex flex-col md:flex-row gap-4">
+                            <div
+                                className={`${
+                                    userRole === "admin"
+                                        ? "md:w-1/2 flex gap-4"
+                                        : "md:w-1/2"
+                                }`}
+                            >
+                                <div className="relative flex-1">
                                     <Search
                                         className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
                                         size={20}
                                     />
                                     <input
                                         type="text"
-                                        placeholder="Search merchant ID or company name..."
-                                        value={merchantQuery}
+                                        placeholder="Search events..."
+                                        value={searchQuery}
                                         onChange={(e) =>
-                                            setMerchantQuery(e.target.value)
+                                            setSearchQuery(e.target.value)
                                         }
                                         className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                                     />
                                 </div>
-                            )}
 
-                            <div className="relative">
-                                <Filter
-                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-                                    size={20}
-                                />
-                                <select
-                                    value={statusFilter}
-                                    onChange={(e) =>
-                                        setStatusFilter(e.target.value)
-                                    }
-                                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent appearance-none bg-white"
-                                >
-                                    <option value="all">All Status</option>
-                                    <option value="active">Active</option>
-                                    <option value="pending">Pending</option>
-                                    <option value="inactive">Inactive</option>
-                                    <option value="rejected">Rejected</option>
-                                    <option value="draft">Draft</option>
-                                </select>
+                                {userRole === "admin" && (
+                                    <div className="relative flex-1">
+                                        <Search
+                                            className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                                            size={20}
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="Search merchant ID or company name..."
+                                            value={merchantQuery}
+                                            onChange={(e) =>
+                                                setMerchantQuery(e.target.value)
+                                            }
+                                            className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                )}
                             </div>
-                            <select
-                                value={typeFilter}
-                                onChange={(e) => setTypeFilter(e.target.value)}
-                                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent appearance-none bg-white"
+                            <div
+                                className={`${
+                                    userRole === "admin"
+                                        ? "md:w-1/2 flex gap-4"
+                                        : "md:w-1/2 flex gap-4"
+                                }`}
                             >
-                                <option value="all">All Types</option>
-                                <option value="event">Events</option>
-                                <option value="trial_class">
-                                    Trial Classes
-                                </option>
-                                <option value="location_based">
-                                    Field Trips
-                                </option>
-                            </select>
+                                <div className="relative flex-1">
+                                    <Filter
+                                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                                        size={20}
+                                    />
+                                    <select
+                                        value={statusFilter}
+                                        onChange={(e) =>
+                                            setStatusFilter(e.target.value)
+                                        }
+                                        className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent appearance-none bg-white"
+                                    >
+                                        <option value="all">All Status</option>
+                                        <option value="active">Active</option>
+                                        <option value="pending">Pending</option>
+                                        <option value="inactive">
+                                            Inactive
+                                        </option>
+                                        <option value="rejected">
+                                            Rejected
+                                        </option>
+                                        <option value="draft">Draft</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex-1">
+                                    <select
+                                        value={typeFilter}
+                                        onChange={(e) =>
+                                            setTypeFilter(e.target.value)
+                                        }
+                                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent appearance-none bg-white"
+                                    >
+                                        <option value="all">All Types</option>
+                                        <option value="event">Events</option>
+                                        <option value="trial_class">
+                                            Trial Classes
+                                        </option>
+                                        <option value="location_based">
+                                            Field Trips
+                                        </option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="flex gap-4 mb-6">
+                    <div className="flex gap-4 mb-8 w-full">
                         <button
-                            className={`px-4 py-2 rounded-lg ${
-                                tab === "upcoming"
-                                    ? "bg-orange-500 text-white"
-                                    : "bg-gray-100"
-                            }`}
                             onClick={() => setTab("upcoming")}
+                            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+                                tab === "upcoming"
+                                    ? "bg-orange-500 text-white shadow-md"
+                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            }`}
                         >
-                            Upcoming Events
+                            Upcoming ({upcomingEvents.length})
                         </button>
                         <button
-                            className={`px-4 py-2 rounded-lg ${
-                                tab === "past"
-                                    ? "bg-orange-500 text-white"
-                                    : "bg-gray-100"
-                            }`}
                             onClick={() => setTab("past")}
+                            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+                                tab === "past"
+                                    ? "bg-orange-500 text-white shadow-md"
+                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            }`}
                         >
-                            Past Events
+                            Past ({pastEvents.length})
                         </button>
                     </div>
 
@@ -411,16 +414,13 @@ export default function EventsIndexPage() {
                     ) : viewMode === "table" ? (
                         /* Table View */
                         <TableView
-                            filteredEvents={
-                                tab === "upcoming" ? upcomingEvents : pastEvents
-                            }
+                            filteredEvents={filteredEvents}
                             statusColors={statusColors}
                             getEventTypeLabel={getEventTypeLabel}
                             userRole={userRole}
-                            formatDate={formatDate}
-                            formatTime={formatTime}
                             router={router}
                             handleDeactivate={handleDeactivate}
+                            tab={tab}
                         />
                     ) : (
                         /* Grid View - Compact Cards */
@@ -428,15 +428,12 @@ export default function EventsIndexPage() {
                             userRole={userRole}
                             router={router}
                             handleDeactivate={handleDeactivate}
-                            filteredEvents={
-                                tab === "upcoming" ? upcomingEvents : pastEvents
-                            }
+                            filteredEvents={filteredEvents}
                             statusColors={statusColors}
                             getEventTypeLabel={getEventTypeLabel}
                             getPriceRange={getPriceRange}
                             getFrequencyLabel={getFrequencyLabel}
-                            formatDate={formatDate}
-                            formatTime={formatTime}
+                            tab={tab}
                         />
                     )}
 

@@ -23,7 +23,7 @@ class SendReminder implements ShouldQueue
 
     public function handle()
     {
-        $reminder = Reminder::with('booking.customer')->find($this->reminderId);
+        $reminder = Reminder::with('booking.customer.slot.event')->find($this->reminderId);
         if (!$reminder || $reminder->status !== 'scheduled') return;
 
         $booking = $reminder->booking;
@@ -34,11 +34,18 @@ class SendReminder implements ShouldQueue
             return;
         }
 
+        $eventTitle = $booking->slot->event->title ?? 'Event';
+        $bookingCode = $booking->booking_code ?? 'N/A';
+
         SendPushNotification::dispatch(
-            $booking->customer->id,
-            "Reminder: your booking",
-            "Your booking for {$booking->event->title} is coming up.",
-            ['booking_id' => (string)$booking->id]
+            (string) $booking->customer->id,
+            "", // no merchant
+            "Reminder: Booking {$bookingCode}",
+            "Your booking for '{$eventTitle}' is coming up soon.",
+            [
+                'booking_id' => (string) $booking->id,
+                'booking_code' => $bookingCode,
+            ]
         );
 
         $reminder->status = 'sent';

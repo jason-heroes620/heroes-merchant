@@ -1,6 +1,6 @@
 import { Calendar, MapPin, Eye, Edit, BadgeX, Star } from "lucide-react";
 import { router } from "@inertiajs/react";
-import type { EventType, EventDate, EventSlot } from "../../../types/events";
+import type { EventType } from "../../../types/events";
 
 interface TableViewProps {
     filteredEvents: EventType[];
@@ -14,10 +14,9 @@ interface TableViewProps {
     >;
     getEventTypeLabel: (type: string) => string;
     userRole: string;
-    formatDate: (date: string) => string;
-    formatTime: (time: string) => string;
     router: typeof router;
     handleDeactivate: (id: string) => void;
+    tab: "upcoming" | "past";
 }
 
 export default function TableView({
@@ -25,10 +24,9 @@ export default function TableView({
     statusColors,
     getEventTypeLabel,
     userRole,
-    formatDate,
-    formatTime,
     router,
     handleDeactivate,
+    tab,
 }: TableViewProps) {
     return (
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
@@ -36,25 +34,22 @@ export default function TableView({
                 <table className="w-full">
                     <thead className="bg-linear-to-r from-orange-50 to-red-50 border-b-2 border-orange-200">
                         <tr>
-                            <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            <th className="px-40 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                                 Event
                             </th>
-                            <th className="px-15 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                Type
-                            </th>
-                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            <th className="px-20 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                                 Location
                             </th>
-                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            <th className="px-10 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
                                 Age Groups
                             </th>
-                            <th className="px-16 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                                Upcoming Dates
+                            <th className="px-20 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                                Dates
                             </th>
-                            <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            <th className="px-4 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                                 Status
                             </th>
-                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider  whitespace-nowrap">
+                            <th className="px-2 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider  whitespace-nowrap">
                                 View Bookings
                             </th>
                             <th className="px-4 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
@@ -104,13 +99,21 @@ export default function TableView({
                                                 )}
                                             </div>
                                             <div className="min-w-0 flex-1">
-                                                <p className="text-sm font-bold text-gray-900 truncate">
+                                                <p className="text-sm font-bold text-gray-900 truncate mb-1">
                                                     {event.title}
                                                 </p>
-                                                <p className="text-xs text-gray-500 mt-1">
-                                                    {event.category}
-                                                </p>
 
+                                                <div className="flex gap-2">
+                                                    <span className="inline-block px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
+                                                        {getEventTypeLabel(
+                                                            event.type
+                                                        )}
+                                                    </span>
+
+                                                    <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+                                                        {event.category}
+                                                    </span>
+                                                </div>
                                                 {userRole === "admin" && (
                                                     <div className="pt-1 space-y-0.5">
                                                         <p className="text-[11px] font-medium text-gray-700 flex items-center gap-1">
@@ -128,13 +131,6 @@ export default function TableView({
                                                 )}
                                             </div>
                                         </div>
-                                    </td>
-
-                                    {/* Type Column */}
-                                    <td className="px-6 py-4">
-                                        <span className="inline-block items-center px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
-                                            {getEventTypeLabel(event.type)}
-                                        </span>
                                     </td>
 
                                     {/* Location Column */}
@@ -187,89 +183,124 @@ export default function TableView({
                                         </div>
                                     </td>
 
-                                    {/* Upcoming Dates Column */}
-                                    <td className="px-6 py-4">
+                                    {/* Upcoming Dates / Past Dates Column */}
+                                    <td className="px-5 py-4">
                                         <div className="space-y-1">
-                                            {(
-                                                (event.is_recurring
-                                                    ? event.slots
-                                                    : event.dates) ?? []
-                                            ).length > 0 ? (
-                                                (
-                                                    (event.is_recurring
-                                                        ? event.slots
-                                                        : event.dates) ?? []
-                                                ).map(
-                                                    (
-                                                        slot:
-                                                            | EventSlot
-                                                            | EventDate,
-                                                        idx: number
-                                                    ) => {
-                                                        // Date display
-                                                        const dateDisplay =
-                                                            "start_date" in
-                                                                slot &&
-                                                            slot.start_date
-                                                                ? slot.start_date ===
-                                                                  slot.end_date
-                                                                    ? formatDate(
-                                                                          slot.start_date
-                                                                      )
-                                                                    : `${formatDate(
-                                                                          slot.start_date
-                                                                      )} - ${formatDate(
-                                                                          slot.end_date
-                                                                      )}`
-                                                                : "date" in
-                                                                      slot &&
-                                                                  slot.date
-                                                                ? formatDate(
-                                                                      slot.date
-                                                                  )
-                                                                : "Date TBD";
+                                            {event.all_slots && (
+                                                <>
+                                                    {event.all_slots
+                                                        .filter((slot) => {
+                                                            const end =
+                                                                new Date(
+                                                                    slot.display_end
+                                                                );
+                                                            const now =
+                                                                new Date();
+                                                            return tab ===
+                                                                "upcoming"
+                                                                ? end >= now
+                                                                : end < now;
+                                                        })
+                                                        .slice(0, 3)
+                                                        .map((slot, idx) => {
+                                                            const start =
+                                                                new Date(
+                                                                    slot.display_start
+                                                                );
+                                                            const end =
+                                                                new Date(
+                                                                    slot.display_end
+                                                                );
 
-                                                        // Time display (works for both EventSlot and EventDate)
-                                                        const timeDisplay =
-                                                            "start_time" in
-                                                                slot &&
-                                                            slot.start_time
-                                                                ? ` • ${formatTime(
-                                                                      slot.start_time
-                                                                  )}${
-                                                                      slot.end_time
-                                                                          ? ` - ${formatTime(
-                                                                                slot.end_time
-                                                                            )}`
-                                                                          : ""
-                                                                  }`
-                                                                : "";
+                                                            const sameDate =
+                                                                start.toDateString() ===
+                                                                end.toDateString();
 
-                                                        return (
-                                                            <div
-                                                                key={idx}
-                                                                className="flex items-center gap-2"
-                                                            >
-                                                                <span className="text-xs font-medium text-gray-700">
+                                                            const dateStr =
+                                                                start.toLocaleDateString(
+                                                                    "en-MY",
                                                                     {
-                                                                        dateDisplay
+                                                                        day: "2-digit",
+                                                                        month: "short",
+                                                                        year: "numeric",
                                                                     }
-                                                                </span>
-                                                                {timeDisplay && (
-                                                                    <span className="text-xs text-gray-400">
-                                                                        {
-                                                                            timeDisplay
-                                                                        }
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    }
-                                                )
-                                            ) : (
-                                                <span className="text-xs text-gray-400">
-                                                    No upcoming dates
-                                                </span>
+                                                                );
+
+                                                            const startTimeStr =
+                                                                start.toLocaleTimeString(
+                                                                    "en-MY",
+                                                                    {
+                                                                        hour: "2-digit",
+                                                                        minute: "2-digit",
+                                                                        hour12: false,
+                                                                    }
+                                                                );
+
+                                                            const endTimeStr =
+                                                                end.toLocaleTimeString(
+                                                                    "en-MY",
+                                                                    {
+                                                                        hour: "2-digit",
+                                                                        minute: "2-digit",
+                                                                        hour12: false,
+                                                                    }
+                                                                );
+
+                                                            return (
+                                                                <p
+                                                                    key={idx}
+                                                                    className="text-xs text-gray-700"
+                                                                >
+                                                                    {sameDate
+                                                                        ? `${dateStr} • ${startTimeStr} - ${endTimeStr}`
+                                                                        : `${dateStr} - ${end.toLocaleDateString(
+                                                                              "en-MY",
+                                                                              {
+                                                                                  day: "2-digit",
+                                                                                  month: "short",
+                                                                                  year: "numeric",
+                                                                              }
+                                                                          )} ${startTimeStr} - ${endTimeStr}`}
+                                                                </p>
+                                                            );
+                                                        })}
+
+                                                    {event.all_slots.filter(
+                                                        (slot) => {
+                                                            const end =
+                                                                new Date(
+                                                                    slot.display_end
+                                                                );
+                                                            const now =
+                                                                new Date();
+                                                            return tab ===
+                                                                "upcoming"
+                                                                ? end >= now
+                                                                : end < now;
+                                                        }
+                                                    ).length > 3 && (
+                                                        <div className="text-xs text-gray-400">
+                                                            +{" "}
+                                                            {event.all_slots.filter(
+                                                                (slot) => {
+                                                                    const end =
+                                                                        new Date(
+                                                                            slot.display_end
+                                                                        );
+                                                                    const now =
+                                                                        new Date();
+                                                                    return tab ===
+                                                                        "upcoming"
+                                                                        ? end >=
+                                                                              now
+                                                                        : end <
+                                                                              now;
+                                                                }
+                                                            ).length - 3}{" "}
+                                                            more
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     </td>
@@ -288,7 +319,7 @@ export default function TableView({
                                     </td>
 
                                     {/* Bookings Column */}
-                                    <td className="px-6 py-4">
+                                    <td className="px-6 py-4 text-center">
                                         <button
                                             onClick={() =>
                                                 router.visit(
@@ -328,7 +359,7 @@ export default function TableView({
                                                                 `/merchant/events/${event.id}/edit`
                                                             )
                                                         }
-                                                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                                        className="p-2 text-yellow-500 hover:bg-yellow-50 rounded-lg transition-all"
                                                         title="Edit"
                                                     >
                                                         <Edit size={16} />

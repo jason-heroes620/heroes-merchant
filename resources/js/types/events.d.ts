@@ -32,7 +32,7 @@ export interface Frequency {
 export interface EventSlot {
     id?: string;
     event_id?: string;
-    event_date: EventDate[];
+    event_date_id?: string;
     date: string;
     start_time: string;
     end_time: string;
@@ -128,6 +128,16 @@ export interface SyntheticSlot {
     end_time?: string | null;
 }
 
+type SlotWithDisplay = {
+  display_start: string; 
+  display_end: string;
+  raw: {
+    is_unlimited?: boolean;
+    capacity?: number;
+    booked_quantity?: number;
+  };
+};
+
 export interface EventType {
     id: string;
     merchant_id?: string;
@@ -151,7 +161,11 @@ export interface EventType {
     slotPrices?: EventSlotPrice[];
     dates?: EventDate[];
     frequency?: Frequency[];
+    is_upcoming: boolean;
+    is_past: boolean;
+    all_slots?: SlotWithDisplay[];
 }
+
 
 export interface Event {
     id: string;

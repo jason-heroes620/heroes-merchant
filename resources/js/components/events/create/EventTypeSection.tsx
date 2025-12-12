@@ -29,7 +29,7 @@ export default function EventTypeSection({ data, setData }: any) {
     return (
         <div className="bg-white rounded-2xl shadow-lg p-8 border-2 border-orange-100">
             <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-orange-100">
-                <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
+                <div className="p-3 bg-linear-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
                     <Calendar className="text-white" size={24} />
                 </div>
                 <div>
@@ -50,7 +50,7 @@ export default function EventTypeSection({ data, setData }: any) {
                             key={type.value}
                             className={`group relative p-6 border-2 rounded-xl cursor-pointer transition-all transform hover:scale-105 ${
                                 isSelected
-                                    ? "border-orange-500 bg-gradient-to-br from-orange-50 to-orange-100 shadow-xl"
+                                    ? "border-orange-500 bg-linear-to-br from-orange-50 to-orange-100 shadow-xl"
                                     : "border-gray-200 hover:border-orange-300 hover:shadow-lg bg-white"
                             }`}
                         >

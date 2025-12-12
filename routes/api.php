@@ -54,7 +54,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/bookings/{booking}', [BookingController::class, 'show']);
     Route::get('bookings/{booking}/qr', [BookingController::class, 'qr']);
     Route::patch('/bookings/{booking}/cancel', [BookingController::class, 'cancel']);
+    
     Route::post('/notifications/token', [NotificationController::class, 'saveToken']);
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.markAsRead'); 
 });
 
 Route::middleware('auth:sanctum')->prefix('merchant')->group(function () {

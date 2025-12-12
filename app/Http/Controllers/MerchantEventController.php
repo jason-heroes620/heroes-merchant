@@ -85,6 +85,7 @@ class MerchantEventController extends Controller
             'prices',
             'ageGroups',
             'slots.prices',
+            'slots.bookings.items',
             'frequencies',
             'media',
             'dates',
@@ -103,24 +104,26 @@ class MerchantEventController extends Controller
 
         $event->setRelation('slots', $filteredSlots);
 
-       $event->slots->transform(function ($slot) use ($event) {
-            $slot->available_seats = $slot->is_unlimited
-                ? null
-                : $slot->capacity - $slot->booked_quantity;
+        $event->slots->transform(function ($slot) use ($event) {
+                $slot->available_seats = $slot->is_unlimited
+                    ? null
+                    : $slot->capacity - $slot->booked_quantity;
 
-            if ($event->is_suitable_for_all_ages) {
-                $slot->booked_quantity_by_age_group = [
-                    'general' => $slot->booked_quantity ?? 0
-                ];
-            } else {
-                $slot->booked_quantity_by_age_group = $slot->prices
-                    ->groupBy('event_age_group_id')
-                    ->map(fn($prices) => $prices->sum('booked_quantity'))
-                    ->toArray();
-            }
+                if ($event->is_suitable_for_all_ages) {
+                    $slot->booked_quantity_by_age_group = [
+                        'general' => $slot->booked_quantity ?? 0
+                    ];
+                } else {
+                    $slot->booked_quantity_by_age_group =
+                        $slot->bookings
+                            ->flatMap(fn($booking) => $booking->items)
+                            ->groupBy('age_group_id')
+                            ->map(fn($items) => $items->sum('quantity'))
+                            ->toArray();
+                }
 
-            return $slot;
-        });
+                return $slot;
+            });
 
         $event->media->transform(function ($media) {
                 $media->file_path = $media->url;

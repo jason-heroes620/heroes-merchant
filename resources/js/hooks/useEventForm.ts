@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useForm } from "@inertiajs/react";
+import { toast } from "react-hot-toast";
 import type {
     AgeGroup,
     Price,
@@ -205,6 +206,7 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
         }
 
         const newSlot: EventSlot = {
+            date: eventDates[dateIndex]?.start_date || "",
             start_time: "",
             end_time: "",
             capacity: null,
@@ -330,8 +332,7 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
         e?.preventDefault();
 
         // Determine is_recurring
-        const isRecurring =
-            frequencies.length > 0;
+        const isRecurring = frequencies.length > 0;
 
         // Build final prices
         const finalPrices = buildPrices();
@@ -343,7 +344,7 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
             age_groups: data.is_suitable_for_all_ages ? [] : ageGroups,
             prices: finalPrices,
             frequencies: isRecurring ? frequencies : [],
-            event_dates: eventDates, 
+            event_dates: eventDates,
         };
 
         const formData = new FormData();
@@ -376,17 +377,32 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
 
         console.log("🚀 Submission Payload:", submissionData);
 
+        const requestOptions = {
+            preserveScroll: true,
+            forceFormData: true,
+            onSuccess: () => {
+                toast.success(
+                    data.id
+                        ? "Event updated successfully!"
+                        : "Event created successfully!"
+                );
+            },
+            onError: (errors: any) => {
+                Object.values(errors).forEach((err) => {
+                    if (Array.isArray(err)) {
+                        err.forEach((msg) => toast.error(msg));
+                    } else {
+                        toast.error(String(err));
+                    }
+                });
+            },
+        };
+
         // Submit
         if (data.id) {
-            form.put(route("merchant.events.update", data.id), {
-                preserveScroll: true,
-                forceFormData: true,
-            });
+            form.put(route("merchant.events.update", data.id), requestOptions);
         } else {
-            form.post(route("merchant.events.store"), {
-                preserveScroll: true,
-                forceFormData: true,
-            });
+            form.post(route("merchant.events.store"), requestOptions);
         }
     };
 

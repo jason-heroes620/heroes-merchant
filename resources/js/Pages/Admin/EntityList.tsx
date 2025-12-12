@@ -1,11 +1,8 @@
 import { useState } from "react";
 import { Search, Eye, Users, Wallet, TrendingUp } from "lucide-react";
 import type { User } from "../../types/index";
-<<<<<<< HEAD
 import AuthenticatedLayout from "@/AuthenticatedLayout";
-=======
 import { router } from "@inertiajs/react";
->>>>>>> 7d50367a0e002dd43a3a6e0a9fbc1dfd2adf2dbe
 
 interface BaseEntity {
     id: string;
@@ -40,7 +37,6 @@ export default function EntityList({
     const [searchTerm, setSearchTerm] = useState("");
     const [filterStatus, setFilterStatus] = useState<string>("all");
 
-    // Generic filtering
     const filteredData = data.filter((item: any) => {
         const name = item.user?.full_name?.toLowerCase() ?? "";
         const email = item.user?.email?.toLowerCase() ?? "";
@@ -48,11 +44,9 @@ export default function EntityList({
 
         const nameMatch = name.includes(search);
         const emailMatch = email.includes(search);
-
         const companyMatch =
             type === "merchant" &&
             item.company_name?.toLowerCase()?.includes(search);
-
         const referralMatch =
             type === "customer" &&
             item.referral_code?.toLowerCase()?.includes(search);
@@ -121,7 +115,7 @@ export default function EntityList({
                                 </div>
                                 <button
                                     onClick={() =>
-                                        Inertia.get(route(createRoute))
+                                        router.get(route(createRoute))
                                     }
                                     className="bg-white text-orange-600 px-6 py-2.5 rounded-lg font-semibold hover:bg-orange-50 transition-all"
                                 >
@@ -195,95 +189,10 @@ export default function EntityList({
                                         Try adjusting your search or filters
                                     </p>
                                 </div>
-<<<<<<< HEAD
                             ) : (
                                 <table className="w-full">
                                     <thead className="bg-gray-50 border-b border-gray-200">
                                         <tr>
-=======
-                            </div>
-                            <button
-                                onClick={() => router.get(route(createRoute))}
-                                className="bg-white text-orange-600 px-6 py-2.5 rounded-lg font-semibold hover:bg-orange-50 transition-all"
-                            >
-                                + Add {title.slice(0, -1)}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Filters and Search */}
-                    <div className="p-6 bg-gray-50 border-b border-gray-200">
-                        <div className="flex flex-col md:flex-row gap-4">
-                            <div className="grow relative">
-                                <Search
-                                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                                    size={20}
-                                />
-                                <input
-                                    type="text"
-                                    placeholder={placeholder}
-                                    value={searchTerm}
-                                    onChange={(e) =>
-                                        setSearchTerm(e.target.value)
-                                    }
-                                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            {type === "merchant" && (
-                                <select
-                                    value={filterStatus}
-                                    onChange={(e) =>
-                                        setFilterStatus(e.target.value)
-                                    }
-                                    className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                >
-                                    <option value="all">
-                                        All Status ({getStatusCount("all")})
-                                    </option>
-                                    <option value="verified">
-                                        Verified ({getStatusCount("verified")})
-                                    </option>
-                                    <option value="pending_verification">
-                                        Pending (
-                                        {getStatusCount("pending_verification")}
-                                        )
-                                    </option>
-                                    <option value="rejected">
-                                        Rejected ({getStatusCount("rejected")})
-                                    </option>
-                                </select>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Table */}
-                    <div className="overflow-x-auto">
-                        {filteredData.length === 0 ? (
-                            <div className="text-center py-12">
-                                <Users
-                                    className="mx-auto text-gray-400 mb-4"
-                                    size={48}
-                                />
-                                <p className="text-gray-500 text-lg">
-                                    No {title.toLowerCase()} found
-                                </p>
-                                <p className="text-gray-400 text-sm mt-1">
-                                    Try adjusting your search or filters
-                                </p>
-                            </div>
-                        ) : (
-                            <table className="w-full">
-                                <thead className="bg-gray-50 border-b border-gray-200">
-                                    <tr>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Full Name
-                                        </th>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Email
-                                        </th>
-                                        {type === "merchant" ? (
->>>>>>> 7d50367a0e002dd43a3a6e0a9fbc1dfd2adf2dbe
                                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                                 Full Name
                                             </th>
@@ -296,7 +205,6 @@ export default function EntityList({
                                                 </th>
                                             ) : (
                                                 <>
-<<<<<<< HEAD
                                                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                                         Age
                                                     </th>
@@ -306,46 +214,6 @@ export default function EntityList({
                                                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                                         Wallet & Transaction
                                                     </th>
-=======
-                                                    <td className="px-6 py-4 text-gray-900 font-medium">
-                                                        {item.age ?? "-"}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-gray-900 font-medium">
-                                                        <button
-                                                            onClick={() =>
-                                                                router.get(
-                                                                    route(
-                                                                        "admin.customers.referrals",
-                                                                        item.id
-                                                                    )
-                                                                )
-                                                            }
-                                                            className="inline-flex items-center justify-center gap-2 bg-gray-100 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-200 transition-all font-medium text-sm"
-                                                        >
-                                                            <TrendingUp
-                                                                size={16}
-                                                            />
-                                                            View Referrals
-                                                        </button>
-                                                    </td>
-
-                                                    <td className="px-6 py-4 text-center">
-                                                        <button
-                                                            onClick={() =>
-                                                                router.get(
-                                                                    route(
-                                                                        "admin.customers.wallet",
-                                                                        item.id
-                                                                    )
-                                                                )
-                                                            }
-                                                            className="inline-flex items-center gap-2 bg-blue-800 text-white px-4 py-2 rounded-lg hover:bg-blue-900 transition-all font-medium"
-                                                        >
-                                                            <Wallet size={16} />
-                                                            View
-                                                        </button>
-                                                    </td>
->>>>>>> 7d50367a0e002dd43a3a6e0a9fbc1dfd2adf2dbe
                                                 </>
                                             )}
                                             {type === "merchant" && (
@@ -358,29 +226,9 @@ export default function EntityList({
                                                     </th>
                                                 </>
                                             )}
-<<<<<<< HEAD
                                             <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                                 Actions
                                             </th>
-=======
-
-                                            <td className="px-6 py-4 text-center">
-                                                <button
-                                                    onClick={() =>
-                                                        router.get(
-                                                            route(
-                                                                showRoute,
-                                                                item.id
-                                                            )
-                                                        )
-                                                    }
-                                                    className="inline-flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-all font-medium"
-                                                >
-                                                    <Eye size={16} />
-                                                    View/Edit Profile
-                                                </button>
-                                            </td>
->>>>>>> 7d50367a0e002dd43a3a6e0a9fbc1dfd2adf2dbe
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-200">
@@ -394,7 +242,7 @@ export default function EntityList({
                                                         {item.user
                                                             ?.profile_picture ? (
                                                             <img
-                                                                src={`/storage/${item.user?.profile_picture}`}
+                                                                src={`/storage/${item.user.profile_picture}`}
                                                                 alt={
                                                                     item.user
                                                                         .full_name
@@ -416,15 +264,37 @@ export default function EntityList({
                                                         </div>
                                                     </div>
                                                 </td>
-
                                                 <td className="px-6 py-4 text-gray-600">
                                                     {item.user.email}
                                                 </td>
 
                                                 {type === "merchant" ? (
-                                                    <td className="px-6 py-4 font-medium text-gray-900">
-                                                        {item.company_name}
-                                                    </td>
+                                                    <>
+                                                        <td className="px-6 py-4 font-medium text-gray-900">
+                                                            {item.company_name}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <span
+                                                                className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(
+                                                                    item.business_status
+                                                                )}`}
+                                                            >
+                                                                {item.business_status
+                                                                    .replace(
+                                                                        "_",
+                                                                        " "
+                                                                    )
+                                                                    .toUpperCase()}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold border">
+                                                                <Eye
+                                                                    size={16}
+                                                                />
+                                                            </span>
+                                                        </td>
+                                                    </>
                                                 ) : (
                                                     <>
                                                         <td className="px-6 py-4 text-gray-900 font-medium">
@@ -433,7 +303,7 @@ export default function EntityList({
                                                         <td className="px-6 py-4 text-gray-900 font-medium">
                                                             <button
                                                                 onClick={() =>
-                                                                    Inertia.get(
+                                                                    router.get(
                                                                         route(
                                                                             "admin.customers.referrals",
                                                                             item.id
@@ -448,11 +318,10 @@ export default function EntityList({
                                                                 View Referrals
                                                             </button>
                                                         </td>
-
                                                         <td className="px-6 py-4 text-center">
                                                             <button
                                                                 onClick={() =>
-                                                                    Inertia.get(
+                                                                    router.get(
                                                                         route(
                                                                             "admin.customers.wallet",
                                                                             item.id
@@ -470,41 +339,10 @@ export default function EntityList({
                                                     </>
                                                 )}
 
-                                                {type === "merchant" && (
-                                                    <>
-                                                        <td className="px-6 py-4 whitespace-nowrap">
-                                                            <span
-                                                                className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(
-                                                                    item.business_status
-                                                                )}`}
-                                                            >
-                                                                {(
-                                                                    item.business_status ||
-                                                                    "N/A"
-                                                                )
-                                                                    .replace(
-                                                                        "_",
-                                                                        " "
-                                                                    )
-                                                                    .toUpperCase()}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap">
-                                                            <span
-                                                                className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border`}
-                                                            >
-                                                                <Eye
-                                                                    size={16}
-                                                                />
-                                                            </span>
-                                                        </td>
-                                                    </>
-                                                )}
-
                                                 <td className="px-6 py-4 text-center">
                                                     <button
                                                         onClick={() =>
-                                                            Inertia.get(
+                                                            router.get(
                                                                 route(
                                                                     showRoute,
                                                                     item.id

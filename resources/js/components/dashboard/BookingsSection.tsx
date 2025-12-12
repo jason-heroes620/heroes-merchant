@@ -142,7 +142,7 @@ const BookingsSection: React.FC<Props> = ({
                             {/* Booking code + Attendance Status */}
                             <div className="flex items-center justify-between mb-3">
                                 <div className="text-xs font-mono font-semibold text-gray-700">
-                                    #{b.booking_code}
+                                    {b.booking_code}
                                 </div>
 
                                 <div

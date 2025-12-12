@@ -218,7 +218,8 @@ class AttendanceController extends Controller
         }
 
         $bookings = Booking::with([
-                'slot.event',
+                'slot.event.location',
+                'slot.event.media',
                 'items.ageGroup',
                 'customer.user',
                 'attendance',
@@ -227,34 +228,77 @@ class AttendanceController extends Controller
             ->where('status', 'confirmed') 
             ->get();
 
-        $grouped = $bookings->map(fn($booking) => [
-            'booking_id' => $booking->id,
-            'booking_code' => $booking->booking_code,
-            'event_id' => $booking->event->id,
-            'event_title' => $booking->event->title,
-            'event_media' => $booking->event->media ?? null,
-            'event_location' => $booking->event->location ?? null,
-            'slot_id' => $booking->slot->id,
-            'slot_start' => optional($booking->slot->display_start)?->setTimezone('Asia/Kuala_Lumpur')->toDateTimeString(),
-            'slot_end' => optional($booking->slot->display_end)?->setTimezone('Asia/Kuala_Lumpur')->toDateTimeString(),
-            'customer' => [
-                'id' => $booking->customer->id,
-                'name' => $booking->customer->user->full_name,
-                'email' => $booking->customer->user->email,
-            ],
-            'booking_items' => $booking->items->map(fn($item) => [
-                'item_id' => $item->id,
-                'age_group' => $item->ageGroup?->label,
-                'quantity' => $item->quantity,
-                'attendances' => $booking->attendance
-                    ->where('booking_item_id', $item->id)
-                    ->map(fn($a) => [
-                        'status' => $a->status,
-                        'scanned_at' => optional($a->scanned_at)?->setTimezone('Asia/Kuala_Lumpur')->toDateTimeString(),
-                    ])->values(),
-            ]),
-            'attendance_status' => $booking->attendance->pluck('status')->first() ?? 'pending', 
-        ]);
+        $grouped = $bookings->map(function($booking) {
+            // Handle null slot gracefully
+            if (!$booking->slot) {
+                return null;
+            }
+
+            $event = $booking->slot->event ?? $booking->event;
+            
+            if (!$event) {
+                return null;
+            }
+
+            // Get first media URL if available
+            $eventMedia = null;
+            if ($event->media && $event->media->isNotEmpty()) {
+                $eventMedia = $event->media->first()->url ?? null;
+            }
+
+            // Get location data
+            $eventLocation = null;
+            if ($event->location) {
+                $eventLocation = [
+                    'id' => $event->location->id,
+                    'location_name' => $event->location->location_name,
+                    'latitude' => $event->location->latitude,
+                    'longitude' => $event->location->longitude,
+                ];
+            }
+
+            return [
+                'booking_id' => $booking->id,
+                'booking_code' => $booking->booking_code,
+                'event_id' => $event->id,
+                'event_title' => $event->title,
+                'event_type' => $event->type ?? 'one-time',
+                'event_media' => $eventMedia,
+                'event_location' => $eventLocation,
+                'slot_id' => $booking->slot->id,
+                'slot_start' => $booking->slot->display_start 
+                    ? $booking->slot->display_start->setTimezone('Asia/Kuala_Lumpur')->toDateTimeString()
+                    : null,
+                'slot_end' => $booking->slot->display_end 
+                    ? $booking->slot->display_end->setTimezone('Asia/Kuala_Lumpur')->toDateTimeString()
+                    : null,
+                'customer' => [
+                    'id' => $booking->customer->id,
+                    'name' => $booking->customer->user->full_name ?? 'Unknown',
+                    'email' => $booking->customer->user->email ?? '',
+                ],
+                'booking_items' => $booking->items->map(function($item) use ($booking) {
+                    $attendances = $booking->attendance
+                        ->where('booking_item_id', $item->id)
+                        ->map(function($a) {
+                            return [
+                                'status' => $a->status,
+                                'scanned_at' => $a->scanned_at 
+                                    ? $a->scanned_at->setTimezone('Asia/Kuala_Lumpur')->toDateTimeString()
+                                    : null,
+                            ];
+                        })->values();
+
+                    return [
+                        'item_id' => $item->id,
+                        'age_group' => $item->ageGroup?->label ?? 'General',
+                        'quantity' => $item->quantity,
+                        'quantity_attended' => $item->quantity_attended ?? 0,
+                        'attendances' => $attendances,
+                    ];
+                })->values(),
+            ];
+        })->filter()->values(); 
 
         return response()->json([
             'success' => true,
