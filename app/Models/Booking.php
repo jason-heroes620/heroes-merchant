@@ -85,6 +85,11 @@ class Booking extends Model
         return $this->hasMany(BookingItem::class, 'booking_id');
     }
 
+    public function attendance()
+    {
+        return $this->hasMany(Attendance::class);
+    }
+
     public function scopeForCustomer($query, $customerId)
     {
         return $query->where('customer_id', $customerId);
@@ -129,8 +134,53 @@ class Booking extends Model
         return $this->slot?->end_at;
     }
 
-    public function attendance()
+     /**
+     * Merchant-safe booking items
+     */
+    public function itemsForMerchantMeta(): array
     {
-        return $this->hasMany(Attendance::class);
+        return $this->items
+            ->map(fn ($item) => $item->toMerchantMeta())
+            ->values()
+            ->toArray();
+    }
+
+    /**
+     * Internal booking items
+     */
+    public function itemsForInternalMeta(): array
+    {
+        return $this->items
+            ->map(fn ($item) => $item->toInternalMeta())
+            ->values()
+            ->toArray();
+    }
+
+    public function creditBreakdown(): array
+    {
+        $paid = 0;
+        $free = 0;
+        $items = [];
+
+        foreach ($this->items as $item) {
+            $totals = $item->creditTotals();
+
+            $paid += $totals['paid'];
+            $free += $totals['free'];
+
+            $items[] = [
+                'age_group_id' => $item->age_group_id,
+                'age_group_label' => $item->ageGroup?->label,
+                'quantity' => $item->quantity,
+                'paid_total' => $totals['paid'],
+                'free_total' => $totals['free'],
+            ];
+        }
+
+        return [
+            'paid' => $paid,
+            'free' => $free,
+            'items' => $items,
+        ];
     }
 }

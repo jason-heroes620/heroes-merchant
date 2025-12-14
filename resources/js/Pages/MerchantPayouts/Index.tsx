@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { router } from "@inertiajs/react";
+import { toast } from "react-hot-toast";
 import {
     Calendar,
     DollarSign,
@@ -8,33 +9,47 @@ import {
     CheckCircle,
     Filter,
     Download,
-    Eye,
     CreditCard,
     Sparkles,
     Trophy,
     ArrowUp,
-    Coins,
+    ChevronDown,
+    ChevronUp,
+    Users,
 } from "lucide-react";
 import AuthenticatedLayout from "../../AuthenticatedLayout";
 
-type Merchant = {
-    id: string;
-    company_name: string;
+type BookingItem = {
+    age_group: string;
+    quantity: number;
+    attended: number;
+    price_per_unit?: number;
+    free_credits?: number;
+    paid_credits?: number;
+};
+
+type BookingDetail = {
+    booking_id: string;
+    booking_code: string;
+    items: BookingItem[];
 };
 
 type Payout = {
     id: string;
     event_title: string;
     date_display: string;
-    gross_rm: string;
-    net_rm: string;
-    platform_fee_in_rm?: string;
+    total_amount: string;
     status: string;
     available_at: string;
     merchant_name?: string;
     total_bookings?: number;
     total_paid_credits?: number;
-    credits_per_rm?: number;
+    booking_details?: BookingDetail[];
+};
+
+type Merchant = {
+    id: string;
+    company_name: string;
 };
 
 type Props = {
@@ -43,8 +58,7 @@ type Props = {
     merchants?: Merchant[];
     selectedMerchant?: string;
     summary?: {
-        total_gross: string;
-        total_net: string;
+        total_amount: string;
         pending: string;
         paid: string;
     };
@@ -55,15 +69,22 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
     role,
     merchants = [],
     selectedMerchant,
-    summary = { total_gross: "0", total_net: "0", pending: "0", paid: "0" },
+    summary = { total_amount: "0", pending: "0", paid: "0" },
 }) => {
     const [selectedPayouts, setSelectedPayouts] = useState<string[]>([]);
+    const [expandedPayouts, setExpandedPayouts] = useState<string[]>([]);
     const [filterMerchant, setFilterMerchant] = useState<string | undefined>(
         selectedMerchant
     );
 
     const togglePayout = (id: string) => {
         setSelectedPayouts((prev) =>
+            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+        );
+    };
+
+    const toggleExpand = (id: string) => {
+        setExpandedPayouts((prev) =>
             prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
         );
     };
@@ -90,34 +111,66 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
 
     const handleRequestPayout = () => {
         if (!selectedPayouts.length) {
-            alert("Please select at least one payout to request");
+            toast.error("No payouts selected");
             return;
         }
-        if (
-            !confirm(
-                `Request payout for ${selectedPayouts.length} selected item(s)?`
-            )
-        )
-            return;
+
+        const routePrefix = role === "admin" ? "/admin" : "/merchant";
+        const url = `${routePrefix}/payouts/request`;
 
         router.post(
-            "/merchant/payouts/request",
+            url,
+            { payout_ids: selectedPayouts },
             {
-                payout_ids: selectedPayouts,
-            },
-            {
-                onSuccess: () => setSelectedPayouts([]),
+                onSuccess: () => {
+                    toast.success("Payout request submitted successfully!");
+                    setSelectedPayouts([]);
+                },
+                onError: (errors: any) => {
+                    console.error(errors);
+                    toast.error(errors.message || "Failed to request payouts");
+                },
             }
         );
+    };
+
+    const exportPdf = () => {
+        const routePrefix = role === "admin" ? "/admin" : "/merchant";
+        let url = `${routePrefix}/payouts/export-pdf`;
+
+        // Build query parameters
+        const params = new URLSearchParams();
+
+        if (selectedPayouts.length > 0) {
+            selectedPayouts.forEach((id) => {
+                params.append("payout_ids[]", id);
+            });
+        }
+
+        if (filterMerchant && role === "admin") {
+            params.append("merchant_id", filterMerchant);
+        }
+
+        // Open in new window/tab for download
+        const fullUrl = params.toString() ? `${url}?${params.toString()}` : url;
+        window.open(fullUrl, "_blank");
+
+        toast.success("Generating PDF report...");
     };
 
     const handleMarkPaid = (payoutId: string) => {
         if (!confirm("Mark this payout as paid?")) return;
         router.post(
-            `/merchant/payouts/${payoutId}/mark-paid`,
+            `/admin/payouts/${payoutId}/mark-paid`,
             {},
             {
                 preserveState: true,
+                onSuccess: () => {
+                    toast.success("Payout marked as paid!");
+                },
+                onError: () => {
+                    toast.error("Failed to mark payout as paid");
+                },
             }
         );
     };
@@ -166,9 +219,10 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
 
     const handleMerchantFilter = (id: string) => {
         setFilterMerchant(id);
-        router.visit("/merchant/payouts", {
+        router.visit("/admin/payouts", {
             data: { merchant_id: id },
             preserveState: true,
+            replace: true,
         });
     };
 
@@ -180,7 +234,7 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
 
     const selectedTotal = payouts.data
         .filter((p) => selectedPayouts.includes(p.id))
-        .reduce((sum, p) => sum + Number(p.net_rm.replace(/,/g, "")), 0);
+        .reduce((sum, p) => sum + Number(p.total_amount.replace(/,/g, "")), 0);
 
     const pendingCount = payouts.data.filter(
         (p) => p.status === "pending"
@@ -215,7 +269,10 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
                                     </p>
                                 </div>
                             </div>
-                            <button className="bg-white/20 hover:bg-white/30 backdrop-blur-sm px-6 py-3 rounded-xl flex items-center gap-2 transition-all hover:scale-105 font-medium">
+                            <button
+                                onClick={exportPdf}
+                                className="bg-white/20 hover:bg-white/30 backdrop-blur-sm px-6 py-3 rounded-xl flex items-center gap-2 transition-all hover:scale-105 font-medium"
+                            >
                                 <Download size={20} />
                                 Export Report
                             </button>
@@ -226,9 +283,9 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
                 <div className="max-w-7xl mx-auto px-6 py-8">
                     {/* Summary Cards - Merchant View */}
                     {role === "merchant" && (
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                             {/* Total Earnings - Hero Card */}
-                            <div className="md:col-span-2 bg-linear-to-br from-orange-500 to-red-500 text-white rounded-2xl shadow-2xl p-8 relative overflow-hidden">
+                            <div className="md:col-span-1 bg-linear-to-br from-orange-500 to-red-500 text-white rounded-2xl shadow-2xl p-8 relative overflow-hidden">
                                 <div className="absolute top-0 right-0 opacity-10">
                                     <Trophy
                                         className="text-yellow-100"
@@ -245,7 +302,7 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
                                         RM{" "}
                                         {(
                                             Number(
-                                                summary.total_net.replace(
+                                                summary.total_amount.replace(
                                                     /,/g,
                                                     ""
                                                 )
@@ -317,38 +374,27 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
 
                     {/* Summary Cards - Admin View */}
                     {role === "admin" && (
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-sm text-gray-600 font-medium">
-                                        Total Gross
+                                        Total Payouts
                                     </span>
                                     <TrendingUp
                                         className="text-orange-500"
-                                        size={40}
+                                        size={24}
                                     />
                                 </div>
                                 <p className="text-2xl font-bold text-gray-900">
                                     RM{" "}
-                                    {Number(summary?.total_gross ?? 0).toFixed(
-                                        2
-                                    )}
-                                </p>
-                            </div>
-
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-sm text-gray-600 font-medium">
-                                        Total Net
-                                    </span>
-                                    <DollarSign
-                                        className="text-green-500"
-                                        size={40}
-                                    />
-                                </div>
-                                <p className="text-2xl font-bold text-gray-900">
-                                    RM{" "}
-                                    {Number(summary?.total_net ?? 0).toFixed(2)}
+                                    {(
+                                        Number(
+                                            summary.total_amount.replace(
+                                                /,/g,
+                                                ""
+                                            )
+                                        ) || 0
+                                    ).toFixed(2)}
                                 </p>
                             </div>
 
@@ -359,14 +405,14 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
                                     </span>
                                     <Clock
                                         className="text-yellow-500"
-                                        size={40}
+                                        size={24}
                                     />
                                 </div>
                                 <p className="text-2xl font-bold text-gray-900">
                                     RM{" "}
                                     {(
                                         Number(
-                                            summary?.pending?.replace(/,/g, "")
+                                            summary.pending.replace(/,/g, "")
                                         ) || 0
                                     ).toFixed(2)}
                                 </p>
@@ -379,14 +425,14 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
                                     </span>
                                     <CheckCircle
                                         className="text-green-500"
-                                        size={40}
+                                        size={24}
                                     />
                                 </div>
                                 <p className="text-2xl font-bold text-gray-900">
                                     RM{" "}
                                     {(
                                         Number(
-                                            summary?.paid?.replace(/,/g, "")
+                                            summary.paid.replace(/,/g, "")
                                         ) || 0
                                     ).toFixed(2)}
                                 </p>
@@ -420,8 +466,8 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
                         </div>
                     )}
 
-                    {/* Selected Payouts Action Bar - Merchant */}
-                    {role === "merchant" && selectedPayouts.length > 0 && (
+                    {/* Selected Payouts Action Bar */}
+                    {selectedPayouts.length > 0 && (
                         <div className="bg-linear-to-r from-orange-500 to-red-500 text-white rounded-2xl p-6 mb-6 shadow-xl">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-4">
@@ -443,8 +489,9 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
                                     onClick={handleRequestPayout}
                                     className="bg-white text-orange-600 hover:bg-orange-50 px-8 py-4 rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-2xl hover:scale-105 flex items-center gap-2"
                                 >
-            
-                                    Request Payout Now!
+                                    {role === "admin"
+                                        ? "Process Selected Payouts"
+                                        : "Request Payout Now!"}
                                 </button>
                             </div>
                         </div>
@@ -452,14 +499,9 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
 
                     {/* Event Groups */}
                     {Object.entries(grouped).map(([eventTitle, group]) => {
-                        const totalGross = group.reduce(
+                        const totalAmount = group.reduce(
                             (sum, p) =>
-                                sum + Number(p.gross_rm.replace(/,/g, "")),
-                            0
-                        );
-                        const totalNet = group.reduce(
-                            (sum, p) =>
-                                sum + Number(p.net_rm.replace(/,/g, "")),
+                                sum + Number(p.total_amount.replace(/,/g, "")),
                             0
                         );
                         const eligibleCount = group.filter(
@@ -489,34 +531,34 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
                                                     {group.length} slot(s) •
                                                     Total Earnings:
                                                     <span className="font-bold text-green-600 ml-1">
-                                                        RM {totalNet.toFixed(2)}
+                                                        RM{" "}
+                                                        {totalAmount.toFixed(2)}
                                                     </span>
                                                 </p>
                                             </div>
                                         </div>
-                                        {role === "merchant" &&
-                                            eligibleCount > 0 && (
-                                                <button
-                                                    onClick={() =>
-                                                        toggleSelectAll(group)
-                                                    }
-                                                    className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:scale-105"
-                                                >
-                                                    {group
-                                                        .filter(
-                                                            (p) =>
-                                                                p.status ===
-                                                                "pending"
+                                        {eligibleCount > 0 && (
+                                            <button
+                                                onClick={() =>
+                                                    toggleSelectAll(group)
+                                                }
+                                                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:scale-105"
+                                            >
+                                                {group
+                                                    .filter(
+                                                        (p) =>
+                                                            p.status ===
+                                                            "pending"
+                                                    )
+                                                    .every((p) =>
+                                                        selectedPayouts.includes(
+                                                            p.id
                                                         )
-                                                        .every((p) =>
-                                                            selectedPayouts.includes(
-                                                                p.id
-                                                            )
-                                                        )
-                                                        ? "Deselect All"
-                                                        : `Select All (${eligibleCount})`}
-                                                </button>
-                                            )}
+                                                    )
+                                                    ? "Deselect All"
+                                                    : `Select All (${eligibleCount})`}
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 
@@ -525,37 +567,24 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
                                     <table className="w-full">
                                         <thead className="bg-gray-50 border-b border-gray-200">
                                             <tr>
-                                                {role === "merchant" && (
-                                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                                                        Select
-                                                    </th>
-                                                )}
+                                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                                                    Select
+                                                </th>
                                                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                                                     Date & Time
                                                 </th>
                                                 {role === "admin" && (
-                                                    <>
-                                                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                                                            Merchant
-                                                        </th>
-                                                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                                                            Credits/RM
-                                                        </th>
-                                                    </>
+                                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                                                        Merchant
+                                                    </th>
                                                 )}
                                                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                                                     Bookings
                                                 </th>
                                                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                                                    Gross
-                                                </th>
-                                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                                                    Platform Fee
-                                                </th>
-                                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                                                     {role === "merchant"
                                                         ? "Your Earnings"
-                                                        : "Net Amount"}
+                                                        : "Payout Amount"}
                                                 </th>
                                                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                                                     Status
@@ -563,18 +592,17 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
                                                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                                                     Available At
                                                 </th>
-                                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                                                    Actions
-                                                </th>
+                                                {role === "admin" && (
+                                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                                                        Actions
+                                                    </th>
+                                                )}
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100">
                                             {group.map((p) => (
-                                                <tr
-                                                    key={p.id}
-                                                    className="hover:bg-orange-50/30 transition-colors"
-                                                >
-                                                    {role === "merchant" && (
+                                                <React.Fragment key={p.id}>
+                                                    <tr className="hover:bg-orange-50/30 transition-colors">
                                                         <td className="px-6 py-4">
                                                             <input
                                                                 type="checkbox"
@@ -593,101 +621,80 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
                                                                 className="w-5 h-5 text-orange-500 border-gray-300 rounded focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                                             />
                                                         </td>
-                                                    )}
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
-                                                            <Calendar
-                                                                size={16}
-                                                                className="text-gray-400"
-                                                            />
-                                                            {p.date_display}
-                                                        </div>
-                                                    </td>
-                                                    {role === "admin" && (
-                                                        <>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                                                                <Calendar
+                                                                    size={16}
+                                                                    className="text-gray-400"
+                                                                />
+                                                                {p.date_display}
+                                                            </div>
+                                                        </td>
+                                                        {role === "admin" && (
                                                             <td className="px-6 py-4 text-sm font-medium text-gray-900">
                                                                 {
                                                                     p.merchant_name
                                                                 }
                                                             </td>
-                                                            <td className="px-6 py-4">
-                                                                <div className="flex items-center gap-1.5 text-sm">
-                                                                    <Coins
+                                                        )}
+                                                        <td className="px-6 py-4">
+                                                            <button
+                                                                onClick={() =>
+                                                                    toggleExpand(
+                                                                        p.id
+                                                                    )
+                                                                }
+                                                                className="flex items-center gap-2 text-sm font-semibold text-orange-600 hover:text-orange-700"
+                                                            >
+                                                                <Users
+                                                                    size={16}
+                                                                />
+                                                                {p.total_bookings ||
+                                                                    0}{" "}
+                                                                bookings
+                                                                {expandedPayouts.includes(
+                                                                    p.id
+                                                                ) ? (
+                                                                    <ChevronUp
                                                                         size={
                                                                             16
                                                                         }
-                                                                        className="text-orange-500"
                                                                     />
-                                                                    <span className="font-semibold text-gray-900">
-                                                                        {p.credits_per_rm ||
-                                                                            0}
-                                                                    </span>
-                                                                </div>
-                                                            </td>
-                                                        </>
-                                                    )}
-                                                    <td className="px-6 py-4 text-sm font-semibold text-gray-900">
-                                                        {p.total_bookings || 0}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-sm font-semibold text-gray-900">
-                                                        RM{" "}
-                                                        {(
-                                                            Number(
-                                                                p.gross_rm.replace(
-                                                                    /,/g,
-                                                                    ""
-                                                                )
-                                                            ) || 0
-                                                        ).toFixed(2)}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-sm font-medium text-red-600">
-                                                        - RM{" "}
-                                                        {(
-                                                            Number(
-                                                                (
-                                                                    p.platform_fee_in_rm ||
-                                                                    "0"
-                                                                ).replace(
-                                                                    /,/g,
-                                                                    ""
-                                                                )
-                                                            ) || 0
-                                                        ).toFixed(2)}
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <span className="font-bold text-green-600 text-lg">
-                                                            RM{" "}
-                                                            {(
-                                                                Number(
-                                                                    p.net_rm.replace(
-                                                                        /,/g,
-                                                                        ""
-                                                                    )
-                                                                ) || 0
-                                                            ).toFixed(2)}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <StatusBadge
-                                                            status={p.status}
-                                                        />
-                                                    </td>
-                                                    <td className="px-6 py-4 text-sm text-gray-600">
-                                                        {p.available_at}
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex items-center gap-2">
-                                                            <button
-                                                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                                                                title="View Details"
-                                                            >
-                                                                <Eye
-                                                                    size={18}
-                                                                    className="text-gray-600"
-                                                                />
+                                                                ) : (
+                                                                    <ChevronDown
+                                                                        size={
+                                                                            16
+                                                                        }
+                                                                    />
+                                                                )}
                                                             </button>
-                                                            {role === "admin" &&
-                                                                p.status ===
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <span className="font-bold text-green-600 text-lg">
+                                                                RM{" "}
+                                                                {(
+                                                                    Number(
+                                                                        p.total_amount.replace(
+                                                                            /,/g,
+                                                                            ""
+                                                                        )
+                                                                    ) || 0
+                                                                ).toFixed(2)}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <StatusBadge
+                                                                status={
+                                                                    p.status
+                                                                }
+                                                            />
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-gray-600">
+                                                            {p.available_at}
+                                                        </td>
+                                                        {role === "admin" && (
+                                                            <td className="px-6 py-4">
+                                                                {p.status ===
                                                                     "requested" && (
                                                                     <button
                                                                         onClick={() =>
@@ -701,9 +708,149 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
                                                                         Paid
                                                                     </button>
                                                                 )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
+                                                            </td>
+                                                        )}
+                                                    </tr>
+
+                                                    {/* Expanded Booking Details */}
+                                                    {expandedPayouts.includes(
+                                                        p.id
+                                                    ) && (
+                                                        <tr>
+                                                            <td
+                                                                colSpan={
+                                                                    role ===
+                                                                    "merchant"
+                                                                        ? 9
+                                                                        : 10
+                                                                }
+                                                                className="px-6 py-4 bg-gray-50"
+                                                            >
+                                                                <div className="space-y-4">
+                                                                    <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                                                                        <Users
+                                                                            size={
+                                                                                18
+                                                                            }
+                                                                        />
+                                                                        Booking
+                                                                        Details
+                                                                    </h4>
+                                                                    {p.booking_details &&
+                                                                    p
+                                                                        .booking_details
+                                                                        .length >
+                                                                        0 ? (
+                                                                        <div className="space-y-3">
+                                                                            {p.booking_details.map(
+                                                                                (
+                                                                                    booking
+                                                                                ) => (
+                                                                                    <div
+                                                                                        key={
+                                                                                            booking.booking_id
+                                                                                        }
+                                                                                        className="bg-white rounded-lg p-4 border border-gray-200"
+                                                                                    >
+                                                                                        <div className="flex items-center justify-between mb-3">
+                                                                                            <span className="font-semibold text-gray-900">
+                                                                                                Booking:{" "}
+                                                                                                {
+                                                                                                    booking.booking_code
+                                                                                                }
+                                                                                            </span>
+                                                                                        </div>
+                                                                                        <div className="overflow-x-auto">
+                                                                                            <table className="w-full text-sm">
+                                                                                                <thead className="bg-gray-50">
+                                                                                                    <tr>
+                                                                                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
+                                                                                                            Age
+                                                                                                            Group
+                                                                                                        </th>
+                                                                                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
+                                                                                                            Quantity
+                                                                                                        </th>
+                                                                                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
+                                                                                                            Attended
+                                                                                                        </th>
+                                                                                                        {role ===
+                                                                                                            "admin" && (
+                                                                                                            <>
+                                                                                                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
+                                                                                                                    Paid
+                                                                                                                    Credits
+                                                                                                                </th>
+                                                                                                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
+                                                                                                                    Free
+                                                                                                                    Credits
+                                                                                                                </th>
+                                                                                                            </>
+                                                                                                        )}
+                                                                                                    </tr>
+                                                                                                </thead>
+                                                                                                <tbody className="divide-y divide-gray-100">
+                                                                                                    {booking.items.map(
+                                                                                                        (
+                                                                                                            item,
+                                                                                                            idx
+                                                                                                        ) => (
+                                                                                                            <tr
+                                                                                                                key={
+                                                                                                                    idx
+                                                                                                                }
+                                                                                                            >
+                                                                                                                <td className="px-3 py-2 text-gray-900">
+                                                                                                                    {
+                                                                                                                        item.age_group
+                                                                                                                    }
+                                                                                                                </td>
+                                                                                                                <td className="px-3 py-2 text-gray-900">
+                                                                                                                    {
+                                                                                                                        item.quantity
+                                                                                                                    }
+                                                                                                                </td>
+                                                                                                                <td className="px-3 py-2 text-gray-900">
+                                                                                                                    {
+                                                                                                                        item.attended
+                                                                                                                    }
+                                                                                                                </td>
+                                                                                                                {role ===
+                                                                                                                    "admin" && (
+                                                                                                                    <>
+                                                                                                                        <td className="px-3 py-2 text-blue-600 font-medium">
+                                                                                                                            {item.paid_credits ||
+                                                                                                                                0}
+                                                                                                                        </td>
+                                                                                                                        <td className="px-3 py-2 text-green-600 font-medium">
+                                                                                                                            {item.free_credits ||
+                                                                                                                                0}
+                                                                                                                        </td>
+                                                                                                                    </>
+                                                                                                                )}
+                                                                                                            </tr>
+                                                                                                        )
+                                                                                                    )}
+                                                                                                </tbody>
+                                                                                            </table>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )
+                                                                            )}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <p className="text-gray-500 text-sm">
+                                                                            No
+                                                                            booking
+                                                                            details
+                                                                            available
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </React.Fragment>
                                             ))}
                                         </tbody>
                                     </table>
@@ -718,18 +865,18 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
                                         <div className="flex items-center gap-8">
                                             <div className="text-sm">
                                                 <span className="text-gray-600">
-                                                    Gross:{" "}
+                                                    Slots:{" "}
                                                 </span>
                                                 <span className="font-bold text-gray-900">
-                                                    RM {totalGross.toFixed(2)}
+                                                    {group.length}
                                                 </span>
                                             </div>
                                             <div className="text-sm">
                                                 <span className="text-gray-600">
-                                                    Net:{" "}
+                                                    Total:{" "}
                                                 </span>
                                                 <span className="font-bold text-green-600 text-lg">
-                                                    RM {totalNet.toFixed(2)}
+                                                    RM {totalAmount.toFixed(2)}
                                                 </span>
                                             </div>
                                         </div>

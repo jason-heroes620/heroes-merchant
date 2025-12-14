@@ -196,43 +196,37 @@ export default function EntityProfileForm({
                                     disabled={isSubmitting}
                                 />
                                 <TextInput
-<<<<<<< HEAD
                                     name="street_name"
                                     label="Street Name"
-                                    value={form.street_name}
+                                    value={data.street_name}
                                     onChange={handleChange}
                                     disabled={isSubmitting}
                                 />
                                 <TextInput
                                     name="postcode"
                                     label="Postcode"
-                                    value={form.postcode}
+                                    value={data.postcode}
                                     onChange={handleChange}
                                     disabled={isSubmitting}
                                 />
                                 <TextInput
                                     name="city"
                                     label="City"
-                                    value={form.city}
+                                    value={data.city}
                                     onChange={handleChange}
                                     disabled={isSubmitting}
                                 />
                                 <TextInput
                                     name="state"
                                     label="State"
-                                    value={form.state}
+                                    value={data.state}
                                     onChange={handleChange}
                                     disabled={isSubmitting}
                                 />
                                 <TextInput
                                     name="country"
                                     label="Country"
-                                    value={form.country}
-=======
-                                    name="address"
-                                    label="Address"
-                                    value={data.address}
->>>>>>> 7d50367a0e002dd43a3a6e0a9fbc1dfd2adf2dbe
+                                    value={data.country}
                                     onChange={handleChange}
                                     disabled={isSubmitting}
                                 />

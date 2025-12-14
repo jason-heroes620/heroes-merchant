@@ -50,9 +50,9 @@ class EventNotification extends Notification
         // Determine message
         $message = match ($this->action) {
             'created' => "New event '{$this->event->title}' created by {$this->event->merchant->user->full_name}",
-            'updated' => "Your event '{$this->event->title}' has been updated",
-            'status_change' => "Your event '{$this->event->title}' is now {$this->status}",
-            default => "Your event '{$this->event->title}' has a new update",
+            'updated' => "Event '{$this->event->title}' by {$this->event->merchant->user->full_name} has been updated",
+            'status_change' => "Event '{$this->event->title}' by {$this->event->merchant->user->full_name} is now {$this->status}",
+            default => "Event '{$this->event->title}' by {$this->event->merchant->user->full_name} has a new update",
         };
 
         return [

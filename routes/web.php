@@ -100,8 +100,9 @@ Route::middleware(['auth'])->group(function () {
 
         // Merchant Payouts
         Route::get('/payouts', [MerchantPayoutController::class, 'index'])->name('payouts.index');
-        Route::post('/payouts/{id}/mark-paid', [MerchantPayoutController::class, 'markPaid']);
-
+        Route::post('/payouts/request', [MerchantPayoutController::class, 'requestPayouts'])->name('payouts.request');
+        Route::get('/payouts/export-pdf', [MerchantPayoutController::class, 'exportSlotPayoutPdf'])->name('payouts.export.pdf');
+        Route::post('/payouts/{payout}/mark-paid', [MerchantPayoutController::class, 'markPaid'])->name('payouts.mark-paid');
         //Dashboard       
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
     });
@@ -122,9 +123,10 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/bookings/event/{eventId}', [MerchantBookingController::class, 'bookingsByEvent'])->name('bookings.by-event');
         Route::patch('/bookings/update-status', [MerchantBookingController::class, 'updateStatus'])->name('bookings.updateStatus');
 
-        Route::get('/payouts', [MerchantPayoutController::class, 'index']);
-        Route::post('/payouts/request', [MerchantPayoutController::class, 'requestPayouts']);
-        Route::post('/payouts/{id}/mark-paid', [MerchantPayoutController::class, 'markPaid']);
+        Route::get('/payouts', [MerchantPayoutController::class, 'index'])->name('payouts.index');
+        Route::post('/payouts/request', [MerchantPayoutController::class, 'requestPayouts'])->name('payouts.request');
+        Route::get('/payouts/export-pdf', [MerchantPayoutController::class, 'exportSlotPayoutPdf'])->name('payouts.export.pdf');
+        
         Route::get('/dashboard', [MerchantDashboardController::class, 'index'])->name('dashboard');
     });
 

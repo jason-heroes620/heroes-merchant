@@ -222,6 +222,9 @@ export default function EntityList({
                                                         Status
                                                     </th>
                                                     <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                                        Events
+                                                    </th>
+                                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                                         Payout Status
                                                     </th>
                                                 </>
@@ -287,12 +290,31 @@ export default function EntityList({
                                                                     .toUpperCase()}
                                                             </span>
                                                         </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap">
-                                                            <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold border">
-                                                                <Eye
+                                                         <td className="px-6 py-4 whitespace-nowrap">
+                                                            <span
+                                                                className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(
+                                                                    item.events
+                                                                )}`}
+                                                            >
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-center">
+                                                            <button
+                                                                onClick={() =>
+                                                                    router.get(
+                                                                        route(
+                                                                            "item.payout_status",
+                                                                            item.id
+                                                                        )
+                                                                    )
+                                                                }
+                                                                className="inline-flex items-center gap-2 bg-blue-800 text-white px-4 py-2 rounded-lg hover:bg-blue-900 transition-all font-medium"
+                                                            >
+                                                                <Wallet
                                                                     size={16}
                                                                 />
-                                                            </span>
+                                                                View
+                                                            </button>
                                                         </td>
                                                     </>
                                                 ) : (

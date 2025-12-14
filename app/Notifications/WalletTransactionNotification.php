@@ -102,15 +102,15 @@ class WalletTransactionNotification extends Notification
         $creditsText = implode(' and ', $credits);
 
         $context = $this->eventTitle 
-            ? " for '{$this->eventTitle}' on {$this->slotDate} at {$this->slotTime}" 
+            ? " for '{$this->eventTitle}' on {$this->slotDate} {$this->slotTime}" 
             : "";
 
-        $bookingInfo = $this->bookingCode ? " (Booking Code: {$this->bookingCode})" : "";
+        $bookingInfo = $this->bookingCode ? "Booking Code: {$this->bookingCode}" : "";
 
         return (new MailMessage)
-            ->subject("Wallet Transaction: {$typeLabel}")
-            ->line("Customer: {$this->customerName} (ID: {$this->customerId})")
+            ->subject("Wallet Transaction: {$typeLabel}")        
             ->line("Transaction: {$typeLabel}{$bookingInfo}")
+            ->line("Customer: {$this->customerName} (ID: {$this->customerId})")
             ->line("Credits: {$creditsText}{$context}")
             ->action('View Wallet', url("/admin/customers/{$this->customerId}/wallet"));
     }

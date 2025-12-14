@@ -17,6 +17,7 @@ class MerchantPayoutRequest extends Model
         'amount_requested',
         'status',
         'paid_at',
+        'payment_reference',
         'payout_ids',
         'meta'
     ];

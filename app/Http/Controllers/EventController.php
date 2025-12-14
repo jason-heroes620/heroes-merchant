@@ -954,6 +954,7 @@ class EventController extends Controller
                     EventSlotPrice::where('id', $sp['id'])->update([
                         'paid_credits' => $sp['paid_credits'],
                         'free_credits' => $sp['free_credits'] ?? $recommended['free_credits'],
+                        'conversion_id' => $conversion->id,
                     ]);
 
                     $updatedSlot = EventSlotPrice::find($sp['id']);

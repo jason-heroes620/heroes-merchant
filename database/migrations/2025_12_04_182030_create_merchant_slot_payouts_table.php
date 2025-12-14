@@ -17,6 +17,7 @@ return new class extends Migration
             $table->foreignUuid('slot_id')->constrained('event_slots')->onDelete('cascade');
 
             $table->integer('total_paid_credits');
+            $table->integer('total_free_credits');
             $table->decimal('gross_amount_in_rm', 12, 2)->default(0);
             $table->decimal('platform_fee_rate', 12, 2)->default(0);
             $table->decimal('net_amount_in_rm', 12, 2)->default(0);
