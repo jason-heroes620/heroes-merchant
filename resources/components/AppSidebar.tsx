@@ -61,11 +61,11 @@ export function AppSidebar() {
     const { state } = useSidebar();
     const { url, props } = usePage();
     console.log(props);
-    const user = props?.auth?.user;
-    console.log(user?.role);
+    const user = props?.auth?.userRole;
+    console.log(user);
 
     if (!user) return null;
-    const rolePrefix = user?.role === "admin" ? "/admin" : "/merchant";
+    const rolePrefix = user === "admin" ? "/admin" : "/merchant";
 
     const adminGroups: SidebarGroupType[] = [
         {
@@ -183,6 +183,12 @@ export function AppSidebar() {
                     label: "Notifications",
                     icon: Bell,
                     href: "/notifications",
+                },
+                {
+                    key: "settings",
+                    label: "Settings",
+                    icon: Bell,
+                    href: "/settings",
                 },
                 {
                     key: "profile",

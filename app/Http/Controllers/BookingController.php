@@ -28,83 +28,79 @@ class BookingController extends Controller
     {
         $user = $request->user();
         $customer = $user->customer ?? null;
-        if (! $customer) {
+        if (!$customer) {
             return response()->json(['message' => 'Customer record not found.'], 404);
         }
+        
         $status = $request->query('status', 'upcoming'); 
         $perPage = (int) $request->query('per_page', 12);
         $now = Carbon::now('Asia/Kuala_Lumpur');
 
-        $query = Booking::with(['slot', 'event.location', 'event.media', 'items.ageGroup', 'transactions'])
-                        ->forCustomer($customer->id)
-                        ->orderBy('booked_at', 'desc');
+        $query = Booking::with([
+            'slot.date',
+            'event.location',
+            'event.media',
+            'items.ageGroup',
+            'transactions'
+        ])->forCustomer($customer->id);
 
-        switch ($status) {
-            case 'upcoming':
-                \Log::info('Filtering: upcoming');
-                $query->whereNotIn('status', ['cancelled', 'refunded'])
-                    ->where(function($q) use ($now) {
-                        // Recurring slots
-                        $q->whereHas('slot', function($sq) use ($now) {
-                            $sq->whereRaw("STR_TO_DATE(CONCAT(date, ' ', start_time), '%Y-%m-%d %H:%i:%s') >= ?", [$now]);
-                        })
-                        // One-time events
-                        ->orWhereHas('event.dates', function($dq) use ($now) {
-                            $dq->whereRaw("STR_TO_DATE(end_date, '%Y-%m-%d') >= ?", [$now->format('Y-m-d')]);
-                        });
-                    });
-                break;
+        $allBookings = $query->get();
 
-            case 'completed':
-                $query->whereNotIn('status', ['cancelled', 'refunded'])
-                    ->where(function($q) use ($now) {
-                        // Recurring slots
-                        $q->whereHas('slot', function($sq) use ($now) {
-                            $sq->whereRaw("STR_TO_DATE(CONCAT(date, ' ', end_time), '%Y-%m-%d %H:%i:%s') < ?", [$now]);
-                        })
-                        // One-time events
-                        ->orWhereHas('event.dates', function($dq) use ($now) {
-                            $dq->whereRaw("STR_TO_DATE(end_date, '%Y-%m-%d') < ?", [$now->format('Y-m-d')]);
-                        });
-                    });
-                break;
+        $bookingsWithTimes = $allBookings->map(function($booking) use ($now) {
+            $slot = $booking->slot;
+            if (!$slot) return null;
 
-            case 'cancelled':
-                $query->whereIn('status', ['cancelled', 'refunded']);
-                break;
+            $displayStart = $slot->display_start;
+            $displayEnd = $slot->display_end;
 
-            default:
-                break;
-        }
+            if (!$displayStart || !$displayEnd) {
+                $eventDate = $slot->date;
+                if ($eventDate) {
+                    $startDate = $eventDate->start_date?->format('Y-m-d');
+                    $endDate = $eventDate->end_date?->format('Y-m-d');
+                    $startTime = $slot->start_time?->format('H:i:s') ?? '00:00:00';
+                    $endTime = $slot->end_time?->format('H:i:s') ?? '23:59:59';
 
-        $page = $query->paginate($perPage)->withQueryString();
+                    $displayStart = $startDate ? Carbon::createFromFormat('Y-m-d H:i:s', "$startDate $startTime", 'Asia/Kuala_Lumpur') : null;
+                    $displayEnd = $endDate ? Carbon::createFromFormat('Y-m-d H:i:s', "$endDate $endTime", 'Asia/Kuala_Lumpur') : null;
+                }
+            }
 
-        return response()->json([
-            'data' => BookingResource::collection($page->items()),
-            'current_page' => $page->currentPage(),
-            'last_page' => $page->lastPage(),
-            'per_page' => $page->perPage(),
-            'total' => $page->total(),
-        ]);
-    }
+            $booking->_is_upcoming = $displayStart && $displayStart->gte($now);
+            $booking->_is_completed = $displayEnd && $displayEnd->lt($now);
 
-    /**
-     * Endpoint to return the QR image file or URL
-     */
-    public function qr(Request $request, $id)
-    {
-        $user = $request->user();
-        $customer = $user->customer ?? null;
-        if (! $customer) return response()->json(['message' => 'Customer not found'], 404);
+            return $booking;
+        })->filter();
 
-        $booking = Booking::forCustomer($customer->id)->findOrFail($id);
 
-        if (! $booking->qr_code_path) {
-            return response()->json(['message' => 'QR code not available'], 404);
-        }
+        $filteredBookings = $bookingsWithTimes->filter(function($booking) use ($status) {
+            switch ($status) {
+                case 'upcoming':
+                    return !in_array($booking->status, ['cancelled', 'refunded']) && $booking->_is_upcoming;
+                    
+                case 'completed':
+                    return !in_array($booking->status, ['cancelled', 'refunded']) && $booking->_is_completed;
+                    
+                case 'cancelled':
+                    return in_array($booking->status, ['cancelled', 'refunded']);
+                    
+                default:
+                    return true;
+            }
+        })->sortByDesc('booked_at');
+
+        $page = (int) $request->query('page', 1);
+        $offset = ($page - 1) * $perPage;
+        $items = $filteredBookings->slice($offset, $perPage)->values();
+        $total = $filteredBookings->count();
+        $lastPage = (int) ceil($total / $perPage);
 
         return response()->json([
-            'qr_url' => asset($booking->qr_code_path)
+            'data' => BookingResource::collection($items),
+            'current_page' => $page,
+            'last_page' => $lastPage,
+            'per_page' => $perPage,
+            'total' => $total,
         ]);
     }
 

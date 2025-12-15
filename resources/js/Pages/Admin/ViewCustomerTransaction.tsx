@@ -98,7 +98,7 @@ export default function ViewCustomerTransaction() {
             purchase: "bg-orange-100 text-orange-700 border-orange-200",
             bonus: "bg-green-100 text-green-700 border-green-200",
             booking: "bg-blue-100 text-blue-700 border-blue-200",
-            refund: "bg-purple-100 text-purple-700 border-purple-200",
+            refund: "bg-emerald-100 text-emerald-700 border-emerald-200",
         } as const;
 
         return (
@@ -110,9 +110,10 @@ export default function ViewCustomerTransaction() {
     const getGrantTypeColor = (type: string) => {
         const colors = {
             purchase: "bg-orange-100 text-orange-600",
-            bonus: "bg-green-100 text-green-600",
+            registration: "bg-purple-100 text-purple-600",
+            referral: "bg-pink-100 text-pink-600",
             free: "bg-blue-100 text-blue-600",
-            paid: "bg-purple-100 text-purple-600",
+            paid: "bg-indigo-100 text-indigo-600",
         } as const;
 
         return (
@@ -355,7 +356,8 @@ export default function ViewCustomerTransaction() {
                                     <option value="purchase">Purchase</option>
                                     <option value="booking">Booking</option>
                                     <option value="refund">Refund</option>
-                                    <option value="bonus">Bonus</option>
+                                    <option value="referral">Referral Bonus</option>
+                                     <option value="registration">Registration Bonus</option>
                                 </select>
                             </div>
                         </div>

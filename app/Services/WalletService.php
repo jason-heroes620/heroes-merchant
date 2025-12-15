@@ -7,7 +7,7 @@ use App\Models\Customer;
 use App\Models\CustomerWallet;
 use App\Models\CustomerCreditTransaction;
 use App\Models\WalletCreditGrant;
-use App\Models\Booking;
+use App\Models\Setting;
 use Illuminate\Support\Facades\Notification;
 use App\Notifications\WalletTransactionNotification;
 use Carbon\Carbon;
@@ -24,29 +24,28 @@ class WalletService
             'cached_paid_credits' => 0,
         ]);
 
-        $deltaFree = 50;
+        $deltaFree = (int) Setting::get('registration_bonus', 0);
         $deltaPaid = 0;
-        $expiresAt = Carbon::now()->addMonths(6);
 
-        // Increment wallet cached credits
+        if ($deltaFree <= 0) {
+            return; 
+        }
+
+        $registrationValidity = (int) Setting::get('registration_bonus_validity', 180);
+        $expiresAt = Carbon::now()->addDays($registrationValidity);
+
         $wallet->increment('cached_free_credits', $deltaFree);
-        $wallet->increment('cached_paid_credits', $deltaPaid);
 
-        // Record wallet grant
         WalletCreditGrant::create([
             'wallet_id' => $wallet->id,
-            'grant_type' => 'bonus',
+            'grant_type' => 'registration',
             'free_credits' => $deltaFree,
-            'paid_credits' => $deltaPaid,
+            'paid_credits' => 0,
             'free_credits_remaining' => $deltaFree,
-            'paid_credits_remaining' => $deltaPaid,
+            'paid_credits_remaining' => 0,
             'expires_at' => $expiresAt,
-            'reference_id' => null,
-            'free_credits_per_rm' => null,
-            'paid_credits_per_rm' => null,
         ]);
 
-        // Record transaction
         $transaction = CustomerCreditTransaction::create([
             'wallet_id' => $wallet->id,
             'type' => 'bonus',
@@ -57,7 +56,11 @@ class WalletService
 
         Notification::send(
             User::where('role', 'admin')->get(),
-            new WalletTransactionNotification($transaction, $customer->user->full_name, $customer->id)
+            new WalletTransactionNotification(
+                $transaction,
+                $customer->user->full_name,
+                $customer->id
+            )
         );
     }
 
@@ -66,46 +69,53 @@ class WalletService
         $referrer = $referredCustomer->referrer;
         if (!$referrer) return;
 
+        $threshold = (int) Setting::get('referral_threshold', 0);
+        $bonus = (int) Setting::get('referral_bonus', 0);
+
+        if ($threshold <= 0 || $bonus <= 0) {
+            return; 
+        }
+
         $referralCount = $referrer->referees()->count();
 
-        // Apply bonus only for every 3 referrals
-        if ($referralCount % 3 !== 0) return;
+        if ($referralCount % $threshold !== 0) return;
 
         $wallet = CustomerWallet::firstOrCreate(
             ['customer_id' => $referrer->id],
             ['cached_free_credits' => 0, 'cached_paid_credits' => 0]
         );
 
-        $freeBonus = 50;
-        $paidBonus = 0;
-        $expiresAt = Carbon::now()->addMonths(6);
+        $referralValidity = (int) Setting::get('referral_bonus_validity', 180);
+        $expiresAt = Carbon::now()->addDays($referralValidity);
 
-        $wallet->increment('cached_free_credits', $freeBonus);
-        $wallet->increment('cached_paid_credits', $paidBonus);
+        $wallet->increment('cached_free_credits', $bonus);
 
         WalletCreditGrant::create([
             'wallet_id' => $wallet->id,
-            'grant_type' => 'bonus',
-            'free_credits' => $freeBonus,
-            'paid_credits' => $paidBonus,
-            'free_credits_remaining' => $freeBonus,
-            'paid_credits_remaining' => $paidBonus,
+            'grant_type' => 'referral',
+            'free_credits' => $bonus,
+            'paid_credits' => 0,
+            'free_credits_remaining' => $bonus,
+            'paid_credits_remaining' => 0,
             'expires_at' => $expiresAt,
-            'purchase_package_id' => null,
             'reference_id' => $referredCustomer->id,
         ]);
 
         $transaction = CustomerCreditTransaction::create([
             'wallet_id' => $wallet->id,
-            'type' => 'bonus',
-            'delta_free' => $freeBonus,
-            'delta_paid' => $paidBonus,
-            'description' => 'Referral bonus for 3 successful referrals',
+            'type' => '',
+            'delta_free' => $bonus,
+            'delta_paid' => 0,
+            'description' => "Referral bonus for {$threshold} successful referrals",
         ]);
 
         Notification::send(
             User::where('role', 'admin')->get(),
-            new WalletTransactionNotification($transaction, $referrer->user->full_name, $referrer->id)
+            new WalletTransactionNotification(
+                $transaction,
+                $referrer->user->full_name,
+                $referrer->id
+            )
         );
     }
 

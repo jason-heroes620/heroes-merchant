@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\User;
+use App\Models\Setting;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -193,9 +194,12 @@ class CustomerController extends Controller
             'wallet.creditGrants'     
         ])->findOrFail($id);
 
+        $threshold = (int) Setting::get('referral_threshold', 3);
+        $bonus = (int) Setting::get('referral_bonus', 0);
+
         // Calculate total referral bonus earned
         $referralBonuses = $customer->wallet?->creditGrants
-            ->where('grant_type', 'bonus')
+            ->where('grant_type', 'referral')
             ->whereNotNull('reference_id') ?? collect();
 
         $totalFreeBonus = $referralBonuses->sum('free_credits');
@@ -237,6 +241,10 @@ class CustomerController extends Controller
                 'referral_code' => $r->referral_code,
                 'created_at' => $r->created_at,
             ]),
+             'referral_settings' => [
+            'bonus' => $bonus,
+            'threshold' => $threshold,
+            ],
             'referral_bonus' => [
                 'free' => $totalFreeBonus,
             ],

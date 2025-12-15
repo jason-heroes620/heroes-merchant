@@ -21,7 +21,6 @@ class Booking extends Model
         'wallet_id',
         'quantity',
         'status',
-        'qr_code_path',
         'booked_at',
         'cancelled_at',
     ];
@@ -116,12 +115,6 @@ class Booking extends Model
     public function scopeCancelled($query)
     {
         return $query->where('status', 'cancelled');
-    }
-
-    public function getQrUrlAttribute()
-    {
-        if (! $this->qr_code_path) return null;
-        return asset($this->qr_code_path);
     }
 
     public function getSlotStartAttribute()

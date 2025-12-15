@@ -23,7 +23,6 @@ return new class extends Migration
             $table->integer('quantity')->default(1);
 
             $table->enum('status', ['pending', 'confirmed', 'cancelled', 'refunded'])->default('confirmed');
-            $table->string('qr_code_path')->nullable();
 
             $table->timestamp('booked_at')->default(DB::raw('CURRENT_TIMESTAMP'));
             $table->timestamp('cancelled_at')->nullable();    

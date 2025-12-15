@@ -20,7 +20,7 @@ return new class extends Migration
                 ->on('wallet_credit_grants')
                 ->onDelete('set null');
 
-            $table->enum('type', ['purchase', 'booking', 'refund', 'bonus']);
+            $table->enum('type', ['purchase', 'booking', 'refund', 'bonus', 'expiry']);
             $table->integer('before_free_credits')->nullable();
             $table->integer('before_paid_credits')->nullable();
 

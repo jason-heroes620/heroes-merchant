@@ -18,6 +18,7 @@ export type PageProps<
 > = T & {
     auth: {
         user: User;
+        userRole: string;
     };
     customers: Customer[];
     merchants: Merchant[];

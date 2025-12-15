@@ -320,8 +320,8 @@ class AdminDashboardService
      * --------------------------------------------- */
     protected function getPackageSales()
     {
-        return PurchasePackage::withCount('purchaseTransactions')
-            ->withSum('purchaseTransactions', 'amount_in_rm')
+        return PurchasePackage::withCount('transactions')
+            ->withSum('transactions', 'amount_in_rm')
             ->get()
             ->map(fn($p) => [
                 'package_name' => $p->name,

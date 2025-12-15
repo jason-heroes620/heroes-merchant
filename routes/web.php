@@ -14,6 +14,7 @@ use App\Http\Controllers\MerchantBookingController;
 use App\Http\Controllers\MerchantPayoutController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\MerchantDashboardController;
+use App\Http\Controllers\SettingsController;
 
 /* Root Redirect */
 Route::get('/', function () {
@@ -60,6 +61,9 @@ Route::middleware(['auth'])->group(function () {
 
     /* Admin Routes */
     Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function () {
+        //Settings and Configurations
+        Route::get('settings', [SettingsController::class, 'edit'])->name('settings.edit');
+        Route::put('settings', [SettingsController::class, 'update'])->name('settings.update');
         // Merchant management
         Route::get('/merchants/create', [MerchantController::class, 'create'])->name('merchants.create');
         Route::post('/merchants', [MerchantController::class, 'store'])->name('merchants.store');

@@ -13,9 +13,7 @@ use App\Services\WalletService;
 use App\Services\SlotAvailabilityService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
-use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Illuminate\Support\Facades\Notification;
 use App\Notifications\WalletTransactionNotification;
 use App\Notifications\MerchantBookingNotification;
@@ -171,42 +169,10 @@ class BookingService
                 );
             }
 
-            // Step 5: Generate QR & send notifications
-            $this->generateQrCode($booking);
             $this->sendConfirmationAndReminder($customer, $slot, $booking);
 
             return $booking;
         });
-    }
-
-    /**
-     * 3️⃣ Generate QR Code
-     */
-    private function generateQrCode($booking)
-    {
-        try {
-            $content = json_encode(['booking_id' => (string)$booking->id]);
-
-            $dir = public_path('qrcodes');
-            File::ensureDirectoryExists($dir);
-
-            $file = $dir . "/{$booking->id}.svg";
-
-            QrCode::format('svg')
-                ->size(300)
-                ->generate($content, $file);
-
-            $booking->qr_code_path = "qrcodes/{$booking->id}.svg";
-            $booking->save();
-        } catch (\Exception $e) {
-            \Log::error('QR code generation failed', [
-                'booking_id' => $booking->id,
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            throw new \Exception('QR code generation failed: ' . $e->getMessage());
-        }
     }
 
     /**

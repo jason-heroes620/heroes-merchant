@@ -13,6 +13,7 @@ use App\Http\Controllers\BookingController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PurchasePackageController;
+use App\Http\Controllers\SettingsController;
 
 // Public API routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -52,12 +53,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/bookings', [BookingController::class, 'index']);
     Route::post('/bookings', [BookingController::class, 'book']);
     Route::get('/bookings/{booking}', [BookingController::class, 'show']);
-    Route::get('bookings/{booking}/qr', [BookingController::class, 'qr']);
     Route::patch('/bookings/{booking}/cancel', [BookingController::class, 'cancel']);
     
     Route::post('/notifications/token', [NotificationController::class, 'saveToken']);
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.markAsRead'); 
+
+    Route::get('/settings', [SettingsController::class, 'apiGetSettings']);
 });
 
 Route::middleware('auth:sanctum')->prefix('merchant')->group(function () {
