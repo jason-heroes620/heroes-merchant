@@ -31,6 +31,7 @@ use Carbon\Carbon;
 class EventController extends Controller
 {
     protected EventSlotService $slotService;
+    protected ConversionService $conversionService;
 
     public function __construct(
         EventSlotService $slotService,

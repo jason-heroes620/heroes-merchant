@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\BookingItem;
 use App\Models\EventSlot;
 use App\Models\Reminder;
+use App\Models\Setting;
 use App\Jobs\SendPushNotification;
 use App\Jobs\SendReminder;
 use App\Services\WalletService;
@@ -206,7 +207,7 @@ class BookingService
         );
 
         if (!$slotDate || !$slotTime) {
-            \Log::warning('No slot date or start time found', [
+            Log::warning('No slot date or start time found', [
                 'slot_id' => $slot->id,
                 'event_id' => $event->id,
                 'slot_date' => $slotDate,
@@ -216,7 +217,7 @@ class BookingService
         }
 
         $slotStart = Carbon::createFromFormat('Y-m-d H:i:s', "{$slotDate} {$slotTime}", 'Asia/Kuala_Lumpur');
-        \Log::info("Slot start datetime:", ['slotStart' => $slotStart->toDateTimeString()]);
+        Log::info("Slot start datetime:", ['slotStart' => $slotStart->toDateTimeString()]);
 
         // 24 hrs before event
         $reminderAt = $slotStart->copy()->subHours(24);
@@ -271,8 +272,12 @@ class BookingService
 
             $slotStart = Carbon::createFromFormat('Y-m-d H:i:s', "{$slotDate} {$slotTime}", 'Asia/Kuala_Lumpur');
 
-            // 24-hour cutoff
-            $eligibleForRefund = now('Asia/Kuala_Lumpur')->lt($slotStart->copy()->subHours(24)) || $force;
+            $cancellationHours = (int) Setting::get('cancellation_policy_hours', 24);
+
+            $eligibleForRefund =
+                now('Asia/Kuala_Lumpur')->lt(
+                    $slotStart->copy()->subHours($cancellationHours)
+                ) || $force;
 
             $transaction = $booking->transactions()->where('type', 'booking')->first();
 

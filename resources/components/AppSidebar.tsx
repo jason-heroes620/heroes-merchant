@@ -27,6 +27,7 @@ import {
     LayoutDashboard,
     Banknote,
     Bell,
+    Settings,
     UserPlus,
     ShoppingCart,
     TrendingUp,
@@ -185,8 +186,8 @@ export function AppSidebar() {
                 {
                     key: "settings",
                     label: "Settings",
-                    icon: Bell,
-                    href: "/settings",
+                    icon: Settings,
+                    href: `${rolePrefix}/settings`,
                 },
                 {
                     key: "profile",

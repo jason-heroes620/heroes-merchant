@@ -9,6 +9,7 @@ use App\Models\MerchantPayoutRequest;
 use App\Services\MerchantPayoutService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
@@ -324,74 +325,18 @@ class MerchantPayoutController extends Controller
 
             $filename = 'merchant_payout_report_' . now()->format('Ymd_His') . '.pdf';
             
-            \Log::info('PDF Generated Successfully', ['filename' => $filename]);
+            Log::info('PDF Generated Successfully', ['filename' => $filename]);
             
             // Use the same pattern as your working customer transaction export
             return $pdf->download($filename);
         } catch (\Exception $e) {
-            \Log::error('PDF Generation Failed', [
+            Log::error('PDF Generation Failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
             
             return back()->withErrors(['message' => 'Failed to generate PDF: ' . $e->getMessage()]);
         }
-    }
-
-    public function requestPayouts(Request $request)
-    {
-        $user = $request->user();
-        $payoutIds = $request->input('payout_ids', []);
-
-        if ($user->role === 'merchant') {
-            $merchant = $user->merchant;
-            
-            $payouts = MerchantSlotPayout::whereIn('id', $payoutIds)
-                ->where('merchant_id', $merchant->id)
-                ->where('status', 'pending')
-                ->where('available_at', '<=', now())
-                ->get();
-
-            if ($payouts->isEmpty()) {
-                return back()->withErrors(['message' => 'No eligible payouts']);
-            }
-
-            $amount = $payouts->sum('net_amount_in_rm');
-
-            // Create a new payout request
-            MerchantPayoutRequest::create([
-                'id' => Str::uuid(),
-                'merchant_id' => $merchant->id,
-                'amount_requested' => round($amount, 2),
-                'requested_at' => now(),
-                'status' => 'pending',
-                'payout_ids' => $payouts->pluck('id')->toArray(),
-            ]);
-
-            // Update the payouts to "requested"
-            MerchantSlotPayout::whereIn('id', $payouts->pluck('id'))->update([
-                'status' => 'requested',
-            ]);
-
-            return redirect()->back()->with('success', 'Payout request submitted successfully.');
-        } elseif ($user->role === 'admin') {
-            // Admin can directly mark as requested or process
-            $payouts = MerchantSlotPayout::whereIn('id', $payoutIds)
-                ->where('status', 'pending')
-                ->get();
-
-            if ($payouts->isEmpty()) {
-                return back()->withErrors(['message' => 'No eligible payouts']);
-            }
-
-            MerchantSlotPayout::whereIn('id', $payouts->pluck('id'))->update([
-                'status' => 'requested',
-            ]);
-
-            return redirect()->back()->with('success', 'Payouts marked as requested.');
-        }
-
-        return back()->withErrors(['message' => 'Unauthorized action']);
     }
 
     public function markPaid(Request $request, $payoutId)

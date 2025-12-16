@@ -21,6 +21,8 @@ class SettingsController extends Controller
                 'referral_bonus' => (int) Setting::get('referral_bonus', 50),
                 'referral_bonus_validity' => (int) Setting::get('referral_bonus_validity', 180), 
                 'referral_threshold' => (int) Setting::get('referral_threshold', 3),
+                'cancellation_policy_hours' => (int) Setting::get('cancellation_policy_hours', 24),
+                'cancellation_policy_terms' => Setting::get('cancellation_policy_terms', 'Credits are forfeited if cancelled within 24 hours before the event.'),
             ];
             
             Log::info('Settings loaded successfully', $settings);
@@ -53,6 +55,8 @@ class SettingsController extends Controller
                 'referral_bonus' => 'required|integer|min:0',
                 'referral_threshold' => 'required|integer|min:1',
                 'referral_bonus_validity' => 'required|integer|min:1',
+                'cancellation_policy_hours' => 'required|integer|min:0',
+                'cancellation_policy_terms' => 'required|string|max:500',
             ]);
             
             Log::info('Validation passed', ['data' => $data]);
@@ -103,6 +107,8 @@ class SettingsController extends Controller
                 'referral_bonus' => (int) Setting::get('referral_bonus', 0),
                 'referral_bonus_validity' => (int) Setting::get('referral_bonus_validity', 180),
                 'referral_threshold' => (int) Setting::get('referral_threshold', 3),
+                'cancellation_policy_hours' => (int) Setting::get('cancellation_policy_hours', 24),
+                'cancellation_policy_terms' => Setting::get('cacnelation_policy_terms', 'Credits are forfeited if cancelled within 24 hours before the event.'),
             ];
             
             Log::info('API settings returned', $settings);
