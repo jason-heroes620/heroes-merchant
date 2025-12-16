@@ -15,7 +15,7 @@ return new class extends Migration {
             $table->foreignUuid('event_id')->constrained('events');
             $table->foreignUuid('event_date_id');
 
-            $table->date('date');
+            $table->date('date')->nullable();;
             $table->time('start_time')->nullable();
             $table->time('end_time')->nullable();
             $table->unsignedInteger('duration')->nullable(); //  minutes

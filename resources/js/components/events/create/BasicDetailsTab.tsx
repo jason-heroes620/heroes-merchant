@@ -2,7 +2,7 @@ import EventTypeSection from "./EventTypeSection";
 import LocationSection from "./LocationSection";
 import MediaUploader from "./MediaUploader";
 import type { AgeGroup } from "../../../types/events";
-import { FileText, Tag, User } from "lucide-react";
+import { FileText, Tag, User, AlertCircle } from "lucide-react";
 import EventDetailsSection from "./EventDetailsSection";
 import CategorySection from "./CategorySection";
 
@@ -16,6 +16,7 @@ interface BasicDetailsTabProps {
     ageGroups: AgeGroup[];
     addAgeGroup: () => void;
     updateAgeGroup: (i: number, f: keyof AgeGroup, v: any) => void;
+    canEditAgeGroups: boolean;
 }
 
 export default function BasicDetailsTab({
@@ -28,6 +29,7 @@ export default function BasicDetailsTab({
     ageGroups,
     addAgeGroup,
     updateAgeGroup,
+    canEditAgeGroups,
 }: BasicDetailsTabProps) {
     return (
         <div className="space-y-6">
@@ -89,6 +91,7 @@ export default function BasicDetailsTab({
                                     e.target.checked
                                 )
                             }
+                            disabled={!canEditAgeGroups}
                             className="w-5 h-5 text-orange-500 rounded focus:ring-2 focus:ring-orange-500"
                         />
                         <span className="text-sm font-bold text-gray-700">
@@ -96,6 +99,15 @@ export default function BasicDetailsTab({
                         </span>
                     </label>
                 </div>
+
+                {!canEditAgeGroups && (
+                    <div className="p-4 bg-red-50 border-2 border-red-300 rounded-xl flex items-center gap-3 mb-6">
+                        <AlertCircle className="text-red-600" size={20} />
+                        <p className="text-red-700 font-medium">
+                            Age Group is not editable once the event is active
+                        </p>
+                    </div>
+                )}
 
                 {!data.is_suitable_for_all_ages && (
                     <>
@@ -118,6 +130,7 @@ export default function BasicDetailsTab({
                                                 e.target.value
                                             )
                                         }
+                                        disabled={!canEditAgeGroups}
                                         placeholder="e.g., Kids, Teens, Adults"
                                         className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm transition-all"
                                     />
@@ -139,6 +152,7 @@ export default function BasicDetailsTab({
                                                     : null
                                             )
                                         }
+                                        disabled={!canEditAgeGroups}
                                         placeholder="e.g., 3"
                                         className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm transition-all"
                                         min="0"
@@ -161,6 +175,7 @@ export default function BasicDetailsTab({
                                                     : null
                                             )
                                         }
+                                        disabled={!canEditAgeGroups}
                                         placeholder="e.g., 10"
                                         className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm transition-all"
                                         min="0"
@@ -169,13 +184,15 @@ export default function BasicDetailsTab({
                             </div>
                         ))}
 
-                        <button
-                            type="button"
-                            onClick={addAgeGroup}
-                            className="mt-4 px-5 py-3 bg-orange-500 text-white font-semibold rounded-xl shadow hover:bg-orange-600 transition"
-                        >
-                            + Add Age Group
-                        </button>
+                        {canEditAgeGroups && (
+                            <button
+                                type="button"
+                                onClick={addAgeGroup}
+                                className="mt-4 px-5 py-3 bg-orange-500 text-white font-semibold rounded-xl shadow hover:bg-orange-600 transition"
+                            >
+                                + Add Age Group
+                            </button>
+                        )}
                     </>
                 )}
             </div>

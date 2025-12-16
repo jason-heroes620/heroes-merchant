@@ -19,7 +19,7 @@ const EventTabsNav: React.FC<EventTabsNavProps> = ({
     setActiveTab
 }) => {
     return (
-        <div className="border-b border-gray-200 bg-gradient-to-r from-orange-50 to-red-50">
+        <div className="border-b border-gray-200 bg-linear-to-r from-orange-50 to-red-50">
             <nav className="flex w-full">
                 {tabs.map((tab) => {
                     const isActive = activeTab === tab.id;
@@ -38,7 +38,7 @@ const EventTabsNav: React.FC<EventTabsNavProps> = ({
                         >
                             <span className="text-center">{tab.label}</span>
                             {isActive && (
-                                <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 to-red-500" />
+                                <div className="absolute bottom-0 left-0 right-0 h-1 bg-linear-to-r from-orange-500 to-red-500" />
                             )}
                         </button>
                     );

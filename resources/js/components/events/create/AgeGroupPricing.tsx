@@ -9,6 +9,7 @@ interface AgeGroupPricingProps {
     updateAgeGroup: (index: number, field: keyof AgeGroup, value: any) => void;
     ageGroupErrors: AgeGroupError[];
     pricing_type: "age_based" | "mixed";
+    disabled?: boolean;
 }
 
 export default function AgeGroupPricing({
@@ -18,6 +19,7 @@ export default function AgeGroupPricing({
     updateAgeGroup,
     ageGroupErrors,
     pricing_type,
+    disabled,
 }: AgeGroupPricingProps) {
     // Handle price changes - now in RM, not cents!
     const handlePriceChange = (
@@ -58,6 +60,7 @@ export default function AgeGroupPricing({
                     <button
                         type="button"
                         onClick={addAgeGroup}
+                        disabled={disabled}
                         className="flex items-center gap-2 px-6 py-3 bg-linear-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg hover:shadow-xl font-semibold transform hover:scale-105 active:scale-95"
                     >
                         <Plus size={20} /> Add Group
@@ -170,6 +173,9 @@ export default function AgeGroupPricing({
                                                                             .value
                                                                     )
                                                                 }
+                                                                disabled={
+                                                                    disabled
+                                                                }
                                                                 className={`w-full pl-14 pr-4 py-3 text-lg font-bold border-2 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white transition-all ${
                                                                     ageGroupErrors[
                                                                         groupIndex
@@ -241,6 +247,9 @@ export default function AgeGroupPricing({
                                                                                     .value
                                                                             )
                                                                         }
+                                                                        disabled={
+                                                                            disabled
+                                                                        }
                                                                         className={`w-full pl-11 pr-3 py-2.5 text-base font-bold border-2 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white transition-all ${
                                                                             ageGroupErrors[
                                                                                 groupIndex
@@ -296,6 +305,9 @@ export default function AgeGroupPricing({
                                                                                     .value
                                                                             )
                                                                         }
+                                                                        disabled={
+                                                                            disabled
+                                                                        }
                                                                         className={`w-full pl-11 pr-3 py-2.5 text-base font-bold border-2 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white transition-all ${
                                                                             ageGroupErrors[
                                                                                 groupIndex
@@ -335,6 +347,7 @@ export default function AgeGroupPricing({
                                                             groupIndex
                                                         )
                                                     }
+                                                    disabled={disabled}
                                                     className="p-3 text-red-600 hover:bg-red-50 rounded-lg transition-all hover:scale-110 active:scale-95 border-2 border-transparent hover:border-red-200"
                                                     title="Remove age group"
                                                 >

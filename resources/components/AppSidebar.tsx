@@ -60,9 +60,7 @@ type SidebarGroupType = {
 export function AppSidebar() {
     const { state } = useSidebar();
     const { url, props } = usePage();
-    console.log(props);
     const user = props?.auth?.userRole;
-    console.log(user);
 
     if (!user) return null;
     const rolePrefix = user === "admin" ? "/admin" : "/merchant";
@@ -272,7 +270,7 @@ export function AppSidebar() {
         },
     ];
 
-    const sidebarGroups = user?.role === "admin" ? adminGroups : merchantGroups;
+    const sidebarGroups = user === "admin" ? adminGroups : merchantGroups;
 
     const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(
         {}

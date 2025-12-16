@@ -111,6 +111,7 @@ export interface EventFormShape {
     is_recurring: boolean;
     frequencies: Frequency[];
     event_dates: EventDate[];
+    slots: EventSlot[];
 
     status?: EventStatus;
     featured?: boolean;

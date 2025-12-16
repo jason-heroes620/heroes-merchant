@@ -26,6 +26,8 @@ interface PricingTabProps {
     addAgeGroup: () => void;
     updateAgeGroup: (index: number, field: keyof AgeGroup, value: any) => void;
     removeAgeGroup: (index: number) => void;
+    disabled?: boolean;
+    canUseAgePricing: boolean;
 }
 
 export default function PricingTab({
@@ -36,6 +38,8 @@ export default function PricingTab({
     addAgeGroup,
     updateAgeGroup,
     removeAgeGroup,
+    disabled,
+    canUseAgePricing,
 }: PricingTabProps) {
     const [ageGroupErrors, setAgeGroupErrors] = useState<AgeGroupError[]>([]);
 
@@ -159,26 +163,35 @@ export default function PricingTab({
         option,
         selected,
         onSelect,
+        disabled,
     }: {
         option: (typeof pricingOptions)[0];
         selected: boolean;
         onSelect: () => void;
+        disabled?: boolean;
     }) => {
         const Icon = option.icon;
 
         return (
             <label
-                className={`relative p-6 border-2 rounded-xl cursor-pointer transition-all transform hover:scale-105 ${
-                    selected
-                        ? "border-orange-500 bg-linear-to-br from-orange-50 to-orange-100 shadow-xl"
-                        : "border-gray-200 hover:border-orange-300 hover:shadow-md"
-                }`}
+                className={`relative p-6 border-2 rounded-xl transition-all
+        ${
+            disabled
+                ? "opacity-50 cursor-not-allowed bg-gray-50"
+                : "cursor-pointer hover:scale-105"
+        }
+        ${
+            selected
+                ? "border-orange-500 bg-linear-to-br from-orange-50 to-orange-100 shadow-xl"
+                : "border-gray-200 hover:border-orange-300 hover:shadow-md"
+        }`}
             >
                 <input
                     type="radio"
                     name="pricing_type"
                     checked={selected}
                     onChange={onSelect}
+                    disabled={disabled}
                     className="sr-only"
                 />
 
@@ -326,7 +339,20 @@ export default function PricingTab({
     };
 
     return (
-        <div className="bg-white rounded-2xl shadow-lg p-8 space-y-8">
+        <div
+            className={`bg-white rounded-2xl shadow-lg p-8 space-y-8 ${
+                disabled ? "opacity-70 pointer-events-none" : ""
+            }`}
+        >
+            {disabled && (
+                <div className="p-4 bg-red-50 border-2 border-red-300 rounded-xl flex items-center gap-3 mb-4">
+                    <AlertCircle className="text-red-600" size={20} />
+                    <p className="text-red-700 font-medium">
+                        Pricing is not editable once the event is active
+                    </p>
+                </div>
+            )}
+
             <PricingBanner />
 
             {/* Pricing Type Selection */}
@@ -339,18 +365,28 @@ export default function PricingTab({
                 </p>
 
                 <div className="grid md:grid-cols-2 gap-4">
-                    {pricingOptions.map((opt) => (
-                        <PricingTypeCard
-                            key={opt.value}
-                            option={opt}
-                            selected={data.pricing_type === opt.value}
-                            onSelect={() => {
-                                setData("pricing_type", opt.value as any);
-                                // Reset prices when changing type
-                                setData("prices", []);
-                            }}
-                        />
-                    ))}
+                    {pricingOptions.map((opt) => {
+                        const isAgePricing =
+                            opt.value === "age_based" || opt.value === "mixed";
+
+                        const isDisabled =
+                            disabled || (isAgePricing && !canUseAgePricing);
+
+                        return (
+                            <PricingTypeCard
+                                key={opt.value}
+                                option={opt}
+                                selected={data.pricing_type === opt.value}
+                                disabled={isDisabled}
+                                onSelect={() => {
+                                    if (isDisabled) return;
+
+                                    setData("pricing_type", opt.value as any);
+                                    setData("prices", []);
+                                }}
+                            />
+                        );
+                    })}
                 </div>
             </section>
 
@@ -392,6 +428,7 @@ export default function PricingTab({
                             updateAgeGroup={updateAgeGroup}
                             ageGroupErrors={ageGroupErrors}
                             pricing_type={data.pricing_type}
+                            disabled={disabled}
                         />
                     )}
                 </>
