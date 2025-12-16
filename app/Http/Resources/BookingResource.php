@@ -22,7 +22,6 @@ class BookingResource extends JsonResource
             'quantity' => $this->quantity,
             'booked_at' => $this->booked_at?->setTimezone('Asia/Kuala_Lumpur')->toIso8601String(),
             'cancelled_at' => $this->cancelled_at?->setTimezone('Asia/Kuala_Lumpur')->toIso8601String(),
-            'qr_url' => $this->qr_url,
 
             'slot' => ($slot && $slot instanceof Model) ? [
                 'id' => (string) $slot->id,

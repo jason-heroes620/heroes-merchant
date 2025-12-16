@@ -44,6 +44,11 @@ export interface EventSlot {
     prices?: EventSlotPrice[];
     display_start?: string;
     display_end?: string;
+    is_completed?: boolean;
+    bookings?: Booking[];
+    expected_attendees?: number;
+    actual_attendees?: number;
+    absent_count?: number;
 }
 
 export interface EventSlotPrice {

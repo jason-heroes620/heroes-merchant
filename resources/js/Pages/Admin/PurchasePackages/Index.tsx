@@ -9,6 +9,7 @@ import {
     DollarSign,
     Gift,
     Clock,
+    Star,
 } from "lucide-react";
 import AuthenticatedLayout from "@/AuthenticatedLayout";
 
@@ -20,7 +21,9 @@ interface Package {
     free_credits: number;
     effective_from: string;
     valid_until?: string;
+    validity_days: number;
     active: boolean;
+    best_value: boolean;
     system_locked: boolean;
 }
 
@@ -82,42 +85,41 @@ export default function Index() {
                                 return (
                                     <div
                                         key={pkg.id}
-                                        className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-200 group"
+                                        className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-200 group relative"
                                     >
+                                        {/* Best Value Badge - Ribbon Style */}
+                                        {pkg.best_value && (
+                                            <div className="absolute top-4 right-4 z-20">
+                                                <div className="bg-yellow-400 text-yellow-900 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
+                                                    <Star
+                                                        size={12}
+                                                        fill="currentColor"
+                                                    />
+                                                    BEST VALUE
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {/* Card Header */}
                                         <div className="bg-linear-to-r from-orange-500 via-orange-600 to-red-500 p-6 text-white relative overflow-hidden">
                                             <div className="relative z-10">
-                                                <div className="flex items-start justify-between mb-4">
-                                                    <div className="w-12 h-12 bg-white text-orange-600 bg-opacity-20 backdrop-blur rounded-xl flex items-center justify-center">
-                                                        <Package size={32} />
-                                                    </div>
-                                                    {creditsPerRM && (
-                                                        <div className="text-right">
-                                                            <div className="text-s font-medium ">
-                                                                Credits per RM
-                                                            </div>
-                                                            <div className="text-2xl font-bold text-white bg-opacity-20 backdrop-blur px-3 py-1 rounded-lg">
-                                                                {creditsPerRM}
-                                                            </div>
+                                                <div className="flex items-start gap-4">
+                                                    <Package
+                                                        size={40}
+                                                        className="shrink-0 mt-1"
+                                                    />
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="text-xl font-bold mb-1 wrap-break-word">
+                                                            {pkg.name ||
+                                                                "Package Name"}
+                                                        </h3>
+                                                        <div className="flex items-baseline gap-1">
+                                                            <span className="text-3xl font-bold">
+                                                                {pkg.price_in_rm === 0
+                                                                    ? "FREE"
+                                                                    : `RM ${pkg.price_in_rm}`}
+                                                            </span>
                                                         </div>
-                                                    )}
-                                                    {!pkg.active && (
-                                                        <span className="px-3 py-1 bg-gray-900 bg-opacity-40 text-xs font-semibold rounded-full">
-                                                            Inactive
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <h3 className="text-2xl font-bold mb-1">
-                                                    {pkg.name}
-                                                </h3>
-                                                <div className="flex items-end justify-between">
-                                                    <div>
-                                                        <span className="text-4xl font-bold block">
-                                                            {pkg.price_in_rm ===
-                                                            0
-                                                                ? "FREE"
-                                                                : `RM ${pkg.price_in_rm}`}
-                                                        </span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -195,37 +197,59 @@ export default function Index() {
                                                         className="text-gray-400"
                                                     />
                                                     <span className="text-xs">
-                                                        Effective from:{" "}
+                                                        Effective from{" "}
                                                         {new Date(
                                                             pkg.effective_from
                                                         ).toLocaleDateString()}
+                                                        {pkg.valid_until && (
+                                                            <>
+                                                                {" "}
+                                                                until{" "}
+                                                                {new Date(
+                                                                    pkg.valid_until
+                                                                ).toLocaleDateString()}
+                                                            </>
+                                                        )}
                                                     </span>
                                                 </div>
-                                                {pkg.valid_until ? (
-                                                    <div className="flex items-center gap-2 text-gray-600">
-                                                        <Calendar
-                                                            size={14}
-                                                            className="text-gray-400"
-                                                        />
-                                                        <span className="text-xs">
-                                                            Valid until:{" "}
-                                                            {new Date(
-                                                                pkg.valid_until
-                                                            ).toLocaleDateString()}
-                                                        </span>
-                                                    </div>
-                                                ) : (
+
+                                                {
                                                     <div className="flex items-center gap-2 text-gray-600">
                                                         <Clock
                                                             size={14}
                                                             className="text-gray-400"
                                                         />
                                                         <span className="text-xs">
-                                                            Valid for 6 months
-                                                            from purchase date
+                                                            {pkg.validity_days %
+                                                                30 ===
+                                                            0 ? (
+                                                                <>
+                                                                    Valid for{" "}
+                                                                    {pkg.validity_days /
+                                                                        30}{" "}
+                                                                    {pkg.validity_days /
+                                                                        30 ===
+                                                                    1
+                                                                        ? "month"
+                                                                        : "months"}{" "}
+                                                                    from
+                                                                    purchase
+                                                                    date
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    Valid for{" "}
+                                                                    {
+                                                                        pkg.validity_days
+                                                                    }{" "}
+                                                                    days from
+                                                                    purchase
+                                                                    date
+                                                                </>
+                                                            )}
                                                         </span>
                                                     </div>
-                                                )}
+                                                }
                                             </div>
 
                                             {/* Actions */}

@@ -17,7 +17,9 @@ class PurchasePackage extends Model
         'free_credits',
         'effective_from',
         'valid_until',
+        'validity_days',
         'active',
+        'best_value',
         'system_locked'
     ];
 
@@ -28,6 +30,7 @@ class PurchasePackage extends Model
         'effective_from' => 'datetime',
         'valid_until' => 'datetime',
         'active' => 'boolean',
+        'best_value' => 'boolean',
         'system_locked' => 'boolean'
     ];
 
@@ -41,11 +44,5 @@ class PurchasePackage extends Model
     public function transactions()
     {
         return $this->hasMany(CustomerCreditTransaction::class, 'purchase_package_id');
-    }
-
-    public function purchaseTransactions()
-    {
-        return $this->hasMany(CustomerCreditTransaction::class, 'purchase_package_id')
-            ->where('type', 'purchase');
     }
 }

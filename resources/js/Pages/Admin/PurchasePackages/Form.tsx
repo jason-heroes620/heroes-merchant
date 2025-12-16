@@ -7,9 +7,9 @@ import {
     DollarSign,
     Gift,
     Calendar,
-    ToggleLeft,
-    ToggleRight,
     Info,
+    Clock,
+    Star,
 } from "lucide-react";
 import AuthenticatedLayout from "@/AuthenticatedLayout";
 
@@ -25,8 +25,12 @@ export default function Form({ package: pkg }: FormProps) {
         free_credits: pkg?.free_credits || 0,
         effective_from: pkg?.effective_from || "",
         valid_until: pkg?.valid_until || "",
+        validity_days: pkg?.validity_days || 180,
         active: pkg?.active ?? true,
+        best_value: pkg?.best_value ?? false,
     });
+
+    const [validityUnit, setValidityUnit] = useState<"days" | "months">("days");
 
     const isFree = form.price_in_rm === 0;
 
@@ -36,6 +40,18 @@ export default function Form({ package: pkg }: FormProps) {
                 ? parseFloat(e.target.value) || 0
                 : e.target.value;
         setForm({ ...form, [e.target.name]: value });
+    };
+
+    const getValidityValue = () => {
+        if (validityUnit === "months") {
+            return Math.round(form.validity_days / 30);
+        }
+        return form.validity_days;
+    };
+
+    const handleValidityChange = (value: number) => {
+        const days = validityUnit === "months" ? value * 30 : value;
+        setForm({ ...form, validity_days: days });
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -86,57 +102,87 @@ export default function Form({ package: pkg }: FormProps) {
                         <div className="lg:col-span-2">
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                                 <div className="p-8 space-y-6">
-                                    {/* Package Name */}
-                                    <div>
-                                        <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                                            <Package
-                                                size={16}
-                                                className="text-orange-600"
-                                            />
-                                            Package Name
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="name"
-                                            value={form.name}
-                                            onChange={handleChange}
-                                            placeholder="e.g., Starter Pack, Premium Package"
-                                            className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
-                                        />
-                                    </div>
-
-                                    {/* Price */}
-                                    <div>
-                                        <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                                            <DollarSign
-                                                size={16}
-                                                className="text-orange-600"
-                                            />
-                                            Price (RM)
-                                        </label>
-                                        <div className="relative">
-                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold text-lg">
-                                                RM
-                                            </span>
+                                    {/* Package Name + Best Value Toggle */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                                                <Package
+                                                    size={16}
+                                                    className="text-orange-600"
+                                                />
+                                                Package Name
+                                            </label>
                                             <input
-                                                type="number"
-                                                name="price_in_rm"
-                                                value={form.price_in_rm}
+                                                type="text"
+                                                name="name"
+                                                value={form.name}
                                                 onChange={handleChange}
-                                                placeholder="0.00"
-                                                min="0"
-                                                step="0.01"
-                                                className="w-full border border-gray-300 rounded-xl pl-16 pr-4 py-3 text-lg font-semibold focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+                                                placeholder="e.g., Starter Pack, Premium Package"
+                                                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
                                             />
                                         </div>
-                                        <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
-                                            <Info size={12} />
-                                            Set to 0 for free packages
-                                        </p>
+
+                                        <div>
+                                            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                                                <Star
+                                                    size={16}
+                                                    className="text-yellow-500"
+                                                />
+                                                Best Value
+                                            </label>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setForm({
+                                                        ...form,
+                                                        best_value:
+                                                            !form.best_value,
+                                                    })
+                                                }
+                                                className={`w-full px-4 py-3 rounded-xl font-semibold text-sm transition-all border-2 ${
+                                                    form.best_value
+                                                        ? "bg-yellow-500 text-white border-yellow-500"
+                                                        : "bg-white text-gray-600 border-gray-300 hover:border-yellow-400"
+                                                }`}
+                                            >
+                                                {form.best_value
+                                                    ? "✓ Best Value"
+                                                    : "Mark as Best Value"}
+                                            </button>
+                                        </div>
                                     </div>
 
-                                    {/* Credits Grid */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    {/* Price + Credits */}
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div>
+                                            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                                                <DollarSign
+                                                    size={16}
+                                                    className="text-orange-600"
+                                                />
+                                                Price (RM)
+                                            </label>
+                                            <div className="relative">
+                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">
+                                                    RM
+                                                </span>
+                                                <input
+                                                    type="number"
+                                                    name="price_in_rm"
+                                                    value={form.price_in_rm}
+                                                    onChange={handleChange}
+                                                    placeholder="0.00"
+                                                    min="0"
+                                                    step="0.01"
+                                                    className="w-full border border-gray-300 rounded-xl pl-14 pr-4 py-3 font-semibold focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+                                                />
+                                            </div>
+                                            <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1">
+                                                <Info size={12} />
+                                                Set to 0 for free
+                                            </p>
+                                        </div>
+
                                         <div>
                                             <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                                                 <DollarSign
@@ -152,7 +198,7 @@ export default function Form({ package: pkg }: FormProps) {
                                                 onChange={handleChange}
                                                 placeholder="0"
                                                 min="0"
-                                                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-lg font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                                className="w-full border border-gray-300 rounded-xl px-4 py-3 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                                             />
                                         </div>
 
@@ -171,13 +217,13 @@ export default function Form({ package: pkg }: FormProps) {
                                                 onChange={handleChange}
                                                 placeholder="0"
                                                 min="0"
-                                                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-lg font-semibold focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all"
+                                                className="w-full border border-gray-300 rounded-xl px-4 py-3 font-semibold focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all"
                                             />
                                         </div>
                                     </div>
 
-                                    {/* Date Range */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    {/* Dates + Validity */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div>
                                             <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                                                 <Calendar
@@ -191,7 +237,7 @@ export default function Form({ package: pkg }: FormProps) {
                                                 name="effective_from"
                                                 value={form.effective_from}
                                                 onChange={handleChange}
-                                                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+                                                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all text-sm"
                                             />
                                         </div>
 
@@ -208,70 +254,62 @@ export default function Form({ package: pkg }: FormProps) {
                                                 name="valid_until"
                                                 value={form.valid_until}
                                                 onChange={handleChange}
-                                                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+                                                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all text-sm"
                                             />
-                                            <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                                            <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1">
                                                 <Info size={12} />
                                                 Leave empty for no expiry
                                             </p>
                                         </div>
                                     </div>
 
-                                    {/* Active Toggle */}
-                                    <div className="pt-2">
-                                        <label className="flex items-center justify-between p-5 bg-gray-50 rounded-xl border-2 border-gray-200 cursor-pointer hover:bg-gray-100 transition-all">
-                                            <div className="flex items-center gap-3">
-                                                {form.active ? (
-                                                    <ToggleRight
-                                                        size={28}
-                                                        className="text-green-600"
-                                                    />
-                                                ) : (
-                                                    <ToggleLeft
-                                                        size={28}
-                                                        className="text-gray-400"
-                                                    />
-                                                )}
-                                                <div>
-                                                    <span className="font-semibold text-gray-900 block text-base">
-                                                        Package Status
-                                                    </span>
-                                                    <span className="text-sm text-gray-600">
-                                                        {form.active
-                                                            ? "Active - Visible to customers"
-                                                            : "Inactive - Hidden from customers"}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <input
-                                                type="checkbox"
-                                                name="active"
-                                                checked={form.active}
-                                                onChange={(e) =>
-                                                    setForm({
-                                                        ...form,
-                                                        active: e.target
-                                                            .checked,
-                                                    })
-                                                }
-                                                className="sr-only"
+                                    {/* Row 5: Validity Period */}
+                                    <div>
+                                        <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                                            <Clock
+                                                size={16}
+                                                className="text-purple-600"
                                             />
-                                            <div
-                                                className={`w-16 h-8 rounded-full transition-colors ${
-                                                    form.active
-                                                        ? "bg-green-500"
-                                                        : "bg-gray-300"
+                                            Validity Period from Purchase Date
+                                        </label>
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="number"
+                                                value={getValidityValue()}
+                                                onChange={(e) =>
+                                                    handleValidityChange(
+                                                        parseFloat(
+                                                            e.target.value
+                                                        ) || 0
+                                                    )
+                                                }
+                                                placeholder="0"
+                                                min="0"
+                                                className="flex-1 font-semibold px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setValidityUnit(
+                                                        validityUnit === "days"
+                                                            ? "months"
+                                                            : "days"
+                                                    )
+                                                }
+                                                className={`px-6 py-3 rounded-xl font-semibold text-sm transition-all border-2 whitespace-nowrap ${
+                                                    validityUnit === "months"
+                                                        ? "bg-purple-600 text-white border-purple-600"
+                                                        : "bg-white text-purple-600 border-purple-600"
                                                 }`}
                                             >
-                                                <div
-                                                    className={`w-7 h-7 bg-white rounded-full shadow-md transform transition-transform m-0.5 ${
-                                                        form.active
-                                                            ? "translate-x-8"
-                                                            : "translate-x-0"
-                                                    }`}
-                                                />
-                                            </div>
-                                        </label>
+                                                {validityUnit === "days"
+                                                    ? "Days"
+                                                    : "Months"}
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-purple-700 font-medium mt-1.5">
+                                            = {form.validity_days} days total
+                                        </p>
                                     </div>
 
                                     {/* Action Buttons */}
@@ -317,25 +355,46 @@ export default function Form({ package: pkg }: FormProps) {
                                                 : "bg-linear-to-br from-orange-500 to-red-600"
                                         } p-6 text-white relative overflow-hidden`}
                                     >
-                                        <div className="flex items-start justify-between mb-3">
-                                            <Package size={34} />
+                                        {/* Best Value Badge */}
+                                        {form.best_value && (
+                                            <div className="absolute top-3 right-3">
+                                                <div className="bg-yellow-400 text-yellow-900 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
+                                                    <Star
+                                                        size={12}
+                                                        fill="currentColor"
+                                                    />
+                                                    BEST VALUE
+                                                </div>
+                                            </div>
+                                        )}
 
-                                            {!form.active && (
+                                        <div className="flex items-start gap-4">
+                                            <Package
+                                                size={40}
+                                                className="shrink-0 mt-1"
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="text-xl font-bold mb-1 wrap-break-word">
+                                                    {form.name ||
+                                                        "Package Name"}
+                                                </h3>
+                                                <div className="flex items-baseline gap-1">
+                                                    <span className="text-3xl font-bold">
+                                                        {isFree
+                                                            ? "FREE"
+                                                            : `RM ${form.price_in_rm}`}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {!form.active && (
+                                            <div className="mt-3">
                                                 <span className="px-2 py-1 bg-gray-900 bg-opacity-50 text-xs font-medium rounded">
                                                     Inactive
                                                 </span>
-                                            )}
-                                        </div>
-                                        <h3 className="text-xl font-bold mb-1">
-                                            {form.name || "Package Name"}
-                                        </h3>
-                                        <div className="flex items-baseline gap-1">
-                                            <span className="text-3xl font-bold">
-                                                {isFree
-                                                    ? "FREE"
-                                                    : `RM ${form.price_in_rm}`}
-                                            </span>
-                                        </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Preview Content */}
@@ -355,6 +414,7 @@ export default function Form({ package: pkg }: FormProps) {
                                                 {form.paid_credits}
                                             </span>
                                         </div>
+
                                         {/* Free Credits */}
                                         <div className="flex items-center justify-between p-3 bg-green-50 rounded-xl border border-green-100">
                                             <div className="flex items-center gap-2">
@@ -370,6 +430,7 @@ export default function Form({ package: pkg }: FormProps) {
                                                 +{form.free_credits}
                                             </span>
                                         </div>
+
                                         {/* Total Credits */}
                                         <div className="flex items-center justify-between p-4 bg-linear-to-r from-orange-50 to-orange-100 rounded-xl border-2 border-orange-200">
                                             <span className="text-sm font-bold text-gray-800 uppercase tracking-wide">
@@ -379,14 +440,31 @@ export default function Form({ package: pkg }: FormProps) {
                                                 {totalCredits}
                                             </span>
                                         </div>
-                                        {/* Value Per Credit */}
+
+                                        {/* Validity Period */}
+                                        <div className="flex items-center justify-between p-3 bg-purple-50 rounded-xl border border-purple-100">
+                                            <div className="flex items-center gap-2">
+                                                <Clock
+                                                    size={18}
+                                                    className="text-purple-600"
+                                                />
+                                                <span className="text-sm font-medium text-gray-700">
+                                                    Valid For
+                                                </span>
+                                            </div>
+                                            <span className="text-xl font-bold text-purple-600">
+                                                {form.validity_days} days
+                                            </span>
+                                        </div>
+
+                                        {/* Credit Value - Centered */}
                                         {form.price_in_rm > 0 &&
                                             totalCredits > 0 && (
-                                                <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-gray-200">
-                                                    <p className="text-xs text-blue-800 font-medium mb-1">
-                                                        Credit Value
+                                                <div className="mt-4 p-4 bg-linear-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 text-center">
+                                                    <p className="text-xs text-blue-700 font-medium mb-1 uppercase tracking-wide">
+                                                        Credits per RM
                                                     </p>
-                                                    <p className="text-xl font-bold text-gray-900">
+                                                    <p className="text-2xl font-bold text-blue-900">
                                                         {creditsPerRM}
                                                     </p>
                                                 </div>

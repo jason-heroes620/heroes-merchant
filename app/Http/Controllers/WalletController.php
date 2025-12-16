@@ -9,6 +9,7 @@ use App\Models\CustomerCreditTransaction;
 use App\Models\WalletCreditGrant;
 use App\Models\PurchasePackage;
 use App\Models\User;
+use App\Models\Setting;
 use Illuminate\Support\Facades\Notification;
 use App\Notifications\WalletTransactionNotification;
 
@@ -26,15 +27,17 @@ class WalletController extends Controller
             return response()->json([
                 'wallet_balance' => 0,
                 'transactions' => [],
+                'current_package' => null,
             ]);
         }
 
         $wallet = $user->customer->wallet;
 
+        // Recent transactions
         $transactions = $wallet?->transactions()
             ->latest()
             ->take(10)
-            ->with('grant:id,wallet_id,expires_at') 
+            ->with('grant:id,wallet_id,expires_at,purchase_package_id,free_credits_remaining,paid_credits_remaining')
             ->get(['id', 'type', 'delta_free', 'delta_paid', 'description', 'created_at', 'wallet_id']);
 
         $transactions = $transactions->map(fn($t) => [
@@ -47,12 +50,31 @@ class WalletController extends Controller
             'expires_at' => $t->grant?->expires_at,
         ]);
 
+        // Determine current active purchase package
+        $activeGrant = $wallet?->creditGrants()
+            ->whereNotNull('purchase_package_id')
+            ->where('free_credits_remaining', '>', 0)
+            ->where('paid_credits_remaining', '>', 0)
+            ->where('expires_at', '>=', now())
+            ->with('purchasePackage')
+            ->orderBy('expires_at', 'desc')
+            ->first();
+
+        $currentPackage = $activeGrant ? [
+            'id' => $activeGrant->purchasePackage->id,
+            'name' => $activeGrant->purchasePackage->name,
+            'free_credits_remaining' => $activeGrant->free_credits_remaining,
+            'paid_credits_remaining' => $activeGrant->paid_credits_remaining,
+            'expires_at' => $activeGrant->expires_at,
+        ] : null;
+
         return response()->json([
             'wallet_balance' => [
                 'free_credits' => $wallet?->cached_free_credits ?? 0,
                 'paid_credits' => $wallet?->cached_paid_credits ?? 0,
             ],
             'transactions' => $transactions,
+            'current_package' => $currentPackage,
         ]);
     }
 
@@ -72,7 +94,7 @@ class WalletController extends Controller
         ]);
 
         $validated = $request->validate([
-            'type' => ['required', Rule::in(['purchase', 'booking', 'refund', 'bonus'])],
+            'type' => ['required', Rule::in(['purchase', 'booking', 'refund', 'bonus', 'expiry'])],
             'delta_free' => 'nullable|integer',
             'delta_paid' => 'nullable|integer',
             'amount_in_rm' => 'nullable|numeric',
@@ -108,17 +130,23 @@ class WalletController extends Controller
             $wallet->save();
 
             $expiresAt = null;
-            if (!empty($validated['purchase_package_id'])) {
+            if ($validated['type'] === 'registration') {
+                $validityDays = (int) Setting::get('registration_bonus_validity', 180);
+                $expiresAt = now()->addDays($validityDays);
+            } elseif ($validated['type'] === 'referral') {
+                $validityDays = (int) Setting::get('referral_bonus_validity', 180);
+                $expiresAt = now()->addDays($validityDays);
+            } elseif (!empty($validated['purchase_package_id'])) {
                 $package = PurchasePackage::find($validated['purchase_package_id']);
-                $expiresAt = $package?->valid_until ?? now()->addMonths(6);
+                $expiresAt = now()->addDays($package->validity_days);
             } else {
                 $expiresAt = now()->addMonths(6);
             }
 
-            if (in_array($validated['type'], ['bonus', 'purchase']) && ($deltaFree > 0 || $deltaPaid > 0)) {
+            if (in_array($validated['type'], ['registration', 'referral', 'purchase']) && ($deltaFree > 0 || $deltaPaid > 0)) {
                 WalletCreditGrant::create([
                     'wallet_id' => $wallet->id,
-                    'grant_type' => $validated['type'],
+                    'grant_type' => in_array($validated['type'], ['registration', 'referral', 'purchase']) ? $validated['type']: 'other',
                     'free_credits' => $deltaFree,
                     'paid_credits' => $deltaPaid,
                     'free_credits_remaining' => $deltaFree,

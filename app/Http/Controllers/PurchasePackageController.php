@@ -45,6 +45,10 @@ class PurchasePackageController extends Controller
     {
         $this->checkAdmin();
 
+        $request->merge([
+            'validity_days' => $request->input('validity_days', 180),
+        ]);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'price_in_rm' => 'nullable|numeric|min:0',
@@ -52,7 +56,9 @@ class PurchasePackageController extends Controller
             'free_credits' => 'nullable|integer|min:0',
             'effective_from' => 'required|date',
             'valid_until' => 'nullable|date|after_or_equal:effective_from',
+            'validity_days' => 'integer|min:1',
             'active' => 'boolean',
+            'best_value' => 'boolean',
         ]);
 
         PurchasePackage::create($validated);
@@ -93,7 +99,9 @@ class PurchasePackageController extends Controller
             'free_credits' => 'nullable|integer|min:0',
             'effective_from' => 'required|date',
             'valid_until' => 'nullable|date|after_or_equal:effective_from',
+            'validity_days' => 'integer|min:1',
             'active' => 'boolean',
+            'best_value' => 'boolean',
         ]);
 
         $package->update($validated);

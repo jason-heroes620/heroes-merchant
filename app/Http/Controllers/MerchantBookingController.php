@@ -14,16 +14,14 @@ class MerchantBookingController extends Controller
     public function main(Request $request)
     {
         $user = $request->user();
-        $perPage = (int) $request->query('per_page', 12);
-        $status = $request->query('status');
+        $status = $request->query('status', 'all');
         $now = Carbon::now('Asia/Kuala_Lumpur');
 
         $query = Booking::with([
-            'slot',
+            'slot.date', 
             'event.location',
             'event.media',
             'items.ageGroup',
-            'transactions',
             'customer.user',
             'attendance',
         ]);
@@ -32,63 +30,166 @@ class MerchantBookingController extends Controller
             $query->whereHas('event', fn($q) => $q->where('merchant_id', $user->merchant->id));
         }
 
-        if ($status) {
-            switch ($status) {
-                case 'upcoming':
-                    $query->whereNotIn('status', ['cancelled', 'refunded'])
-                        ->whereHas('slot', fn($q) => $q->where('display_start', '>=', $now));
-                    break;
+        $allBookings = $query->get();
 
-                case 'completed':
-                    $query->whereNotIn('status', ['cancelled', 'refunded'])
-                        ->whereHas('slot', fn($q) => $q->where('display_end', '<', $now));
-                    break;
+        // Calculate display_start/display_end for each booking's slot
+        $bookingsWithTimes = $allBookings->map(function($booking) use ($now) {
+            $slot = $booking->slot;
+            if (!$slot) return null;
 
-                case 'cancelled':
-                    $query->whereIn('status', ['cancelled', 'refunded']);
-                    break;
+            $displayStart = $slot->display_start;
+            $displayEnd = $slot->display_end;
+
+            // Fallback for one-time events
+            if (!$displayStart || !$displayEnd) {
+                $eventDate = $slot->date;
+                if ($eventDate) {
+                    $startDate = $eventDate->start_date instanceof \DateTimeInterface
+                        ? $eventDate->start_date->format('Y-m-d')
+                        : null;
+
+                    $endDate = $eventDate->end_date instanceof \DateTimeInterface
+                        ? $eventDate->end_date->format('Y-m-d')
+                        : null;
+                    $startTime = $slot->start_time?->format('H:i:s') ?? '00:00:00';
+                    $endTime = $slot->end_time?->format('H:i:s') ?? '23:59:59';
+
+                    $displayStart = $startDate ? Carbon::createFromFormat('Y-m-d H:i:s', "$startDate $startTime", 'Asia/Kuala_Lumpur') : null;
+                    $displayEnd = $endDate ? Carbon::createFromFormat('Y-m-d H:i:s', "$endDate $endTime", 'Asia/Kuala_Lumpur') : null;
+                }
             }
+
+            $booking->_display_start = $displayStart;
+            $booking->_display_end = $displayEnd;
+            $booking->_is_completed = $displayEnd && $displayEnd->lt($now);
+            $booking->_is_upcoming = $displayStart && $displayStart->gte($now);
+
+            return $booking;
+        })->filter();
+
+        // Apply status filter
+        $filteredBookings = $bookingsWithTimes;
+        
+        if ($status !== 'all') {
+            $filteredBookings = $bookingsWithTimes->filter(function($booking) use ($status) {
+                switch ($status) {
+                    case 'upcoming':
+                        return !in_array($booking->status, ['cancelled', 'refunded']) && $booking->_is_upcoming;
+                        
+                    case 'completed':
+                        return !in_array($booking->status, ['cancelled', 'refunded']) && $booking->_is_completed;
+                        
+                    case 'cancelled':
+                        return in_array($booking->status, ['cancelled', 'refunded']);
+                        
+                    default:
+                        return true;
+                }
+            });
         }
 
-        $page = $query->orderBy('booked_at', 'desc')->paginate($perPage)->withQueryString();
-
-        // Stats calculation using display_start / display_end
-        $allBookings = Booking::with('slot')->get();
-
+        // Calculate stats
         $stats = [
-            'total' => $allBookings->count(),
-            'upcoming' => $allBookings->filter(fn($b) =>
-                $b->slot && !in_array($b->status, ['cancelled', 'refunded']) &&
-                $b->slot->display_start?->gte($now)
+            'total' => $bookingsWithTimes->count(),
+            'confirmed' => $bookingsWithTimes->filter(fn($b) => 
+                !in_array($b->status, ['cancelled', 'refunded'])
             )->count(),
-            'completed' => $allBookings->filter(fn($b) =>
-                $b->slot && !in_array($b->status, ['cancelled', 'refunded']) &&
-                $b->slot->display_end?->lt($now)
-            )->count(),
-            'cancelled' => $allBookings->filter(fn($b) =>
+            'cancelled' => $bookingsWithTimes->filter(fn($b) =>
                 in_array($b->status, ['cancelled', 'refunded'])
             )->count(),
         ];
 
+        // Group bookings by event
+        $eventSummaries = [];
+        
+        foreach ($filteredBookings->groupBy('event_id') as $eventId => $eventBookings) {
+            $event = $eventBookings->first()->event;
+            if (!$event) continue;
+
+            $slotSummaries = [];
+            
+            // Group by slot
+            foreach ($eventBookings->groupBy('slot_id') as $slotId => $slotBookings) {
+                $firstBooking = $slotBookings->first();
+                $slot = $firstBooking->slot;
+                if (!$slot) continue;
+
+                $displayStart = $firstBooking->_display_start;
+                $displayEnd = $firstBooking->_display_end;
+                $isCompleted = $firstBooking->_is_completed;
+                
+                $confirmedBookings = $slotBookings->filter(fn($b) => 
+                    !in_array($b->status, ['cancelled', 'refunded'])
+                );
+                
+                $cancelledBookings = $slotBookings->filter(fn($b) =>
+                    in_array($b->status, ['cancelled', 'refunded'])
+                );
+
+                $slotSummaries[] = [
+                    'slot_id' => $slot->id,
+                    'date' => $displayStart?->format('d M Y'),
+                    'start_time' => $displayStart?->format('h:i A'),
+                    'end_time' => $displayEnd?->format('h:i A'),
+                    'display_start' => $displayStart,
+                    'display_end' => $displayEnd,
+                    'is_completed' => $isCompleted,
+                    'confirmed_count' => $confirmedBookings->count(),
+                    'expected_attendees' => $confirmedBookings->sum('quantity'),
+                    'cancelled_count' => $cancelledBookings->count(),
+                    'actual_attendees' => $isCompleted ? $confirmedBookings->sum(fn($b) => 
+                        $b->attendance?->where('status', 'attended')->count() ?? 0
+                    ) : null,
+                    'absent_count' => $isCompleted ? $confirmedBookings->sum(fn($b) =>
+                        $b->attendance?->where('status', 'absent')->count() ?? 0
+                    ) : null,
+                ];
+            }
+
+            // Sort slots by display_start (newest first for better visibility)
+            usort($slotSummaries, function($a, $b) {
+                return $b['display_start'] <=> $a['display_start'];
+            });
+
+            $totalConfirmed = collect($slotSummaries)->sum('confirmed_count');
+            $totalExpected = collect($slotSummaries)->sum('expected_attendees');
+            $totalCancelled = collect($slotSummaries)->sum('cancelled_count');
+
+            $eventSummaries[] = [
+                'event' => [
+                    'id' => $event->id,
+                    'title' => $event->title,
+                    'type' => $event->type,
+                    'category' => $event->category,
+                    'location' => $event->location?->location_name,
+                    'media' => $event->media?->first()?->url,
+                ],
+                'slots' => array_map(function($slot) {
+                    unset($slot['display_start'], $slot['display_end']);
+                    return $slot;
+                }, $slotSummaries),
+                'summary' => [
+                    'total_slots' => count($slotSummaries),
+                    'confirmed' => $totalConfirmed,
+                    'expected' => $totalExpected,
+                    'cancelled' => $totalCancelled,
+                ],
+            ];
+        }
+
         return Inertia::render('Bookings/MainBookingPage', [
-            'bookings' => BookingAdminResource::collection($page),
-            'pagination' => [
-                'current_page' => $page->currentPage(),
-                'last_page' => $page->lastPage(),
-                'per_page' => $page->perPage(),
-                'total' => $page->total(),
-            ],
+            'eventSummaries' => $eventSummaries,
             'stats' => $stats,
+            'currentFilter' => $status,
         ]);
     }
 
     public function bookingsByEvent(Request $request, $eventId)
     {
         $user = $request->user();
-        $event = Event::with(['slots', 'media'])->findOrFail($eventId);
+        $event = Event::with(['slots', 'media', 'location'])->findOrFail($eventId);
 
         $query = Booking::with([
-            'slot',
             'slot.date',
             'event.media',
             'items.ageGroup',
@@ -99,50 +200,63 @@ class MerchantBookingController extends Controller
             $q->where('event_id', $eventId);
         });
 
-        if ($status = $request->query('status')) {
-            $now = Carbon::now('Asia/Kuala_Lumpur');
+        $allBookings = $query->get();
+        $now = Carbon::now('Asia/Kuala_Lumpur');
 
-            switch ($status) {
-                case 'upcoming':
-                    $query->whereNotIn('status', ['cancelled', 'refunded'])
-                        ->where(function($q) use ($now) {
-                            // Recurring slots
-                            $q->whereHas('slot', function($sq) use ($now) {
-                                $sq->whereRaw("STR_TO_DATE(CONCAT(date, ' ', start_time), '%Y-%m-%d %H:%i:%s') >= ?", [$now]);
-                            })
-                            // One-time events
-                            ->orWhereHas('event.dates', function($dq) use ($now) {
-                                $dq->whereRaw("STR_TO_DATE(end_date, '%Y-%m-%d') >= ?", [$now->format('Y-m-d')]);
-                            });
-                        });
-                    break;
+        // Calculate display times for each booking
+        $bookingsWithTimes = $allBookings->map(function($booking) use ($now) {
+            $slot = $booking->slot;
+            if (!$slot) return null;
 
-                case 'completed':
-                    $query->whereNotIn('status', ['cancelled', 'refunded'])
-                        ->where(function($q) use ($now) {
-                            // Recurring slots
-                            $q->whereHas('slot', function($sq) use ($now) {
-                                $sq->whereRaw("STR_TO_DATE(CONCAT(date, ' ', end_time), '%Y-%m-%d %H:%i:%s') < ?", [$now]);
-                            })
-                            // One-time events
-                            ->orWhereHas('event.dates', function($dq) use ($now) {
-                                $dq->whereRaw("STR_TO_DATE(end_date, '%Y-%m-%d') < ?", [$now->format('Y-m-d')]);
-                            });
-                        });
-                    break;
+            $displayStart = $slot->display_start;
+            $displayEnd = $slot->display_end;
 
-                case 'cancelled':
-                    $query->whereIn('status', ['cancelled', 'refunded']);
-                    break;
+            // Fallback for one-time events
+            if (!$displayStart || !$displayEnd) {
+                $eventDate = $slot->date;
+                if ($eventDate) {
+                    $startDate = $eventDate->start_date instanceof \DateTimeInterface
+                    ? $eventDate->start_date->format('Y-m-d')
+                    : null;
+                    $endDate = $eventDate->end_date instanceof \DateTimeInterface
+                    ? $eventDate->end_date->format('Y-m-d')
+                    : null;
+                    $startTime = $slot->start_time?->format('H:i:s') ?? '00:00:00';
+                    $endTime = $slot->end_time?->format('H:i:s') ?? '23:59:59';
+
+                    $displayStart = $startDate ? Carbon::createFromFormat('Y-m-d H:i:s', "$startDate $startTime", 'Asia/Kuala_Lumpur') : null;
+                    $displayEnd = $endDate ? Carbon::createFromFormat('Y-m-d H:i:s', "$endDate $endTime", 'Asia/Kuala_Lumpur') : null;
+                }
             }
-        }
 
-        $bookings = $query->orderBy('slot_id')->get();
+            $booking->_is_upcoming = $displayStart && $displayStart->gte($now);
+            $booking->_is_completed = $displayEnd && $displayEnd->lt($now);
+
+            return $booking;
+        })->filter();
+
+        // Apply status filter
+        if ($status = $request->query('status')) {
+            $bookingsWithTimes = $bookingsWithTimes->filter(function($booking) use ($status) {
+                switch ($status) {
+                    case 'upcoming':
+                        return !in_array($booking->status, ['cancelled', 'refunded']) && $booking->_is_upcoming;
+                        
+                    case 'completed':
+                        return !in_array($booking->status, ['cancelled', 'refunded']) && $booking->_is_completed;
+                        
+                    case 'cancelled':
+                        return in_array($booking->status, ['cancelled', 'refunded']);
+                        
+                    default:
+                        return true;
+                }
+            });
+        }
 
         return Inertia::render('Bookings/EventBookingPage', [
             'event' => $event,
-            'bookings' => BookingAdminResource::collection($bookings)->resolve(), 
-            'slots' => $event->slots()->with('date')->get(),
+            'bookings' => BookingAdminResource::collection($bookingsWithTimes)->resolve(),
         ]);
     }
 

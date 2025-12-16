@@ -216,8 +216,13 @@ class EventController extends Controller
     {
         $merchant = Merchant::where('user_id', Auth::id())->first();
 
+        // Check if merchant exists and is verified
+        if (!$merchant || $merchant->business_status !== 'verified') {
+            return redirect()->back()->with('error', 'Only verified merchants can create events.');
+        }
+
         return Inertia::render('Events/Create', [
-            'merchant_id' => $merchant?->id,
+            'merchant_id' => $merchant->id,
             'userRole' => Auth::user()->role,
         ]);
     }
@@ -527,9 +532,13 @@ class EventController extends Controller
         $user = Auth::user();
         $merchant = Merchant::where('user_id', $user->id)->firstOrFail();
 
-        $event = Event::with(['location', 'ageGroups', 'prices', 'frequencies', 'dates'])
-            ->where('merchant_id', $merchant->id)
-            ->findOrFail($id);
+        foreach (['age_groups', 'prices', 'frequencies', 'event_dates', 'location'] as $field) {
+            if ($request->has($field) && is_string($request->$field)) {
+                $request->merge([
+                    $field => json_decode($request->$field, true)
+                ]);
+            }
+        }
 
         $hasCustomFreq = false;
 
@@ -787,6 +796,16 @@ class EventController extends Controller
     {
         $user = Auth::user();
         $merchant = Merchant::where('user_id', $user->id)->firstOrFail();
+
+        // 1️⃣ Ensure the event belongs to this merchant
+        if ($event->merchant_id !== $merchant->id) {
+            abort(403, 'You are not allowed to edit this event.');
+        }
+
+        // 2️⃣ Ensure merchant is verified (event-related restriction)
+        if ($merchant->business_status !== 'verified') {
+            abort(403, 'Only verified merchants can edit events.');
+        }
 
         $event->load([
             'location',

@@ -15,7 +15,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('wallet_id')->constrained('customer_wallets')->onDelete('cascade');
 
-            $table->enum('grant_type', ['free', 'paid', 'bonus', 'purchase']); 
+            $table->enum('grant_type', ['free', 'paid', 'referral', 'registration', 'purchase']); 
             $table->integer('free_credits')->nullable();
             $table->integer('paid_credits')->nullable();
             $table->integer('free_credits_remaining')->nullable(); 

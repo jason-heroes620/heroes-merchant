@@ -19,7 +19,9 @@ return new class extends Migration
             $table->integer('free_credits')->nullable();
             $table->datetime('effective_from');
             $table->datetime('valid_until')->nullable();
+            $table->integer('validity_days')->default(180);
             $table->boolean('active')->default(true);
+            $table->boolean('best_value')->default(false);
             $table->boolean('system_locked')->default(false);
             $table->timestamps();
         });
