@@ -16,7 +16,7 @@ use Inertia\Inertia;
 
 class AuthController extends Controller
 {
-     /* Show login page (Web only)*/
+    /* Show login page (Web only)*/
     public function showLogin()
     {
         Log::info('Accessed login page');
@@ -48,7 +48,7 @@ class AuthController extends Controller
 
         $role = $isApi ? $validated['role'] : 'merchant';
 
-         // Prevent duplicate device ID for API customers
+        // Prevent duplicate device ID for API customers
         if ($isApi && $role === 'customer') {
             $existingCustomer = Customer::where('device_id', $validated['device_id'])->first();
             if ($existingCustomer) {
@@ -96,8 +96,8 @@ class AuthController extends Controller
                     Log::warning('Referrer code invalid', ['code' => $validated['referrer_code']]);
                 }
             }
- 
-           try {
+
+            try {
                 $walletService->registrationBonus($customer);
                 Log::info('Registration bonus applied', ['customer_id' => $customer->id]);
             } catch (\Exception $e) {
@@ -129,7 +129,7 @@ class AuthController extends Controller
         }
 
         Auth::login($user);
-        return redirect()->route('events')->with('success', 'Registration successful!');
+        return redirect()->route('merchant.dashboard')->with('success', 'Registration successful!');
     }
 
     /**Login (Web = session, API = token)*/
@@ -274,8 +274,7 @@ class AuthController extends Controller
     }
 
     public function profile(Request $request)
-{
-    return response()->json(['user' => $request->user()]);
-}
-
+    {
+        return response()->json(['user' => $request->user()]);
+    }
 }

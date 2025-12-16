@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('attendances', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('booking_id')->constrained('bookings')->onDelete('cascade');
+            $table->foreignUuid('booking_item_id')->constrained('booking_items')->onDelete('cascade');
             $table->foreignUuid('slot_id')->constrained('event_slots')->onDelete('cascade');
             $table->foreignUuid('event_id')->constrained('events')->onDelete('cascade');
             $table->foreignUuid('customer_id')->constrained('customers')->onDelete('cascade');
