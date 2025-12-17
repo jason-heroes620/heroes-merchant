@@ -94,7 +94,7 @@ class EghlPaymentController extends Controller
             'PaymentDesc' => $paymentDesc,
             'MerchantReturnURL' => $redirectScheme, // Deep link to return to mobile app
             // 'MerchantCallbackURL' => route('eghl.callback')
-            'MerchantCallbackURL' => "https://nondetrimental-postpeduncular-jacob.ngrok-free.dev/api/eghl/secure-callback"
+            'MerchantCallbackURL' => env("EGHL_CALLBACK_URL")
         ];
 
         // Generate the full eGHL URL with the HashValue (Checksum)
