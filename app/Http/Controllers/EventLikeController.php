@@ -18,7 +18,7 @@ class EventLikeController extends Controller
         if ($user->role !== 'customer') {
             return response()->json(['success' => false, 'message' => 'Only customers can like events.'], 403);
         }
-        \Log::info("Fetching liked events for user", ['user_id' => $user->id, 'role' => $user->role]);
+        Log::info("Fetching liked events for user", ['user_id' => $user->id, 'role' => $user->role]);
 
         $customer = Customer::where('user_id', $user->id)->firstOrFail();
         $event = Event::findOrFail($eventId);

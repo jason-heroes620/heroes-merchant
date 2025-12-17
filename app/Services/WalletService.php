@@ -8,6 +8,7 @@ use App\Models\CustomerWallet;
 use App\Models\CustomerCreditTransaction;
 use App\Models\WalletCreditGrant;
 use App\Models\Setting;
+use App\Models\Conversion;
 use Illuminate\Support\Facades\Notification;
 use App\Notifications\WalletTransactionNotification;
 use Carbon\Carbon;
@@ -119,8 +120,12 @@ class WalletService
         );
     }
 
-    public function hasEnoughCredits(CustomerWallet $wallet, int $paidNeeded, int $freeNeeded = 0, int $quantity = 1): bool
+    public function hasEnoughCredits(CustomerWallet $wallet, int $paidNeeded, Conversion $conversion, int $quantity = 1): bool
     {
+        $paidToFreeRatio = $conversion->paid_to_free_ratio > 0 ? $conversion->paid_to_free_ratio : 1;
+
+        $freeNeeded = (int) ceil($paidNeeded / $paidToFreeRatio);
+
         $totalPaid = $paidNeeded * $quantity;
         $totalFree = $freeNeeded * $quantity;
 
@@ -128,34 +133,63 @@ class WalletService
             && ($wallet->cached_free_credits >= $totalFree);
     }
 
-    public function canBookWithCredits(CustomerWallet $wallet, int $paidNeeded, int $freeNeeded, int $quantity = 1, bool $allowFallback = false): bool
-    {
-        $totalPaid = $paidNeeded * $quantity;
-        $totalFree = $freeNeeded * $quantity;
+    public function canBookWithCredits(
+        CustomerWallet $wallet,
+        int $paidNeeded,
+        Conversion $conversion,
+        int $quantity = 1,
+        bool $allowFallback = false
+    ): bool {
+        $paidToFreeRatio = max(1, $conversion->paid_to_free_ratio);
 
-        // Step 1: paid credits must always be enough
-        if ($wallet->cached_paid_credits < $totalPaid) {
+        $totalPaidNeeded = $paidNeeded * $quantity;
+        $totalFreeNeeded = (int) ceil($paidNeeded / $paidToFreeRatio) * $quantity;
+
+        // 1️⃣ Paid credits must ALWAYS be sufficient
+        if ($wallet->cached_paid_credits < $totalPaidNeeded) {
             throw new \Exception("Insufficient paid credits. Booking failed.");
         }
 
-        // Step 2: check free credits
-        if ($wallet->cached_free_credits >= $totalFree) {
-            return true; // enough free credits, no fallback needed
+        // 2️⃣ Enough free credits → OK
+        if ($wallet->cached_free_credits >= $totalFreeNeeded) {
+            return true;
         }
 
-        $shortfall = $totalFree - $wallet->cached_free_credits;
+        // 3️⃣ Free shortfall
+        $shortfall = $totalFreeNeeded - $wallet->cached_free_credits;
 
-        if ($allowFallback && $wallet->cached_paid_credits >= $totalPaid + $shortfall) {
-            return true; // enough paid credits to cover remaining free
+        // 4️⃣ Allow fallback using paid credits
+        if ($allowFallback && $wallet->cached_paid_credits >= $totalPaidNeeded + $shortfall) {
+            return true;
         }
-        
 
-        // Not enough free, fallback not allowed or paid insufficient
-        throw new \Exception("Insufficient free credits. You can use paid credits to cover missing free credits.");
+        throw new \Exception(
+            "Insufficient free credits. You can use paid credits to cover the remaining {$shortfall} credits."
+        );
     }
 
-    public function deductCredits(CustomerWallet $wallet, int $paidNeeded, int $freeNeeded, string $desc = '', ?string $bookingId = null, int $quantity = 1, bool $allowFallback = false)
+    public function calculateAdditionalPaid(CustomerWallet $wallet, int $paidNeeded, Conversion $conversion, int $quantity = 1): array
     {
+        $paidToFreeRatio = $conversion->paid_to_free_ratio > 0 ? $conversion->paid_to_free_ratio : 1;
+
+        $totalPaidNeeded = $paidNeeded * $quantity;
+        $totalFreeNeeded = (int) ceil($paidNeeded / $paidToFreeRatio) * $quantity;
+
+        $shortfallFree = max(0, $totalFreeNeeded - $wallet->cached_free_credits);
+        $canCoverWithPaid = $wallet->cached_paid_credits >= $totalPaidNeeded + $shortfallFree;
+
+        return [
+            'shortfallFree' => $shortfallFree,
+            'paidToFreeRatio' => $paidToFreeRatio,
+            'canCoverWithPaid' => $canCoverWithPaid,
+        ];
+    }
+
+    public function deductCredits(CustomerWallet $wallet, int $paidNeeded, Conversion $conversion, string $desc = '', ?string $bookingId = null, int $quantity = 1, bool $allowFallback = false)
+    {
+        $paidToFreeRatio = $conversion->paid_to_free_ratio > 0 ? $conversion->paid_to_free_ratio : 1;
+        $freeNeeded = (int) ceil($paidNeeded / $paidToFreeRatio);
+
         $totalPaid = $paidNeeded * $quantity;
         $totalFree = $freeNeeded * $quantity;
 
@@ -168,14 +202,10 @@ class WalletService
 
         // Deduct remaining free from paid if allowed
         $deductPaid = $totalPaid;
-
         if ($remainingFree > 0) {
             if (!$allowFallback) {
-                // Don't deduct anything extra, but signal the frontend to ask user
                 throw new \Exception("Insufficient free credits. You can use paid credits to cover missing free credits.");
             }
-
-            // Fallback allowed: paid covers remaining free
             $deductPaid += $remainingFree;
         }
 

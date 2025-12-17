@@ -23,6 +23,14 @@ export default function EventFormWrapper({
     const form = useEventForm(initialProps);
     const [activeTab, setActiveTab] = useState<TabId>("basic");
 
+    const isActiveEvent = form.data?.status === "active";
+    const ageGroupCount = form.ageGroups.length;
+
+    const canEditPricing = !isActiveEvent;
+    const canEditAgeGroups = !isActiveEvent;
+
+    const canUseAgePricing = ageGroupCount > 1;
+
     // Determine if we're editing based on whether initialData has an ID
     const isEditing = !!initialProps?.initialData?.id;
 
@@ -61,6 +69,7 @@ export default function EventFormWrapper({
                     ageGroups={form.ageGroups}
                     addAgeGroup={form.addAgeGroup}
                     updateAgeGroup={form.updateAgeGroup}
+                    canEditAgeGroups={canEditAgeGroups}
                 />
             )}
 
@@ -73,6 +82,8 @@ export default function EventFormWrapper({
                     addAgeGroup={form.addAgeGroup}
                     updateAgeGroup={form.updateAgeGroup}
                     removeAgeGroup={form.removeAgeGroup}
+                    disabled={!canEditPricing}
+                    canUseAgePricing={canUseAgePricing}
                 />
             )}
 
@@ -93,7 +104,7 @@ export default function EventFormWrapper({
                     getSlots={form.getSlots}
                 />
             )}
-            
+
             {/* Form Navigation */}
             <FormNavigation
                 tabs={tabs}

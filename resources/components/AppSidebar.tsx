@@ -27,6 +27,7 @@ import {
     LayoutDashboard,
     Banknote,
     Bell,
+    Settings,
     UserPlus,
     ShoppingCart,
     TrendingUp,
@@ -60,9 +61,7 @@ type SidebarGroupType = {
 export function AppSidebar() {
     const { state } = useSidebar();
     const { url, props } = usePage();
-    console.log(props);
     const user = props?.auth?.userRole;
-    console.log(user);
 
     if (!user) return null;
     const rolePrefix = user === "admin" ? "/admin" : "/merchant";
@@ -187,8 +186,8 @@ export function AppSidebar() {
                 {
                     key: "settings",
                     label: "Settings",
-                    icon: Bell,
-                    href: "/settings",
+                    icon: Settings,
+                    href: `${rolePrefix}/settings`,
                 },
                 {
                     key: "profile",
@@ -272,7 +271,7 @@ export function AppSidebar() {
         },
     ];
 
-    const sidebarGroups = user?.role === "admin" ? adminGroups : merchantGroups;
+    const sidebarGroups = user === "admin" ? adminGroups : merchantGroups;
 
     const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(
         {}

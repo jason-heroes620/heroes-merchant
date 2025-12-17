@@ -14,9 +14,14 @@ interface UseEventFormProps {
     userRole?: string;
     merchant_id?: string | null;
     initialData?: Partial<EventFormShape>;
+    permissions?: {
+        canEditPricing?: boolean;
+    };
 }
 
 export default function useEventForm(initialProps?: UseEventFormProps) {
+    const canEditPricing = initialProps?.permissions?.canEditPricing ?? true;
+
     const defaultData: EventFormShape = {
         merchant_id: initialProps?.merchant_id ?? null,
         type: "event",
@@ -36,11 +41,12 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
         removed_media: [],
         is_suitable_for_all_ages: false,
         age_groups: [],
-        pricing_type: "fixed",
+        pricing_type: initialProps?.initialData ? undefined : "fixed",
         prices: [],
         is_recurring: false,
         frequencies: [],
         event_dates: [],
+        slots: [],
         status: "pending",
         featured: false,
     };
@@ -74,6 +80,17 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
     const form = useForm<EventFormShape>(initialFormData);
     const { data, setData, errors, processing } = form;
 
+    useEffect(() => {
+        if (
+            !data.pricing_type &&
+            data.prices &&
+            data.prices.length > 0 &&
+            data.prices[0].pricing_type
+        ) {
+            setData("pricing_type", data.prices[0].pricing_type);
+        }
+    }, [data.prices, data.pricing_type]);
+
     // Local state for complex fields
     const [mediaPreviews, setMediaPreviews] = useState<string[]>(
         data.media?.map((file: any) => file.url || "") || []
@@ -87,6 +104,17 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
     const [eventDates, setEventDates] = useState<EventDate[]>(
         initialFormData.event_dates || []
     );
+
+    const [isRecurring, setIsRecurring] = useState<boolean>(
+        initialFormData.is_recurring ?? false
+    );
+
+    useEffect(() => {
+        setData("is_recurring", isRecurring);
+        if (!isRecurring) {
+            setFrequencies([]);
+        }
+    }, [isRecurring]);
 
     // ==================== MEDIA HANDLERS ====================
     const handleMediaInput = (files?: FileList | null) => {
@@ -151,13 +179,13 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
         };
         setFrequencies([...frequencies, newFreq]);
 
-        // Add corresponding event date with empty slots array
         const newDate: EventDate = {
             start_date: "",
             end_date: "",
-            slots: [], // Initialize with empty slots
+            slots: [],
         };
         setEventDates([...eventDates, newDate]);
+        if (!isRecurring) setIsRecurring(true);
     };
 
     const updateFrequency = (index: number, field: string, value: any) => {
@@ -334,17 +362,14 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
         // Determine is_recurring
         const isRecurring = frequencies.length > 0;
 
-        // Build final prices
-        const finalPrices = buildPrices();
-
         // Prepare submission data
         const submissionData: EventFormShape = {
             ...data,
             is_recurring: isRecurring,
             age_groups: data.is_suitable_for_all_ages ? [] : ageGroups,
-            prices: finalPrices,
             frequencies: isRecurring ? frequencies : [],
             event_dates: eventDates,
+            prices: buildPrices(),
         };
 
         const formData = new FormData();
@@ -380,6 +405,7 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
         const requestOptions = {
             preserveScroll: true,
             forceFormData: true,
+            data: formData, 
             onSuccess: () => {
                 toast.success(
                     data.id
@@ -430,5 +456,8 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
         updateSlot,
         getSlots,
         handleSubmit,
+        canEditPricing,
+        isRecurring,
+        setIsRecurring,
     };
 }

@@ -173,9 +173,7 @@ class EventSlotService
                 if (!$priceRow) continue;
 
                 $price = match($pricingType) {
-                    'age_based' => $isWeekend
-                        ? ($priceRow->weekend_price_in_rm ?? 0)
-                        : ($priceRow->weekday_price_in_rm ?? 0),
+                    'age_based' => $priceRow->fixed_price_in_rm ?? 0,
                     'mixed' => $isWeekend
                         ? ($priceRow->weekend_price_in_rm ?? $priceRow->fixed_price_in_rm ?? 0)
                         : ($priceRow->weekday_price_in_rm ?? $priceRow->fixed_price_in_rm ?? 0),

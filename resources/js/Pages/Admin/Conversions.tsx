@@ -1,12 +1,21 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, router, usePage } from "@inertiajs/react";
-import { TrendingUp, DollarSign, Gift, Calendar, Plus } from "lucide-react";
-import type { PageProps } from "../../types/index";
+import {
+    TrendingUp,
+    DollarSign,
+    Gift,
+    Calendar,
+    Plus,
+    Repeat,
+} from "lucide-react";
 import AuthenticatedLayout from "@/AuthenticatedLayout";
+import { toast } from "react-hot-toast";
+import type { PageProps } from "../../types";
 
 interface Conversion {
     id: string;
     credits_per_rm: number;
+    paid_to_free_ratio: number;
     paid_credit_percentage: number;
     free_credit_percentage: number;
     effective_from: string;
@@ -19,7 +28,10 @@ interface Props {
 }
 
 type PagePropsWithErrors = PageProps & {
-    errors?: Record<string, string[]>;
+    flash?: {
+        error?: string;
+        success?: string;
+    };
 };
 
 const ConversionsIndex: React.FC<Props> = ({ conversions }) => {
@@ -30,7 +42,13 @@ const ConversionsIndex: React.FC<Props> = ({ conversions }) => {
         "activate" | "deactivate" | null
     >(null);
 
-    const { errors } = usePage<PagePropsWithErrors>().props;
+    const { flash } = usePage<PagePropsWithErrors>().props;
+
+    // Show flash messages from backend
+    useEffect(() => {
+        if (flash?.error) toast.error(flash.error);
+        if (flash?.success) toast.success(flash.success);
+    }, [flash]);
 
     const today = new Date();
 
@@ -88,32 +106,32 @@ const ConversionsIndex: React.FC<Props> = ({ conversions }) => {
                 : {};
 
         router.post(routeUrl, payload, {
-            onSuccess: () => router.reload({ only: ["conversions"] }),
+            onSuccess: (page) => {
+                console.log("Inertia onSuccess page:", page);
+                toast.success(
+                    actionType === "activate"
+                        ? "Conversion rate activated successfully"
+                        : "Conversion rate deactivated successfully"
+                );
+                setModalOpen(false);
+                setSelectedConversion(null);
+                setActionType(null);
+            },
+            onError: (errors) => {
+                console.log("Inertia onError:", errors);
+                Object.values(errors).forEach((fieldErrors) => {
+                    if (Array.isArray(fieldErrors)) {
+                        fieldErrors.forEach((msg) => toast.error(msg));
+                    }
+                });
+            },
         });
-
-        setModalOpen(false);
-        setSelectedConversion(null);
-        setActionType(null);
     };
 
     return (
         <AuthenticatedLayout>
             <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 py-8 px-4">
                 <div className="max-w-[1600px] mx-auto">
-                    {errors && Object.keys(errors).length > 0 && (
-                        <div className="mb-6 max-w-7xl mx-auto px-6">
-                            <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-4">
-                                <ul className="list-disc list-inside space-y-1">
-                                    {Object.entries(errors).map(([key, msgs]) =>
-                                        msgs.map((msg, i) => (
-                                            <li key={`${key}-${i}`}>{msg}</li>
-                                        ))
-                                    )}
-                                </ul>
-                            </div>
-                        </div>
-                    )}
-
                     {/* Header Section */}
                     <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
                         <div className="bg-linear-to-r from-orange-500 via-orange-600 to-red-500 px-8 py-8">
@@ -190,7 +208,7 @@ const ConversionsIndex: React.FC<Props> = ({ conversions }) => {
                                                 {/* Content */}
                                                 <div className="p-6">
                                                     {/* Main Rate */}
-                                                    <div className="text-center mb-6 pb-6 border-b border-gray-100">
+                                                    <div className="text-center mb-4 pb-4 border-b border-gray-100">
                                                         <div className="text-4xl font-bold text-gray-800 mb-1">
                                                             {
                                                                 conv.credits_per_rm
@@ -225,6 +243,42 @@ const ConversionsIndex: React.FC<Props> = ({ conversions }) => {
                                                                 {free_credits}
                                                             </span>
                                                         </div>
+                                                    </div>
+
+                                                    {/* Paid → Free Conversion Rule (Fallback) */}
+                                                    <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-6">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-2">
+                                                                <Repeat className="w-4 h-4 text-amber-600" />
+                                                                <span className="text-xs font-semibold text-amber-700 uppercase">
+                                                                    Conversion
+                                                                    Rule
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="text-sm font-bold text-blue-600">
+                                                                    {
+                                                                        conv.paid_to_free_ratio
+                                                                    }
+                                                                </span>
+                                                                <span className="text-xs text-gray-600">
+                                                                    PAID
+                                                                </span>
+                                                                <span className="text-amber-600 font-bold">
+                                                                    →
+                                                                </span>
+                                                                <span className="text-sm font-bold text-green-600">
+                                                                    1
+                                                                </span>
+                                                                <span className="text-xs text-gray-600">
+                                                                    FREE
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <p className="text-xs text-amber-700 mt-1.5 ml-6">
+                                                            When short on free
+                                                            credits
+                                                        </p>
                                                     </div>
 
                                                     {/* Percentages */}

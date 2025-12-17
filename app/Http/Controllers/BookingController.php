@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Services\BookingService;
+use App\Services\WalletService;
 use App\Http\Resources\BookingResource;
 use App\Models\Booking;
 use App\Models\Attendance;
 use App\Models\EventSlot;
+use App\Models\Conversion;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
@@ -15,10 +17,12 @@ use Carbon\Carbon;
 class BookingController extends Controller
 {
     protected BookingService $bookingService;
+    protected WalletService $walletService;
 
-    public function __construct(BookingService $bookingService)
+    public function __construct(BookingService $bookingService, WalletService $walletService)
     {
         $this->bookingService = $bookingService;
+        $this->walletService = $walletService;
     }
 
     /**
@@ -56,8 +60,9 @@ class BookingController extends Controller
             if (!$displayStart || !$displayEnd) {
                 $eventDate = $slot->date;
                 if ($eventDate) {
-                    $startDate = $eventDate->start_date?->format('Y-m-d');
-                    $endDate = $eventDate->end_date?->format('Y-m-d');
+                    $startDate = $eventDate->start_date ? Carbon::parse($eventDate->start_date)->format('Y-m-d') : null;
+                    $endDate = $eventDate->end_date ? Carbon::parse($eventDate->end_date)->format('Y-m-d') : null;
+
                     $startTime = $slot->start_time?->format('H:i:s') ?? '00:00:00';
                     $endTime = $slot->end_time?->format('H:i:s') ?? '23:59:59';
 
@@ -142,11 +147,25 @@ class BookingController extends Controller
         }
 
         try {
-            $booking = $this->bookingService->bookSlot($customer, $slot, $quantitiesByAgeGroup, $allowFallback);
-            foreach ($booking->items as $item) {
+            $conversion = Conversion::first(); // or whatever logic applies
+            if (!$conversion) {
+                return response()->json(['message' => 'Conversion settings not found.'], 500);
+            }
+
+            $bookingResponse = $this->bookingService->bookSlot(
+                $customer,
+                $slot,
+                $quantitiesByAgeGroup,
+                $conversion,
+                $allowFallback
+            );
+
+            $bookingModel = $bookingResponse['booking'];
+
+            foreach ($bookingModel->items as $item) {
                 Attendance::create([
                     'id' => Str::uuid(),
-                    'booking_id' => $booking->id,
+                    'booking_id' => $bookingModel->id,
                     'booking_item_id' => $item->id,
                     'slot_id' => $slot->id,
                     'event_id' => $slot->event_id,
@@ -154,8 +173,23 @@ class BookingController extends Controller
                     'status' => 'pending',
                 ]);
             }
-            return response()->json($booking, 201);
+
+            return response()->json($bookingResponse, 201);
         } catch (\Exception $e) {
+            if (str_contains($e->getMessage(), 'Insufficient free credits')) {
+                $additionalPaidInfo = $this->walletService->calculateAdditionalPaid(
+                    $customer->wallet,
+                    $slot->prices()->first()->paid_credits,
+                    $conversion,
+                    array_sum($quantitiesByAgeGroup)
+                );
+
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'paid_to_free_ratio' => $additionalPaidInfo['paidToFreeRatio'],
+                    'additional_paid_needed' => $additionalPaidInfo['shortfallFree'],
+                ], 422); 
+            }
             return response()->json(['message' => $e->getMessage()], 400);
         }
     }
