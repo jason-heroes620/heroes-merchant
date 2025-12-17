@@ -11,6 +11,8 @@ use App\Http\Controllers\MerchantBookingController;
 use App\Http\Controllers\EventLikeController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\EghlCallbackController;
+use App\Http\Controllers\EghlPaymentController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PurchasePackageController;
 use App\Http\Controllers\SettingsController;
@@ -24,6 +26,13 @@ Route::post('/merchant/login', [AuthController::class, 'merchantLogin']);
 
 
 Route::get('/packages', [PurchasePackageController::class, 'index']);
+
+
+// EGHL Payment
+Route::post('/eghl/secure-callback', [EghlCallbackController::class, 'handleCallback'])->name('eghl.callback');
+// 2. The public browser redirect endpoint (GET). This is mostly just for final checks.
+Route::get('/payment/return', [EghlCallbackController::class, 'handleReturn'])->name('payment.return');
+
 
 // Authenticated routes (mobile)
 Route::middleware('auth:sanctum')->group(function () {
@@ -40,7 +49,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Wallet
     Route::get('/wallet', [WalletController::class, 'show']);
-    Route::post('/wallet/transactions', [WalletController::class, 'addWalletTransaction']);  
+    Route::post('/wallet/transactions', [WalletController::class, 'addWalletTransaction']);
+
+    // payment 
+    Route::post('/eghl/initiate', [EghlPaymentController::class, 'initiate']);
+    Route::get('/payment/status/{order_number}', [EghlPaymentController::class, 'paymentStatus']);
 
     //Referrals
     Route::get('/referrals', [CustomerController::class, 'viewReferral']);
@@ -48,33 +61,33 @@ Route::middleware('auth:sanctum')->group(function () {
     //Events
     Route::get('/events/liked', [MobileEventController::class, 'likedEvents']);
     Route::post('/events/{id}/toggle-like', [EventLikeController::class, 'toggleLike']);
-    
+
     // Booking
     Route::get('/bookings', [BookingController::class, 'index']);
     Route::post('/bookings', [BookingController::class, 'book']);
     Route::get('/bookings/{booking}', [BookingController::class, 'show']);
     Route::patch('/bookings/{booking}/cancel', [BookingController::class, 'cancel']);
-    
+
     Route::post('/notifications/token', [NotificationController::class, 'saveToken']);
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
-    Route::post('/notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.markAsRead'); 
+    Route::post('/notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.markAsRead');
 
     Route::get('/settings', [SettingsController::class, 'apiGetSettings']);
 });
 
 Route::middleware('auth:sanctum')->prefix('merchant')->group(function () {
     Route::get('/events', [MerchantEventController::class, 'merchantEvents']);
-    Route::get('/events/{event}', [MerchantEventController::class, 'showMerchantEvent']); 
+    Route::get('/events/{event}', [MerchantEventController::class, 'showMerchantEvent']);
     Route::post('/scan-qr', [AttendanceController::class, 'scanQr']);
     Route::get('/bookings/event/{eventId}', [MerchantBookingController::class, 'apiBookingsByEvent']);
-    Route::get('/attendances', [AttendanceController::class, 'getAttendances']);  
-    Route::post('/attendances/{bookingId}/mark', [AttendanceController::class, 'markAttendance']); 
+    Route::get('/attendances', [AttendanceController::class, 'getAttendances']);
+    Route::post('/attendances/{bookingId}/mark', [AttendanceController::class, 'markAttendance']);
     Route::get('/attendances/slot/{slotId}', [AttendanceController::class, 'getSlotAttendances']);
 });
 
 //Public Events
 Route::prefix('events')->group(function () {
     Route::get('/', [MobileEventController::class, 'index']);
-    Route::post('/{id}/click', [MobileEventController::class, 'incrementClickCount']);   
-    Route::get('/{event}', [MobileEventController::class, 'show']);  
+    Route::post('/{id}/click', [MobileEventController::class, 'incrementClickCount']);
+    Route::get('/{event}', [MobileEventController::class, 'show']);
 });

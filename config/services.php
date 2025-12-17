@@ -37,4 +37,11 @@ return [
     'fcm' => [
         'server_key' => env('FCM_SERVER_KEY'),
     ],
+    'eghl' => [
+        'service_id' => env('EGHL_SERVICE_ID'),
+        'password' => env('EGHL_PASSWORD'),
+        'payment_url' => env('EGHL_PAYMENT_URL'),
+        'callback' => env('EGHL_CALLBACK_URL'),
+        'return' => env('EGHL_RETURN_URL')
+    ]
 ];

@@ -13,10 +13,13 @@ use App\Http\Controllers\PurchasePackageController;
 use App\Http\Controllers\MerchantBookingController;
 use App\Http\Controllers\MerchantPayoutController;
 use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\EghlCallbackController;
+use App\Http\Controllers\EghlPaymentController;
 use App\Http\Controllers\MerchantDashboardController;
 use App\Http\Controllers\SettingsController;
 
 /* Root Redirect */
+
 Route::get('/', function () {
     if (!Auth::check()) {
         return redirect()->route('login.show');
@@ -41,6 +44,9 @@ Route::get('/dashboard', function () {
     };
 })->middleware('auth')->name('dashboard');
 
+
+
+
 /* Authentication */
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login.show');
 Route::post('/login', [AuthController::class, 'login'])->name('login');
@@ -51,6 +57,9 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::post('/password/forgot', [AuthController::class, 'sendResetLinkEmail'])->name('password.forgot');
 Route::post('/password/reset', [AuthController::class, 'resetPassword'])->name('password.reset');
 
+
+
+
 /* Authenticated User Routes */
 Route::middleware(['auth'])->group(function () {
     /* Profile */
@@ -58,6 +67,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/profile/update', [ProfileController::class, 'update'])->name('profile.update');
     Route::post('/profile/change-password', [ProfileController::class, 'changePassword'])->name('profile.changePassword');
     Route::post('/users/{id}/deactivate', [AuthController::class, 'deactivate'])->name('user.deactivate');
+
+
 
     /* Admin Routes */
     Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function () {
@@ -77,7 +88,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
         Route::get('/customers/{id}', [CustomerController::class, 'showProfile'])->name('customers.showProfile');
         Route::post('/customers/{id}/update', [CustomerController::class, 'update'])->name('customers.update');
-        
+
         // Wallet and transaction management
         Route::get('/customers/{id}/wallet', [CustomerController::class, 'wallet'])->name('customers.wallet');
         Route::get('/customers/{customer}/transactions/export-pdf', [CustomerController::class, 'exportPdf'])->name('customers.transactions.exportPdf');
@@ -130,11 +141,11 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/payouts', [MerchantPayoutController::class, 'index'])->name('payouts.index');
         Route::post('/payouts/request', [MerchantPayoutController::class, 'requestPayouts'])->name('payouts.request');
         Route::get('/payouts/export-pdf', [MerchantPayoutController::class, 'exportSlotPayoutPdf'])->name('payouts.export.pdf');
-        
+
         Route::get('/dashboard', [MerchantDashboardController::class, 'index'])->name('dashboard');
     });
 
     /* Notifications (shared for all authenticated users) */
-    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
-    Route::post('/notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.markAsRead'); 
+    // Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    // Route::post('/notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.markAsRead');
 });
