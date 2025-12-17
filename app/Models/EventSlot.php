@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class EventSlot extends Model
@@ -85,7 +86,7 @@ class EventSlot extends Model
             : (is_string($this->start_time) ? substr($this->start_time, 0, 8) : null);
 
         if (!$slotDate || !$slotTime) {
-            \Log::warning('Slot display_start is missing date or time', [
+            Log::warning('Slot display_start is missing date or time', [
                 'slot_id' => $this->id,
                 'slot_date' => $slotDate,
                 'slot_time' => $slotTime,
@@ -96,7 +97,7 @@ class EventSlot extends Model
         try {
             return Carbon::createFromFormat('Y-m-d H:i:s', "{$slotDate} {$slotTime}", 'Asia/Kuala_Lumpur');
         } catch (\Exception $e) {
-            \Log::error('Failed to parse display_end', [
+            Log::error('Failed to parse display_end', [
                 'slot_id' => $this->id,
                 'slot_date' => $slotDate,
                 'slot_time' => $slotTime,
@@ -125,7 +126,7 @@ class EventSlot extends Model
             : (is_string($this->end_time) ? substr($this->end_time, 0, 8) : null);
 
         if (!$slotDate || !$slotTime) {
-            \Log::warning('Slot display_end is missing date or time', [
+            Log::warning('Slot display_end is missing date or time', [
                 'slot_id' => $this->id,
                 'slot_date' => $slotDate,
                 'slot_time' => $slotTime,
@@ -136,7 +137,7 @@ class EventSlot extends Model
         try {
             return Carbon::createFromFormat('Y-m-d H:i:s', "{$slotDate} {$slotTime}", 'Asia/Kuala_Lumpur');
         } catch (\Exception $e) {
-            \Log::error('Failed to parse display_end', [
+            Log::error('Failed to parse display_end', [
                 'slot_id' => $this->id,
                 'slot_date' => $slotDate,
                 'slot_time' => $slotTime,

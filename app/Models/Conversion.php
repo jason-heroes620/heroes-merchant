@@ -12,6 +12,7 @@ class Conversion extends Model
 
     protected $fillable = [
         'credits_per_rm',
+        'paid_to_free_ratio',
         'paid_credit_percentage',
         'free_credit_percentage',
         'effective_from',
@@ -21,6 +22,7 @@ class Conversion extends Model
 
     protected $casts = [
         'credits_per_rm' => 'float',
+        'paid_to_free_ratio' => 'float',
         'paid_credit_percentage' => 'float',
         'free_credit_percentage' => 'float',
         'effective_from' => 'datetime',

@@ -8,6 +8,7 @@ use App\Models\BookingItem;
 use App\Models\EventSlot;
 use App\Models\Reminder;
 use App\Models\Setting;
+use App\Models\Conversion;
 use App\Jobs\SendPushNotification;
 use App\Jobs\SendReminder;
 use App\Services\WalletService;
@@ -30,9 +31,9 @@ class BookingService
         $this->slotAvailability = $slotAvailability;
     }
 
-    public function bookSlot($customer, EventSlot $slot, array $quantitiesByAgeGroup, bool $allowFallback = false)
+    public function bookSlot($customer, EventSlot $slot, array $quantitiesByAgeGroup, Conversion $conversion, bool $allowFallback = false)
     {
-        return DB::transaction(function () use ($customer, $slot, $quantitiesByAgeGroup, $allowFallback) {
+        return DB::transaction(function () use ($customer, $slot, $quantitiesByAgeGroup, $conversion, $allowFallback) {
             $totalQuantity = array_sum($quantitiesByAgeGroup);
             if ($totalQuantity < 1) {
                 throw new \Exception('Please select at least one ticket.');
@@ -48,6 +49,10 @@ class BookingService
             $wallet = $customer->wallet ?? throw new \Exception('Wallet not found.');
 
             // Step 1: Validate credits first
+            $bookingItemsData = [];
+            $totalPaid = 0;
+            $totalFree = 0;
+
             foreach ($quantitiesByAgeGroup as $ageGroupId => $quantity) {
                 if ($quantity < 1) continue;
 
@@ -57,9 +62,38 @@ class BookingService
                     ->first();
 
                 $requiredPaid = $slotPrice->paid_credits ?? 0;
-                $requiredFree = $slotPrice->free_credits ?? 0;
 
-                $this->walletService->canBookWithCredits($wallet, $requiredPaid, $requiredFree, $quantity, $allowFallback);
+                // Step 1: Calculate additional paid needed
+                $additionalPaidInfo = $this->walletService->calculateAdditionalPaid(
+                    $wallet,
+                    $requiredPaid,
+                    $conversion,
+                    $quantity
+                );
+
+                $requiredFree = (int) ceil($requiredPaid / $additionalPaidInfo['paidToFreeRatio']);
+
+                Log::info('Credit calculation', [
+                    'paid_needed_per_ticket' => $requiredPaid,
+                    'quantity' => $quantity,
+                    'wallet_paid' => $wallet->cached_paid_credits,
+                    'wallet_free' => $wallet->cached_free_credits,
+                    'paid_to_free_ratio' => $additionalPaidInfo['paidToFreeRatio'],
+                    'shortfall_free' => $additionalPaidInfo['shortfallFree'],
+                ]);
+
+                $this->walletService->canBookWithCredits($wallet, $requiredPaid, $conversion, $quantity, $allowFallback);
+
+                $bookingItemsData[] = [
+                    'age_group_id' => $ageGroupIdForQuery,
+                    'quantity' => $quantity,
+                    'paid_credits' => $requiredPaid,
+                    'free_credits' => $requiredFree,
+                    'additional_paid' => $additionalPaidInfo['shortfallFree'], // pass to frontend
+                ];
+
+                $totalPaid += $requiredPaid * $quantity;
+                $totalFree += $requiredFree * $quantity;
             }
 
             // Step 2: Create main booking
@@ -74,55 +108,34 @@ class BookingService
             ]);
 
             // Step 3: Create booking items per age group
-            foreach ($quantitiesByAgeGroup as $ageGroupId => $quantity) {
-                if ($quantity < 1) continue;
-
-                $ageGroupIdForQuery = $ageGroupId === 'general' ? null : $ageGroupId;
-                $slotPrice = $slot->prices()
-                    ->when($ageGroupIdForQuery, fn($q) => $q->where('event_age_group_id', $ageGroupIdForQuery))
-                    ->first();
-
-                Log::info("Creating BookingItem", [
-                    'booking_id' => $booking->id,
-                    'age_group_id' => $ageGroupIdForQuery,
-                    'quantity' => $quantity,
-                    'paid' => $slotPrice->paid_credits,
-                    'free' => $slotPrice->free_credits,
-                ]);
-
-                BookingItem::create([
-                    'booking_id' => $booking->id,
-                    'age_group_id' => $ageGroupIdForQuery,
-                    'quantity' => $quantity,
-                    'paid_credits' => $slotPrice->paid_credits ?? 0,
-                    'free_credits' => $slotPrice->free_credits ?? 0,                ]);
+            foreach ($bookingItemsData as $item) {
+                BookingItem::create(array_merge($item, [
+                    'booking_id' => $booking->id
+                ]));
             }
 
-            // Step 4: Deduct credits after booking items
-            $totalPaid = 0;
-            $totalFree = 0;
+            $slotDate = $slot->date
+                ? $slot->date->format('Y-m-d')
+                : optional($slot->event->dates->first())->start_date?->format('Y-m-d');
 
-            foreach ($quantitiesByAgeGroup as $ageGroupId => $quantity) {
-                if ($quantity < 1) continue;
+            $slotTime = $slot->start_time instanceof Carbon
+                ? $slot->start_time->format('H:i:s')
+                : $slot->start_time;
 
-                $ageGroupIdForQuery = $ageGroupId === 'general' ? null : $ageGroupId;
-                $slotPrice = $slot->prices()
-                    ->when($ageGroupIdForQuery, fn($q) => $q->where('event_age_group_id', $ageGroupIdForQuery))
-                    ->first();
-                $totalPaid += ($slotPrice->paid_credits ?? 0) * $quantity;
-                $totalFree += ($slotPrice->free_credits ?? 0) * $quantity;
-            }
+            $desc = "Booking Code {$booking->booking_code}:\nBooking Confirmed for '{$slot->event->title}' on {$slotDate} at {$slotTime}";
 
+            // Step 4: Deduct credits
             $this->walletService->deductCredits(
                 $wallet,
                 $totalPaid,
-                $totalFree,
-                "Booking for slot {$slot->id}",
+                $conversion, 
+                 $desc,
                 $booking->id,
                 1,
                 $allowFallback
             );
 
+            // Step 5: Notifications (same as before)
             $transaction = $booking->transactions()->where('type', 'booking')->first();
             if ($transaction) {
                 Notification::send(
@@ -138,15 +151,6 @@ class BookingService
                 );
             }
 
-            $slotDate = $slot->date
-                ? $slot->date->format('Y-m-d')
-                : optional($slot->event->dates->first())->start_date?->format('Y-m-d');
-
-            $slotTime = $slot->start_time instanceof Carbon
-                ? $slot->start_time->format('H:i:s')
-                : $slot->start_time;
-
-            // Merchant notification
             $merchantUser = $slot->event->merchant->user ?? null;
             if ($merchantUser) {
                 Notification::send(
@@ -172,7 +176,15 @@ class BookingService
 
             $this->sendConfirmationAndReminder($customer, $slot, $booking);
 
-            return $booking;
+            // Step 6: Return booking with calculated credits for frontend
+            return [
+                'booking' => $booking->load('items'),
+                'total_paid_credits' => $totalPaid,
+                'total_free_credits' => $totalFree,
+                'items' => $bookingItemsData,
+                'paid_to_free_ratio' => $conversion->paid_to_free_ratio, 
+                'additional_paid_needed' => array_sum(array_column($bookingItemsData, 'additional_paid')),
+            ];
         });
     }
 

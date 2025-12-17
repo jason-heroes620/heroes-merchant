@@ -7,13 +7,16 @@ import {
     Calendar,
     Lock,
     Info,
+    Repeat,
 } from "lucide-react";
 import AuthenticatedLayout from "@/AuthenticatedLayout";
+import { toast } from "react-hot-toast";
 
 interface FormData {
     credits: string;
     rm: string;
     credits_per_rm: string;
+    paid_to_free_ratio: string;
     paid_credit_percentage: number;
     free_credit_percentage: number;
     paid_credits_preview: number | null;
@@ -24,6 +27,7 @@ interface FormData {
 
 interface Errors {
     credits_per_rm?: string;
+    paid_to_free_ratio?: string;
     paid_credit_percentage?: string;
     free_credit_percentage?: string;
     effective_from?: string;
@@ -36,6 +40,7 @@ const ConversionsCreate: React.FC = () => {
         credits: "",
         rm: "",
         credits_per_rm: "",
+        paid_to_free_ratio: "2",
         paid_credit_percentage: 80,
         free_credit_percentage: 20,
         paid_credits_preview: null,
@@ -44,18 +49,6 @@ const ConversionsCreate: React.FC = () => {
         valid_until: "",
     });
     const errors = props.errors as Errors;
-
-    // const [form, setForm] = useState<FormState>({
-    //     credits: "",
-    //     rm: "",
-    //     credits_per_rm: "",
-    //     paid_credit_percentage: 80,
-    //     free_credit_percentage: 20,
-    //     paid_credits_preview: null,
-    //     free_credits_preview: null,
-    //     effective_from: "",
-    //     valid_until: "",
-    // });
 
     // Auto-calculate credits_per_rm when credits or rm changes
     useEffect(() => {
@@ -76,14 +69,11 @@ const ConversionsCreate: React.FC = () => {
     useEffect(() => {
         const creditsPerRM = parseFloat(data.credits_per_rm);
         if (!isNaN(creditsPerRM) && creditsPerRM > 0) {
-            // Minimum paid credits must be at least credits_per_rm (rounded up)
             const minPaidCredits = Math.ceil(creditsPerRM);
             const calculatedPaid = Math.ceil(
                 creditsPerRM * (data.paid_credit_percentage / 100)
             );
             const paidCredits = Math.max(calculatedPaid, minPaidCredits);
-
-            // Free credits calculated from paid credits
             const freeCredits = Math.ceil(
                 (paidCredits / data.paid_credit_percentage) *
                     data.free_credit_percentage
@@ -136,15 +126,25 @@ const ConversionsCreate: React.FC = () => {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        post("/admin/conversions");
+        post("/admin/conversions", {
+            onSuccess: () => {
+                toast.success("Conversion rate created successfully. Standard Package has been created.");
+            },
+            onError: (errors) => {
+                Object.values(errors).forEach((error) =>
+                    toast.error(error as string)
+                );
+            },
+        });
     };
 
     const totalCredits =
         (data.paid_credits_preview || 0) + (data.free_credits_preview || 0);
+    const conversionRatio = parseFloat(data.paid_to_free_ratio);
 
     return (
         <AuthenticatedLayout>
-            <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 py-8 px-4">
+            <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 py-6 px-3">
                 <div className="max-w-[1600px] mx-auto">
                     {/* Header */}
                     <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
@@ -329,6 +329,60 @@ const ConversionsCreate: React.FC = () => {
 
                                     <div className="border-t border-gray-200"></div>
 
+                                    {/* Paid → Free Conversion Rule */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-2 text-amber-600">
+                                            <Repeat className="w-5 h-5" />
+                                            <h2 className="text-lg font-semibold text-gray-800">
+                                                Conversion Rule (Fallback)
+                                            </h2>
+                                        </div>
+
+                                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                            <p className="text-sm text-amber-800 mb-3 flex items-start gap-2">
+                                                <Info className="w-4 h-4 mt-0.5 shrink-0" />
+                                                <span>
+                                                    When customers run out of
+                                                    free credits, paid credits
+                                                    will be converted at this
+                                                    ratio
+                                                </span>
+                                            </p>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Paid to Free Ratio
+                                                </label>
+                                                <div className="flex items-center gap-3">
+                                                    <input
+                                                        type="number"
+                                                        name="paid_to_free_ratio"
+                                                        value={
+                                                            data.paid_to_free_ratio
+                                                        }
+                                                        onChange={handleChange}
+                                                        min="0.01"
+                                                        step="0.1"
+                                                        className="flex-1 border-2 border-amber-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
+                                                        placeholder="e.g., 2"
+                                                    />
+                                                    <span className="text-gray-500 font-medium whitespace-nowrap">
+                                                        PAID : 1 FREE
+                                                    </span>
+                                                </div>
+                                                {errors.paid_to_free_ratio && (
+                                                    <p className="text-red-500 text-sm mt-1">
+                                                        {
+                                                            errors.paid_to_free_ratio
+                                                        }
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="border-t border-gray-200"></div>
+
                                     {/* Validity Period */}
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-2 text-orange-600">
@@ -388,7 +442,7 @@ const ConversionsCreate: React.FC = () => {
                             </div>
 
                             {/* Preview Card */}
-                            <div className="lg:col-span-2">
+                            <div className="md:col-span-2">
                                 <div className="sticky top-6 bg-white rounded-xl shadow-md overflow-hidden">
                                     <div className="bg-linear-to-r from-orange-500 to-red-500 px-6 py-4">
                                         <h3 className="text-white font-semibold text-lg">
@@ -400,7 +454,7 @@ const ConversionsCreate: React.FC = () => {
                                         {/* Main Rate Display */}
                                         {data.credits_per_rm ? (
                                             <>
-                                                <div className="text-center pb-6 border-b border-gray-100">
+                                                <div className="text-center pb-2 border-b border-gray-100">
                                                     <div className="text-5xl font-bold text-gray-800 mb-2">
                                                         {data.credits_per_rm}
                                                     </div>
@@ -414,8 +468,8 @@ const ConversionsCreate: React.FC = () => {
                                                     null &&
                                                     data.free_credits_preview !==
                                                         null && (
-                                                        <div className="space-y-3">
-                                                            <div className="bg-blue-50 px-4 py-4 rounded-lg border border-blue-100">
+                                                        <div className="space-y-2">
+                                                            <div className="bg-blue-50 px-2 py-2 rounded-lg border border-blue-100">
                                                                 <div className="flex justify-between items-center mb-1">
                                                                     <div className="flex items-center gap-2">
                                                                         <DollarSign className="w-4 h-4 text-blue-600" />
@@ -438,7 +492,7 @@ const ConversionsCreate: React.FC = () => {
                                                                 </div>
                                                             </div>
 
-                                                            <div className="bg-green-50 px-4 py-4 rounded-lg border border-green-100">
+                                                            <div className="bg-green-50 px-2 py-2 rounded-lg border border-green-100">
                                                                 <div className="flex justify-between items-center mb-1">
                                                                     <div className="flex items-center gap-2">
                                                                         <Gift className="w-4 h-4 text-green-600" />
@@ -476,6 +530,93 @@ const ConversionsCreate: React.FC = () => {
                                                             </div>
                                                         </div>
                                                     )}
+
+                                                {/* Conversion Rule Preview */}
+                                                {data.paid_to_free_ratio &&
+                                                    conversionRatio > 0 &&
+                                                    data.paid_credits_preview &&
+                                                    data.free_credits_preview && (
+                                                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                                            <div className="flex items-center justify-between mb-3">
+                                                                <span className="text-xs font-semibold text-amber-700 uppercase">
+                                                                    Conversion
+                                                                    Example
+                                                                </span>
+                                                            </div>
+
+                                                            {/* Package Purchase */}
+                                                            <div className="bg-white rounded-lg p-3 mb-2">
+                                                                <p className="text-xs text-gray-600 mb-2 font-medium">
+                                                                    Purchase
+                                                                    Package (RM
+                                                                    1):
+                                                                </p>
+                                                                <div className="flex items-center justify-center gap-2">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <DollarSign className="w-4 h-4 text-blue-600" />
+                                                                        <span className="text-lg font-bold text-blue-600">
+                                                                            {
+                                                                                data.paid_credits_preview
+                                                                            }
+                                                                        </span>
+                                                                        <span className="text-xs text-gray-600">
+                                                                            PAID
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="text-gray-400">
+                                                                        +
+                                                                    </span>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <Gift className="w-4 h-4 text-green-600" />
+                                                                        <span className="text-lg font-bold text-green-600">
+                                                                            {
+                                                                                data.free_credits_preview
+                                                                            }
+                                                                        </span>
+                                                                        <span className="text-xs text-gray-600">
+                                                                            FREE
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Conversion */}
+                                                            <div className="bg-white rounded-lg p-3">
+                                                                <p className="text-xs text-amber-700 mb-2 font-medium">
+                                                                    Conversion
+                                                                    (when short
+                                                                    of free
+                                                                    credits):
+                                                                </p>
+                                                                <div className="flex items-center justify-center gap-2">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <DollarSign className="w-4 h-4 text-blue-600" />
+                                                                        <span className="text-lg font-bold text-blue-600">
+                                                                            {conversionRatio *
+                                                                                data.free_credits_preview}
+                                                                        </span>
+                                                                        <span className="text-xs text-gray-600">
+                                                                            PAID
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="text-amber-600 font-bold">
+                                                                        →
+                                                                    </span>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <Gift className="w-4 h-4 text-green-600" />
+                                                                        <span className="text-lg font-bold text-green-600">
+                                                                            {
+                                                                                data.free_credits_preview
+                                                                            }
+                                                                        </span>
+                                                                        <span className="text-xs text-gray-600">
+                                                                            FREE
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                             </>
                                         ) : (
                                             <div className="text-center py-12 text-gray-400">
@@ -486,16 +627,6 @@ const ConversionsCreate: React.FC = () => {
                                                 </p>
                                             </div>
                                         )}
-
-                                        <div className="border-t border-gray-200"></div>
-
-                                        {/* Submit Button */}
-                                        <button
-                                            onClick={handleSubmit}
-                                            className="w-full bg-linear-to-r from-orange-500 to-red-500 text-white px-6 py-4 rounded-lg font-semibold hover:shadow-xl transition-all text-lg"
-                                        >
-                                            Save Conversion Rate
-                                        </button>
                                     </div>
                                 </div>
                             </div>

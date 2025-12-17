@@ -37,7 +37,9 @@ class ConversionController extends Controller
     {
         try {
             $validated = $request->validate([
+                'rm' => 'required|numeric|min:0.01', 
                 'credits_per_rm' => 'required|numeric|min:0',
+                'paid_to_free_ratio' => 'required|numeric|min:0|max:100',
                 'paid_credit_percentage' => 'required|numeric|min:0|max:100',
                 'free_credit_percentage' => 'required|numeric|min:0|max:100',
                 'effective_from' => 'required|date',
@@ -48,6 +50,12 @@ class ConversionController extends Controller
                 Log::warning('⚠️ Paid + Free percentage mismatch', $validated);
                 throw ValidationException::withMessages([
                     'paid_credit_percentage' => 'Paid + Free percentages must equal 100',
+                ]);
+            }
+
+            if ($validated['paid_to_free_ratio'] <= 0) {
+                throw ValidationException::withMessages([
+                    'paid_to_free_ratio' => 'Paid to free ratio must be greater than 0.',
                 ]);
             }
 
@@ -65,7 +73,7 @@ class ConversionController extends Controller
             if ($overlaps) {
                 Log::warning('⚠️ Conversion overlap detected', $validated);
                 throw ValidationException::withMessages([
-                    'credits_per_rm' => 'This conversion rate overlaps with an existing rate.'
+                    'credits_per_rm' => 'This conversion rate overlaps with an existing rate. Please deactivate the existing rate first.',
                 ]);
             }
 
@@ -87,22 +95,54 @@ class ConversionController extends Controller
 
                 $conversionService = new ConversionService();
                 $activeConversion = $conversionService->getActiveConversion();
-                $credits = $conversionService->getCreditsForConversion($activeConversion, 1);
 
-                PurchasePackage::updateOrCreate(
-                    ['name' => 'Standard Package'],
-                    [
-                        'price_in_rm' => 1,
+                // Use the RM amount entered by admin instead of hardcoded 1
+                $rm = $validated['rm'];
+                $credits = $conversionService->getCreditsForConversion($activeConversion, $rm);
+
+                $package = PurchasePackage::where('name', 'Standard Package')->first();
+                $hasTransactions = $package?->transactions()->exists() ?? false;
+
+                if ($package) {
+                    if ($hasTransactions) {
+                        // Step 3a: Deactivate current package
+                        $package->update(['active' => false]);
+
+                        // Step 3b: Create a new Standard Package
+                        $package = PurchasePackage::create([
+                            'name' => 'Standard Package',
+                            'price_in_rm' => $rm, 
+                            'paid_credits' => $credits['paid_credits'],
+                            'free_credits' => $credits['free_credits'],
+                            'effective_from' => now(),
+                            'active' => true,
+                            'system_locked' => true,
+                        ]);
+                    } else {
+                        // Safe to update directly
+                        $package->update([
+                            'price_in_rm' => $rm,
+                            'paid_credits' => $credits['paid_credits'],
+                            'free_credits' => $credits['free_credits'],
+                            'effective_from' => now(),
+                            'active' => true,
+                            'system_locked' => true,
+                        ]);
+                    }
+                } else {
+                    // Step 3c: No package exists, just create
+                    $package = PurchasePackage::create([
+                        'name' => 'Standard Package',
+                        'price_in_rm' => $rm,
                         'paid_credits' => $credits['paid_credits'],
                         'free_credits' => $credits['free_credits'],
                         'effective_from' => now(),
                         'active' => true,
                         'system_locked' => true,
-                    ]
-                );
+                    ]);
+                }
             }
-
-            $conversion = Conversion::create(array_merge($validated, ['status' => $status]));
+            Conversion::create(array_merge($validated, ['status' => $status]));
 
             return redirect()
                 ->route('admin.conversions.index')
@@ -134,12 +174,7 @@ class ConversionController extends Controller
             ->exists();
 
         if ($overlaps) {
-            Log::warning('⚠️ Cannot activate conversion, overlaps with another active conversion', [
-                'conversion_id' => $conversion->id
-            ]);
-            return redirect()
-                ->route('admin.conversions.index')
-                ->with('error', 'Cannot activate this conversion because it overlaps with an existing active conversion.');
+            return redirect()->back()->with('error', 'This conversion rate overlaps with an existing rate. Please deactivate the existing rate first.');
         }
 
         Conversion::where('status', 'active')->update(['status' => 'inactive']);
@@ -151,19 +186,50 @@ class ConversionController extends Controller
 
         $conversionService = new ConversionService();
         $activeConversion = $conversionService->getActiveConversion();
-        $credits = $conversionService->getCreditsForConversion($activeConversion, 1);
+        $rm = $conversion->rm ?? 1;
+        $credits = $conversionService->getCreditsForConversion($activeConversion, $rm);
 
-        PurchasePackage::updateOrCreate(
-            ['name' => 'Standard Package'],
-            [
-                'price_in_rm' => 1,
+        $package = PurchasePackage::where('name', 'Standard Package')->first();
+        $hasTransactions = $package?->transactions()->exists() ?? false;
+
+        if ($package) {
+            if ($hasTransactions) {
+                // Deactivate the current package so old transactions stay intact
+                $package->update(['active' => false]);
+
+                // Create a new Standard Package
+                $package = PurchasePackage::create([
+                    'name' => 'Standard Package',
+                    'price_in_rm' => $rm, // replace 1 with the actual RM value
+                    'paid_credits' => $credits['paid_credits'],
+                    'free_credits' => $credits['free_credits'],
+                    'effective_from' => now(),
+                    'active' => true,
+                    'system_locked' => true,
+                ]);
+            } else {
+                // Safe to update directly
+                $package->update([
+                    'price_in_rm' => $rm,
+                    'paid_credits' => $credits['paid_credits'],
+                    'free_credits' => $credits['free_credits'],
+                    'effective_from' => now(),
+                    'active' => true,
+                    'system_locked' => true,
+                ]);
+            }
+        } else {
+            // No existing package, create a new one
+            $package = PurchasePackage::create([
+                'name' => 'Standard Package',
+                'price_in_rm' => $rm,
                 'paid_credits' => $credits['paid_credits'],
                 'free_credits' => $credits['free_credits'],
                 'effective_from' => now(),
                 'active' => true,
                 'system_locked' => true,
-            ]
-        );
+            ]);
+        }
 
         return redirect()
             ->route('admin.conversions.index')
