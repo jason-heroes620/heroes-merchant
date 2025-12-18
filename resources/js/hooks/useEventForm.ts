@@ -405,7 +405,7 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
         const requestOptions = {
             preserveScroll: true,
             forceFormData: true,
-            data: formData, 
+            data: formData,
             onSuccess: () => {
                 toast.success(
                     data.id
@@ -426,7 +426,7 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
 
         // Submit
         if (data.id) {
-            form.put(route("merchant.events.update", data.id), requestOptions);
+            form.put(route("merchant.events.update", data.id));
         } else {
             form.post(route("merchant.events.store"), requestOptions);
         }

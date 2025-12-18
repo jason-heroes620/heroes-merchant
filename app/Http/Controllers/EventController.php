@@ -73,7 +73,7 @@ class EventController extends Controller
 
             $event->media->transform(fn($m) => tap($m, fn() => $m->file_path = $m->url));
 
-            $event->slots->transform(fn($slot) => tap($slot, function($s) {
+            $event->slots->transform(fn($slot) => tap($slot, function ($s) {
                 $s->available_seats = $s->is_unlimited ? null : $s->capacity - $s->booked_quantity;
             }));
 
@@ -83,7 +83,7 @@ class EventController extends Controller
             // ---------------------------
             // Build all_slots for display
             // ---------------------------
-            $all = $event->slots->map(function($s) {
+            $all = $event->slots->map(function ($s) {
                 $displayStart = $s->display_start;
                 $displayEnd = $s->display_end;
 
@@ -117,8 +117,8 @@ class EventController extends Controller
 
             // Filter out nulls and sort
             $all = $all->filter(fn($s) => $s->display_start && $s->display_end)
-                    ->sortBy('display_start')
-                    ->values();
+                ->sortBy('display_start')
+                ->values();
 
             $event->all_slots = $all;
             $event->next_active_slot = $all->first(fn($s) => $s->display_end->greaterThanOrEqualTo($now));
@@ -127,7 +127,7 @@ class EventController extends Controller
             $event->is_past = $event->next_active_slot === null;
 
             return $event;
-        }); 
+        });
 
         $merchants = Merchant::select('id', 'company_name')->orderBy('company_name')->get();
 
@@ -200,16 +200,16 @@ class EventController extends Controller
             'dates' => $dates,
             'slots' => $event->slots,
             'slotPrices' => $event->slots->flatMap(fn($slot) => $slot->prices)->values(),
-            'bookings' => $event->bookings, 
-            'conversion' => $activeConversion, 
+            'bookings' => $event->bookings,
+            'conversion' => $activeConversion,
             'location' => $event->location,
         ];
 
         return Inertia::render('Events/Show', [
             'eventData' => $eventData,
             'auth' => [
-                'user' => $user, 
-        ],
+                'user' => $user,
+            ],
         ]);
     }
 
@@ -274,7 +274,7 @@ class EventController extends Controller
             'location.location_name' => 'required|string|max:255',
             'location.latitude' => 'nullable|numeric|between:-90,90',
             'location.longitude' => 'nullable|numeric|between:-180,180',
-            'location.viewport' => 'nullable|array', 
+            'location.viewport' => 'nullable|array',
             'location.raw_place' => 'nullable|array',
 
             'location.how_to_get_there' => 'nullable|string',
@@ -368,9 +368,9 @@ class EventController extends Controller
                             'max_age' => (int) $g['max_age'],
                         ]);
                         $ageGroupModels[] = $ag;
-                        Log::info("✅ AgeGroup created", ['id'=>$ag->id, 'label'=>$g['label']]);
+                        Log::info("✅ AgeGroup created", ['id' => $ag->id, 'label' => $g['label']]);
                     } catch (\Throwable $e) {
-                        Log::error("❌ Failed to create AgeGroup", ['error'=>$e->getMessage(), 'data'=>$g]);
+                        Log::error("❌ Failed to create AgeGroup", ['error' => $e->getMessage(), 'data' => $g]);
                     }
                 }
             }
@@ -474,7 +474,7 @@ class EventController extends Controller
                             'event_id' => $event->id,
                             'event_frequency_id' => $freqModel->id,
                             'start_date' => $dateStr,
-                            'end_date' => $dateStr, 
+                            'end_date' => $dateStr,
                         ]);
 
                         $templateSlots = $eventDate->slots()->get()->toArray();
@@ -493,21 +493,21 @@ class EventController extends Controller
 
             // Event dates
             foreach ($validated['event_dates'] as $date) {
-            $eventDate = EventDate::create([
-                'event_id' => $event->id,
-                'event_frequency_id' => $isRecurring ? ($frequencyIds[0] ?? null) : null,
-                'start_date' => $date['start_date'],
-                'end_date' => $date['end_date'],
-            ]);
+                $eventDate = EventDate::create([
+                    'event_id' => $event->id,
+                    'event_frequency_id' => $isRecurring ? ($frequencyIds[0] ?? null) : null,
+                    'start_date' => $date['start_date'],
+                    'end_date' => $date['end_date'],
+                ]);
 
-            foreach ($date['slots'] ?? [] as $slotPayload) {
-                $this->slotService->createSlotForDate($event, $eventDate, $date['start_date'], $slotPayload);
-            }
+                foreach ($date['slots'] ?? [] as $slotPayload) {
+                    $this->slotService->createSlotForDate($event, $eventDate, $date['start_date'], $slotPayload);
+                }
 
-            if ($isRecurring) {
-                $slotService->generateSlotsForEvent($event);
+                if ($isRecurring) {
+                    $slotService->generateSlotsForEvent($event);
+                }
             }
-        }
             DB::commit();
 
             $admins = User::where('role', 'admin')->get();
@@ -586,7 +586,7 @@ class EventController extends Controller
             ];
         })->toArray();
 
-       $frequencies = $event->frequencies->map(function ($f) {
+        $frequencies = $event->frequencies->map(function ($f) {
             $days = is_string($f->days_of_week) ? json_decode($f->days_of_week, true) : ($f->days_of_week ?? []);
             $dates = is_string($f->selected_dates) ? json_decode($f->selected_dates, true) : ($f->selected_dates ?? []);
 
@@ -626,7 +626,7 @@ class EventController extends Controller
         $media = $event->media->map(function ($m) {
             return [
                 'id' => $m->id,
-                'file_path' => $m->file_path, 
+                'file_path' => $m->file_path,
                 'url' => Storage::url($m->file_path),
                 'file_type' => $m->file_type,
                 'file_size' => $m->file_size,
@@ -648,7 +648,7 @@ class EventController extends Controller
                 'frequencies' => $frequencies,
                 'event_dates' => $eventDates,
                 'media' => $media,
-                'prices' => $prices, 
+                'prices' => $prices,
             ],
             'merchant_id' => $merchant->id,
             'userRole' => $user->role ?? 'merchant',
@@ -689,7 +689,7 @@ class EventController extends Controller
             'prices' => 'sometimes|array',
             'frequencies' => 'sometimes|array',
 
-            'event_dates' => 'sometimes|array|min:1',
+            // 'event_dates' => 'sometimes|array|min:1',
             'event_dates.*.id' => 'nullable|uuid',
             'event_dates.*.start_date' => 'required_with:event_dates|date',
             'event_dates.*.end_date' => 'required_with:event_dates|date',
@@ -714,7 +714,7 @@ class EventController extends Controller
                 'description' => $validated['description'] ?? $event->description,
                 'category' => $validated['category'] ?? $event->category,
                 'is_suitable_for_all_ages' =>
-                    $validated['is_suitable_for_all_ages'] ?? $event->is_suitable_for_all_ages,
+                $validated['is_suitable_for_all_ages'] ?? $event->is_suitable_for_all_ages,
             ]);
 
             /* =======================
@@ -892,7 +892,6 @@ class EventController extends Controller
             return redirect()
                 ->route('merchant.events.index')
                 ->with('success', 'Event updated successfully');
-
         } catch (\Throwable $e) {
             DB::rollBack();
             Log::error('❌ Event update failed', ['error' => $e->getMessage()]);
@@ -907,7 +906,7 @@ class EventController extends Controller
     public function updateStatus(Request $request, Event $event)
     {
         $user = Auth::user();
-        
+
         $validated = $request->validate([
             'status' => 'required|in:draft,pending,active,inactive,rejected',
             'rejected_reason' => 'nullable|string',
@@ -956,7 +955,7 @@ class EventController extends Controller
                     $slot = EventSlotPrice::find($sp['id']);
                     $price = $slot->price_in_rm ? (float) $slot->price_in_rm : 0.00;
                     Log::info('Processing slot price', ['slot' => $slot->toArray(), 'submitted' => $sp]);
-            
+
                     $recommended = app(ConversionService::class)->calculateCredits($price, $conversion);
 
                     if ($sp['paid_credits'] < $recommended['paid_credits']) {
