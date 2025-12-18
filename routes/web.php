@@ -88,6 +88,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/events', [EventController::class, 'index'])->name('events.index');
         Route::get('/events/{event}', [EventController::class, 'show'])->name('events.show');
         Route::post('/events/{event}/update-status', [EventController::class, 'updateStatus'])->name('events.updateStatus');
+        Route::patch('/events/{event}/featured', [EventController::class, 'updateFeaturedStatus'])->name('events.feature.update');
 
         // Conversion Management
         Route::get('/conversions', [ConversionController::class, 'index'])->name('conversions.index');
@@ -104,10 +105,9 @@ Route::middleware(['auth'])->group(function () {
 
         // Merchant Payouts
         Route::get('/payouts', [MerchantPayoutController::class, 'index'])->name('payouts.index');
-        Route::post('/payouts/request', [MerchantPayoutController::class, 'requestPayouts'])->name('payouts.request');
-        Route::get('/payouts/export-pdf', [MerchantPayoutController::class, 'exportSlotPayoutPdf'])->name('payouts.export.pdf');
-        Route::post('/payouts/{payout}/mark-paid', [MerchantPayoutController::class, 'markPaid'])->name('payouts.mark-paid');
-        //Dashboard       
+        Route::get('/payouts/export-pdf', [MerchantPayoutController::class, 'exportSlotPayoutPdf'])->name('payouts.export.pdf');          
+        Route::get('/payouts/{payout}', [MerchantPayoutController::class, 'show'])->name('payouts.show');
+        Route::post('/payouts/{payout}/mark-paid', [MerchantPayoutController::class, 'markAsPaid'])->name('payouts.mark-paid');
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
     });
 
@@ -127,9 +127,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/bookings/event/{eventId}', [MerchantBookingController::class, 'bookingsByEvent'])->name('bookings.by-event');
         Route::patch('/bookings/update-status', [MerchantBookingController::class, 'updateStatus'])->name('bookings.updateStatus');
 
+        Route::get('/payouts/export-pdf', [MerchantPayoutController::class, 'exportSlotPayoutPdf'])->name('payouts.export.pdf');          
         Route::get('/payouts', [MerchantPayoutController::class, 'index'])->name('payouts.index');
-        Route::post('/payouts/request', [MerchantPayoutController::class, 'requestPayouts'])->name('payouts.request');
-        Route::get('/payouts/export-pdf', [MerchantPayoutController::class, 'exportSlotPayoutPdf'])->name('payouts.export.pdf');
+        Route::get('/payouts/{payout}', [MerchantPayoutController::class, 'show'])->name('payouts.show');
         
         Route::get('/dashboard', [MerchantDashboardController::class, 'index'])->name('dashboard');
     });

@@ -6,6 +6,7 @@ import {
     Edit,
     BadgeX,
     Heart,
+    Star
 } from "lucide-react";
 import type {
     EventType,
@@ -75,8 +76,13 @@ export default function GridView({
                                 </div>
                             )}
                             {event.featured && (
-                                <div className="absolute top-3 right-3 bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                                    ⭐ Featured
+                                <div className="absolute top-3 right-3 bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                                    <Star
+                                        size={12}
+                                        className="text-yellow-400"
+                                        fill="currentColor"
+                                    />
+                                    FEATURED
                                 </div>
                             )}
                             <div

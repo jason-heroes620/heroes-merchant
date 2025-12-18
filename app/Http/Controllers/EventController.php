@@ -102,7 +102,7 @@ class EventController extends Controller
                     }
                 }
 
-                \Log::info('Slot All Slots', [
+                Log::info('Slot All Slots', [
                     'slot_id' => $s->id,
                     'display_start' => $displayStart?->toDateTimeString(),
                     'display_end' => $displayEnd?->toDateTimeString(),
@@ -903,7 +903,6 @@ class EventController extends Controller
         }
     }
 
-
     public function updateStatus(Request $request, Event $event)
     {
         $user = Auth::user();
@@ -1005,6 +1004,57 @@ class EventController extends Controller
             return redirect()->back()->withErrors([
                 'error' => 'Event status update failed: ' . $e->getMessage()
             ]);
+        }
+    }
+
+    public function updateFeaturedStatus(Request $request, Event $event)
+    {
+        $user = Auth::user();
+
+        if ($user->role !== 'admin') {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $validated = $request->validate([
+            'featured' => ['required', 'boolean'],
+        ]);
+
+        try {
+            if ((bool) $event->featured === (bool) $validated['featured']) {
+                return back()->with(
+                    'error',
+                    $validated['featured']
+                        ? 'Event is already featured.'
+                        : 'Event is already not featured.'
+                );
+            }
+
+            $updated = $event->update([
+                'featured' => $validated['featured'],
+            ]);
+
+            if (!$updated) {
+                return back()->with('error', 'Failed to update event status.');
+            }
+
+            return back()->with(
+                'success',
+                $validated['featured']
+                    ? 'Event has been featured successfully.'
+                    : 'Event has been unfeatured successfully.'
+            );
+
+        } catch (\Throwable $e) {
+            Log::error('Failed to update featured status', [
+                'event_id' => $event->id,
+                'target_state' => $validated['featured'],
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()->with(
+                'error',
+                'Something went wrong while updating the event status.'
+            );
         }
     }
 

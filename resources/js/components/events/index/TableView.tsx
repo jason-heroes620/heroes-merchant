@@ -89,10 +89,10 @@ export default function TableView({
                                                     </div>
                                                 )}
                                                 {event.featured && (
-                                                    <div className="absolute -top-2 -right-2 bg-yellow-400 rounded-full p-1">
+                                                    <div className="absolute -top-2 -right-2 bg-white rounded-full p-1">
                                                         <Star
                                                             size={12}
-                                                            className="text-yellow-900"
+                                                            className="text-yellow-400"
                                                             fill="currentColor"
                                                         />
                                                     </div>

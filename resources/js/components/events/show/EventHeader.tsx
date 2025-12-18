@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { router } from "@inertiajs/react";
+import { toast } from "react-hot-toast";
 import type { UserRole, Event, Conversion } from "../../../types/events";
 import { Star, ChevronLeft } from "lucide-react";
 import StatusToggleModal from "./StatusToggleModal";
@@ -19,7 +21,9 @@ const EventHeader: React.FC<{
         return `${day}-${month}-${year} (${weekday})`;
     };
 
+    const isAdmin = userRole === "admin";
     const [showModal, setShowModal] = useState(false);
+    const [isTogglingFeatured, setIsTogglingFeatured] = useState(false);
 
     const canToggleStatus = () => {
         if (userRole === "merchant") {
@@ -31,11 +35,48 @@ const EventHeader: React.FC<{
         return false;
     };
 
+    const handleToggleFeatured = () => {
+        if (!isAdmin || isTogglingFeatured) return;
+
+        setIsTogglingFeatured(true);
+
+        const nextFeaturedState = !event.featured;
+
+        router.patch(
+            route("admin.events.feature.update", event.id),
+            {
+                featured: nextFeaturedState,
+            },
+            {
+                preserveState: true,
+                onSuccess: () => {
+                    event.featured = nextFeaturedState;
+
+                    toast.success(
+                        nextFeaturedState
+                            ? "Event featured successfully"
+                            : "Event unfeatured successfully"
+                    );
+                },
+                onError: (errors) => {
+                    if (errors.featured) {
+                        toast.error(errors.featured);
+                    } else {
+                        toast.error("Failed to update featured status");
+                    }
+                },
+                onFinish: () => {
+                    setIsTogglingFeatured(false);
+                },
+            }
+        );
+    };
+
     return (
         <>
             <div className="bg-linear-to-r from-orange-500 to-red-500 rounded-2xl p-8 text-white mb-6">
                 {/* Back Button */}
-                <div className="mb-4">
+                <div className="mb-4 flex justify-between">
                     <button
                         onClick={() => window.history.back()}
                         className="mb-4 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg text-sm font-medium transition-all flex items-center gap-2"
@@ -43,6 +84,37 @@ const EventHeader: React.FC<{
                         <ChevronLeft className="w-4 h-4" />
                         Back to Events
                     </button>
+
+                    {isAdmin && (
+                        <button
+                            onClick={handleToggleFeatured}
+                            disabled={isTogglingFeatured}
+                            title={
+                                event.featured
+                                    ? "Unfeature event"
+                                    : "Feature event"
+                            }
+                            className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all
+            ${
+                event.featured
+                    ? "bg-white/20 hover:bg-white/30"
+                    : "bg-white/10 hover:bg-white/20"
+            }
+            ${isTogglingFeatured ? "opacity-50 cursor-not-allowed" : ""}
+        `}
+                        >
+                            <Star
+                                className={`w-5 h-5 transition-all ${
+                                    event.featured
+                                        ? "fill-yellow-400 text-yellow-400"
+                                        : "text-white"
+                                }`}
+                            />
+                            <span className="text-sm font-medium">
+                                {event.featured ? "Featured" : "Feature"}
+                            </span>
+                        </button>
+                    )}
                 </div>
                 <div className="flex items-start justify-between mb-4">
                     <div>
@@ -54,14 +126,6 @@ const EventHeader: React.FC<{
                             updated {formatDate(event.updated_at)}
                         </p>
                     </div>
-                    {event.featured && (
-                        <div className="bg-white bg-opacity-20 px-3 py-1 rounded-full flex items-center gap-1">
-                            <Star className="w-4 h-4 fill-current" />
-                            <span className="text-sm font-medium">
-                                Featured
-                            </span>
-                        </div>
-                    )}
                 </div>
 
                 <div className="flex items-center gap-4">

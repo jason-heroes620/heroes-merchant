@@ -12,6 +12,7 @@ import {
     XCircle,
     ChevronRight,
     Ban,
+    Clock,
 } from "lucide-react";
 
 type SlotSummary = {
@@ -101,59 +102,60 @@ const MainBookingPage = () => {
         <AuthenticatedLayout>
             <div className="min-h-screen bg-linear-to-br from-orange-50 via-white to-orange-50">
                 {/* Header */}
-                <div className="bg-linear-to-r from-orange-500 to-orange-600 px-8 py-8 shadow-lg">
+                <div className="bg-linear-to-r from-orange-500 to-orange-600 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 shadow-lg">
                     <div className="max-w-7xl mx-auto">
-                        <h1 className="text-3xl font-bold text-white mb-1">
+                        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">
                             Booking Dashboard
                         </h1>
-                        <p className="text-orange-100">
+                        <p className="text-sm sm:text-base text-orange-100">
                             Quick overview of all event bookings
                         </p>
                     </div>
                 </div>
 
-                <div className="max-w-7xl mx-auto px-8 py-6">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
                     {/* Global Stats */}
-                    <div className="grid grid-cols-3 gap-4 mb-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 sm:gap-6 mb-6 sm:mb-8">
                         {[
                             {
                                 label: "Total Bookings",
                                 value: stats.total,
-                                icon: <TrendingUp size={20} />,
-                                bg: "from-orange-100 to-orange-200",
+                                icon: <TrendingUp size={24} />,
+                                iconBg: "bg-orange-100",
+                                iconColor: "text-orange-600",
                                 border: "border-orange-200",
                             },
                             {
                                 label: "Confirmed",
                                 value: stats.confirmed,
-                                icon: <CheckCircle size={20} />,
-                                bg: "from-green-100 to-green-200",
+                                icon: <CheckCircle size={24} />,
+                                iconBg: "bg-green-100",
+                                iconColor: "text-green-600",
                                 border: "border-green-200",
                             },
                             {
                                 label: "Cancelled",
                                 value: stats.cancelled,
-                                icon: <XCircle size={20} />,
-                                bg: "from-red-100 to-red-200",
+                                icon: <XCircle size={24} />,
+                                iconBg: "bg-red-100",
+                                iconColor: "text-red-600",
                                 border: "border-red-200",
                             },
                         ].map((card, idx) => (
                             <div
                                 key={idx}
-                                className={`bg-white rounded-xl p-5 border ${card.border} shadow-sm hover:shadow-md transition-shadow flex items-center gap-4`}
+                                className={`bg-white rounded-2xl p-5 sm:p-6 border ${card.border} shadow-sm hover:shadow-md transition-shadow flex items-center gap-4 sm:gap-6`}
                             >
                                 <div
-                                    className={`p-3 bg-linear-to-br ${card.bg} rounded-lg`}
+                                    className={`p-3 sm:p-4 ${card.iconBg} ${card.iconColor} rounded-xl shrink-0`}
                                 >
-                                    <div className="text-gray-700">
-                                        {card.icon}
-                                    </div>
+                                    {card.icon}
                                 </div>
-                                <div>
-                                    <div className="text-sm text-gray-600 font-medium">
+                                <div className="min-w-0">
+                                    <div className="text-xs sm:text-sm text-gray-500 font-medium mb-1">
                                         {card.label}
                                     </div>
-                                    <div className="text-3xl font-bold text-gray-900">
+                                    <div className="text-2xl sm:text-3xl font-bold text-gray-900">
                                         {card.value}
                                     </div>
                                 </div>
@@ -173,17 +175,17 @@ const MainBookingPage = () => {
                                 placeholder="Search events by title or location..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300 shadow-sm"
+                                className="w-full pl-11 pr-4 py-3 text-sm sm:text-base rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300 shadow-sm"
                             />
                         </div>
 
-                        <div className="flex gap-2 bg-white p-1.5 rounded-xl shadow-sm border border-orange-100">
+                        <div className="flex gap-2 bg-white p-1.5 rounded-xl shadow-sm border border-orange-100 overflow-x-auto">
                             {["all", "upcoming", "completed", "cancelled"].map(
                                 (s) => (
                                     <button
                                         key={s}
                                         onClick={() => handleStatusChange(s)}
-                                        className={`px-4 py-2 rounded-lg font-medium text-sm transition-all flex-1 ${
+                                        className={`px-3 sm:px-4 py-2 rounded-lg font-medium text-xs sm:text-sm transition-all flex-1 whitespace-nowrap ${
                                             currentFilter === s
                                                 ? "bg-linear-to-r from-orange-500 to-orange-600 text-white shadow-md"
                                                 : "text-gray-600 hover:bg-orange-50"
@@ -196,140 +198,130 @@ const MainBookingPage = () => {
                         </div>
                     </div>
 
-                    {/* Events Summary */}
-                    <div className="space-y-4">
+                    {/* Events Summary - 3 Cards Per Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {filteredEvents.map((eventSummary) => (
                             <div
                                 key={eventSummary.event.id}
                                 className="bg-white rounded-2xl shadow-md border border-orange-100 overflow-hidden hover:shadow-lg transition-shadow"
                             >
-                                <div className="grid grid-cols-12 gap-6 p-6">
-                                   
-                                    <div className="col-span-4 border-r border-gray-200 pr-6">
-                                        {/* Event Image */}
-                                        {eventSummary.event.media ? (
-                                            <img
-                                                src={eventSummary.event.media}
-                                                alt={eventSummary.event.title}
-                                                className="w-full h-40 rounded-xl object-cover border-2 border-orange-200 mb-4"
+                                <div className="p-4 sm:p-6">
+                                    {/* Event Image */}
+                                    {eventSummary.event.media ? (
+                                        <img
+                                            src={eventSummary.event.media}
+                                            alt={eventSummary.event.title}
+                                            className="w-full h-32 sm:h-40 rounded-xl object-cover border-2 border-orange-200 mb-4"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-32 sm:h-40 rounded-xl bg-linear-to-br from-orange-100 to-red-100 flex items-center justify-center mb-4">
+                                            <Calendar
+                                                className="text-orange-400"
+                                                size={32}
                                             />
-                                        ) : (
-                                            <div className="w-full h-40 rounded-xl bg-linear-to-br from-orange-100 to-red-100 flex items-center justify-center mb-4">
-                                                <Calendar
-                                                    className="text-orange-400"
-                                                    size={40}
-                                                />
-                                            </div>
-                                        )}
-
-                                        {/* Event Details */}
-                                        <h2 className="text-xl font-bold text-gray-900 mb-2">
-                                            {eventSummary.event.title}
-                                        </h2>
-                                        <div className="flex flex-wrap gap-2 mb-3">
-                                            <span className="px-2.5 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
-                                                {getEventTypeLabel(
-                                                    eventSummary.event.type
-                                                )}
-                                            </span>
-                                            {eventSummary.event.category && (
-                                                <span className="px-2.5 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full">
-                                                    {
-                                                        eventSummary.event
-                                                            .category
-                                                    }
-                                                </span>
-                                            )}
                                         </div>
-                                        {eventSummary.event.location && (
-                                            <div className="flex items-center gap-2 text-gray-600 text-sm mb-4">
-                                                <MapPin size={14} />
-                                                <span>
-                                                    {
-                                                        eventSummary.event
-                                                            .location
-                                                    }
-                                                </span>
-                                            </div>
-                                        )}
+                                    )}
 
-                                        {/* Event Summary - Improved Layout */}
-                                        <div className="bg-linear-to-br from-gray-50 to-gray-100 rounded-xl p-4 mb-4">
-                                            <div className="grid grid-cols-2 gap-3 text-sm">
-                                                <div className="text-center p-2 bg-white rounded-lg">
-                                                    <div className="text-xs text-gray-500 mb-1">
+                                    {/* Event Details */}
+                                    <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">
+                                        {eventSummary.event.title}
+                                    </h2>
+                                    <div className="flex flex-wrap gap-2 mb-3">
+                                        <span className="px-2.5 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+                                            {getEventTypeLabel(
+                                                eventSummary.event.type
+                                            )}
+                                        </span>
+                                        {eventSummary.event.category && (
+                                            <span className="px-2.5 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full">
+                                                {eventSummary.event.category}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {eventSummary.event.location && (
+                                        <div className="flex items-start gap-2 text-gray-600 text-xs sm:text-sm mb-4">
+                                            <MapPin size={14} className="mt-0.5 shrink-0" />
+                                            <span className="line-clamp-2">
+                                                {eventSummary.event.location}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {/* Event Summary Stats - Icons on Left */}
+                                    <div className="bg-linear-to-br from-gray-50 to-gray-100 rounded-xl p-3 sm:p-4 mb-4">
+                                        <div className="grid grid-cols-2 gap-2 sm:gap-3 text-sm">
+                                            <div className="flex items-center text-center gap-4 p-2 sm:p-3 bg-white rounded-lg">
+                                                <Clock
+                                                    size={24}
+                                                    className="text-gray-600 shrink-0"
+                                                />
+                                                <div className="min-w-0">
+                                                    <div className="text-xs text-gray-500 truncate">
                                                         Total Slots
                                                     </div>
-                                                    <div className="text-xl font-bold text-gray-900">
-                                                        {
-                                                            eventSummary.summary
-                                                                .total_slots
-                                                        }
+                                                    <div className="text-lg sm:text-xl font-bold text-gray-900">
+                                                        {eventSummary.summary.total_slots}
                                                     </div>
                                                 </div>
-                                                <div className="flex  p-2 bg-white rounded-lg">
-                                                    <CheckCircle
-                                                        size={25}
-                                                        className="text-green-600"
-                                                    />
-                                                    <div className="ml-2">
-                                                        <div className="text-xs text-gray-500 mb-1">
-                                                            Confirmed Bookings
-                                                        </div>
-                                                        <div className="text-xl font-bold text-green-600">
-                                                            {
-                                                                eventSummary
-                                                                    .summary
-                                                                    .confirmed
-                                                            }
-                                                        </div>
+                                            </div>
+                                            
+                                            <div className="flex items-center text-center gap-4 p-2 sm:p-3 bg-white rounded-lg">
+                                                <CheckCircle
+                                                    size={24}
+                                                    className="text-green-600 shrink-0"
+                                                />
+                                                <div className="min-w-0">
+                                                    <div className="text-xs text-gray-500 truncate">
+                                                        Confirmed
+                                                    </div>
+                                                    <div className="text-lg sm:text-xl font-bold text-green-600">
+                                                        {eventSummary.summary.confirmed}
                                                     </div>
                                                 </div>
+                                            </div>
 
-                                                <div className="text-center p-2 bg-white rounded-lg">
-                                                    <Users
-                                                        size={14}
-                                                        className="text-blue-600"
-                                                    />
-                                                    <div className="text-xs text-gray-500 mb-1">
-                                                        Expected Attendees
+                                            <div className="flex items-center text-center gap-4 p-2 sm:p-3 bg-white rounded-lg">
+                                                <Users
+                                                    size={24}
+                                                    className="text-blue-600 shrink-0"
+                                                />
+                                                <div className="min-w-0">
+                                                    <div className="text-xs text-gray-500 truncate">
+                                                        Expected
                                                     </div>
-                                                    <div className="text-xl font-bold text-blue-600">
-                                                        {
-                                                            eventSummary.summary
-                                                                .expected
-                                                        }
+                                                    <div className="text-lg sm:text-xl font-bold text-blue-600">
+                                                        {eventSummary.summary.expected}
                                                     </div>
                                                 </div>
-                                                <div className="text-center p-2 bg-white rounded-lg">
-                                                    <Ban
-                                                        size={14}
-                                                        className="text-red-600"
-                                                    />
-                                                    <div className="text-xs text-gray-500 mb-1">
+                                            </div>
+                                            
+                                            <div className="flex items-center text-center gap-4 p-2 sm:p-3 bg-white rounded-lg">
+                                                <Ban 
+                                                    size={24} 
+                                                    className="text-red-600 shrink-0" 
+                                                />
+                                                <div className="min-w-0">
+                                                    <div className="text-xs text-gray-500 truncate">
                                                         Cancelled
                                                     </div>
-                                                    <div className="text-xl font-bold text-red-600">
-                                                        {
-                                                            eventSummary.summary
-                                                                .cancelled
-                                                        }
+                                                    <div className="text-lg sm:text-xl font-bold text-red-600">
+                                                        {eventSummary.summary.cancelled}
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
-
-                                        {/* View Details Button */}
-                                        <Link
-                                            href={getBookingUrl(
-                                                eventSummary.event.id
-                                            )}
-                                            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-orange-500 to-orange-600 text-white rounded-xl font-medium hover:from-orange-600 hover:to-orange-700 transition-all shadow-md hover:shadow-lg"
-                                        >
-                                            View Details
-                                            <ChevronRight size={18} />
-                                        </Link>
                                     </div>
+
+                                    {/* View Details Button */}
+                                    <Link
+                                        href={getBookingUrl(
+                                            eventSummary.event.id
+                                        )}
+                                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 bg-linear-to-r from-orange-500 to-orange-600 text-white rounded-xl text-sm sm:text-base font-medium hover:from-orange-600 hover:to-orange-700 transition-all shadow-md hover:shadow-lg"
+                                    >
+                                        View Details
+                                        <ChevronRight size={18} />
+                                    </Link>
                                 </div>
                             </div>
                         ))}
