@@ -117,6 +117,18 @@ const EventBookingPage: React.FC = () => {
         new Set(bookings.map((b) => b.slot?.date).filter(Boolean))
     ).sort();
 
+    const formatDateTime = (dateTimeString: string) => {
+        const date = new Date(dateTimeString);
+        return date.toLocaleString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+        });
+    };
+
     return (
         <AuthenticatedLayout>
             <div className="min-h-screen bg-linear-to-br from-orange-50 via-white to-orange-50">
@@ -262,10 +274,10 @@ const EventBookingPage: React.FC = () => {
                                     <button
                                         key={s}
                                         onClick={() => handleStatusChange(s)}
-                                        className={`px-4 py-2 rounded-lg font-medium text-sm transition-all flex-1 ${
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                                             currentFilter === s
-                                                ? "bg-linear-to-r from-orange-500 to-orange-600 text-white shadow-md"
-                                                : "text-gray-600 hover:bg-orange-50"
+                                                ? "bg-orange-500 text-white"
+                                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                                         }`}
                                     >
                                         {s.charAt(0).toUpperCase() + s.slice(1)}
@@ -359,9 +371,9 @@ const EventBookingPage: React.FC = () => {
                                                                         Booked:
                                                                     </span>
                                                                     <span className="text-xs text-green-600 font-semibold">
-                                                                        {
+                                                                        {formatDateTime(
                                                                             b.booked_at
-                                                                        }
+                                                                        )}
                                                                     </span>
                                                                 </div>
                                                                 {b.cancelled_at && (
@@ -370,9 +382,9 @@ const EventBookingPage: React.FC = () => {
                                                                             Cancelled:
                                                                         </span>
                                                                         <span className="text-xs text-red-500 font-semibold">
-                                                                            {
+                                                                            {formatDateTime(
                                                                                 b.cancelled_at
-                                                                            }
+                                                                            )}
                                                                         </span>
                                                                     </div>
                                                                 )}
