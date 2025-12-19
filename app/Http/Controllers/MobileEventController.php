@@ -112,29 +112,31 @@ class MobileEventController extends Controller
 
         $now = now()->setTimezone('Asia/Kuala_Lumpur');
 
-        $filteredSlots = $event->slots->filter(function ($slot) use ($now, $event) {
-
-            $slotEnd = $slot->display_end; 
-
-            return $slotEnd && $slotEnd->gte($now);
-
+        // Filter slots that have not ended yet
+        $filteredSlots = $event->slots->filter(function ($slot) use ($now) {
+            return $slot->display_end && $slot->display_end->gte($now);
         })->values();
 
         $event->setRelation('slots', $filteredSlots);
 
+        // Transform slots
         $event->slots->transform(function ($slot) {
             $slot->available_seats = $slot->is_unlimited
                 ? null
                 : $slot->capacity - $slot->booked_quantity;
+
+            $slot->makeHidden('event'); // hide nested event to avoid duplication
+
             return $slot;
         });
 
+        // Transform media URLs
         $event->media->transform(function ($media) {
-            $media->file_path = $media->url;
+            $media->file_path = $media->url ?? $media->file_path;
             return $media;
         });
 
-
+        // Build dates array
         if ($event->is_recurring) {
             $dates = $event->slots->map(function ($slot) {
                 return [
@@ -157,6 +159,7 @@ class MobileEventController extends Controller
             })->values();
         }
 
+        // Collect all slot prices
         $slotPrices = $event->slots->flatMap(fn($slot) => $slot->prices)->values();
 
         return response()->json([

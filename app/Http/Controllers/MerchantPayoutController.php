@@ -2,18 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Merchant;
 use App\Models\MerchantSlotPayout;
-use App\Models\MerchantPayoutRequest;
 use App\Services\MerchantPayoutService;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class MerchantPayoutController extends Controller
 {
@@ -23,349 +20,392 @@ class MerchantPayoutController extends Controller
     {
         $this->payoutService = $payoutService;
     }
-
+    /**
+     * Display a listing of merchant payouts.
+     */
     public function index(Request $request)
     {
         $user = Auth::user();
-
-        $query = MerchantSlotPayout::with([
-            'slot.event',
-            'slot.event.dates',
-            'merchant.user',
-        ])->orderByDesc('calculated_at');
-
-        if ($user->role === 'admin' && $request->merchant_id) {
-            $query->where('merchant_id', $request->merchant_id);
-        }
-
-        if ($user->role === 'merchant') {
-            $query->where('merchant_id', $user->merchant->id);
-        }
-
-        $payouts = $query->paginate(20);
-
-        $payouts->getCollection()->transform(function ($p) use ($user) {
-            $slot = $p->slot;
-            $event = $slot->event;
-
-            $displayStart = $slot->display_start ?? null;
-            $displayEnd = $slot->display_end ?? null;
-
-            // Fallback for one-time events
-            if (!$displayStart || !$displayEnd) {
-                $eventDate = $slot->date;
-                if ($eventDate) {
-                    $startDate = $eventDate->start_date?->format('Y-m-d');
-                    $endDate = $eventDate->end_date?->format('Y-m-d');
-
-                    $startTime = $slot->start_time?->format('H:i:s') ?? '00:00:00';
-                    $endTime = $slot->end_time?->format('H:i:s') ?? '23:59:59';
-
-                    $displayStart = $startDate
-                        ? Carbon::createFromFormat('Y-m-d H:i:s', "$startDate $startTime", 'Asia/Kuala_Lumpur')
-                        : null;
-                    $displayEnd = $endDate
-                        ? Carbon::createFromFormat('Y-m-d H:i:s', "$endDate $endTime", 'Asia/Kuala_Lumpur')
-                        : null;
-                }
-            }
-
-            $displayDate = '-';
-            if ($displayStart) {
-                $startDateOnly = $displayStart->format('Y-m-d');
-                $endDateOnly = $displayEnd ? $displayEnd->format('Y-m-d') : null;
-
-                if ($endDateOnly && $startDateOnly !== $endDateOnly) {
-                    $displayDate = $displayStart->format('Y-m-d H:i') . ' → ' . $displayEnd->format('Y-m-d H:i');
-                } else {
-                    $displayDate = $displayStart->format('Y-m-d H:i');
-                    if ($displayEnd) {
-                        $displayDate .= ' - ' . $displayEnd->format('H:i');
-                    }
-                }
-            }
-
-            // Parse meta for booking details
-            $meta = json_decode($p->meta, true) ?? [];
-            $bookingDetails = [];
-
-            foreach ($meta as $bookingMeta) {
-                $items = [];
-                
-                if ($user->role === 'admin') {
-                    // Admin sees full details including credits
-                    $internalItems = $bookingMeta['internal']['credit_items'] ?? [];
-                    foreach ($internalItems as $item) {
-                        $pricePerUnit = isset($bookingMeta['internal']['rm']['gross']) && $item['quantity'] > 0
-                            ? $bookingMeta['internal']['rm']['gross'] / array_sum(array_column($internalItems, 'quantity'))
-                            : 0;
-
-                        $items[] = [
-                            'age_group' => $item['age_group_label'] ?? 'Unknown',
-                            'quantity' => $item['quantity'] ?? 0,
-                            'attended' => $item['attended'] ?? 0,
-                            'price_per_unit' => round($pricePerUnit, 2),
-                            'paid_credits' => $item['paid_total'] ?? 0,
-                            'free_credits' => $item['free_total'] ?? 0,
-                        ];
-                    }
-                } else {
-                    // Merchant sees basic details without credits
-                    $merchantItems = $bookingMeta['items'] ?? [];
-                    $totalQuantity = array_sum(array_column($merchantItems, 'quantity'));
-                    $bookingGross = $bookingMeta['internal']['rm']['gross'] ?? 0;
-
-                    foreach ($merchantItems as $item) {
-                        $pricePerUnit = $totalQuantity > 0 ? $bookingGross / $totalQuantity : 0;
-
-                        $items[] = [
-                            'age_group' => $item['age_group'] ?? 'Unknown',
-                            'quantity' => $item['quantity'] ?? 0,
-                            'attended' => $item['attended'] ?? 0,
-                            'price_per_unit' => round($pricePerUnit, 2),
-                        ];
-                    }
-                }
-
-                $bookingDetails[] = [
-                    'booking_id' => $bookingMeta['booking_id'] ?? '',
-                    'booking_code' => $bookingMeta['booking_code'] ?? '',
-                    'items' => $items,
-                ];
-            }
-
-            $base = [
-                'id' => $p->id,
-                'event_title' => $event->title ?? '-',
-                'date_display' => $displayDate,
-                'total_amount' => number_format($p->net_amount_in_rm, 2),
-                'total_bookings' => $p->total_bookings, 
-                'status' => $p->status,
-                'available_at' => $p->available_at ? $p->available_at->format('Y-m-d H:i') : '-',
-                'booking_details' => $bookingDetails,
-            ];
-
-            if ($user->role === 'admin') {
-                $base += [
-                    'merchant_name' => $p->merchant->user->full_name ?? 'Unknown',
-                    'merchant_id' => $p->merchant_id,
-                    'total_paid_credits' => $p->total_paid_credits,
-                ];
-            }
-
-            return $base;
-        });
-
-        $summary = null;
-        if ($user->role === 'merchant') {
-            $merchantId = $user->merchant->id;
-            $summaryQuery = MerchantSlotPayout::where('merchant_id', $merchantId);
-
-            $summary = [
-                'total_amount' => number_format($summaryQuery->sum('net_amount_in_rm'), 2),
-                'pending' => number_format($summaryQuery->where('status', 'pending')->sum('net_amount_in_rm'), 2),
-                'paid' => number_format($summaryQuery->where('status', 'paid')->sum('net_amount_in_rm'), 2),
-            ];
-        } elseif ($user->role === 'admin') {
-            $summaryQuery = MerchantSlotPayout::query();
-            if ($request->merchant_id) {
-                $summaryQuery->where('merchant_id', $request->merchant_id);
-            }
-
-            $summary = [
-                'total_amount' => number_format($summaryQuery->sum('net_amount_in_rm'), 2),
-                'pending' => number_format($summaryQuery->where('status', 'pending')->sum('net_amount_in_rm'), 2),
-                'paid' => number_format($summaryQuery->where('status', 'paid')->sum('net_amount_in_rm'), 2),
-            ];
-        }
-
-        return Inertia::render('MerchantPayouts/Index', [
-            'payouts' => $payouts,
-            'summary' => $summary,
-            'role' => $user->role,
-            'merchants' => Merchant::select('id', 'company_name')->orderBy('company_name')->get(),
-            'selectedMerchant' => $request->merchant_id,
-        ]);
-    }
-
-    public function exportSlotPayoutPdf(Request $request)
-    {
-        \Log::info('PDF Export Started', [
-            'user_role' => $request->user()->role,
-            'merchant_id' => $request->merchant_id,
-            'payout_ids' => $request->input('payout_ids', []),
-        ]);
-
-        $user = $request->user();
-        $mode = $user->role === 'admin' ? 'admin' : 'merchant';
-
+        $isAdmin = $user->role === 'admin';
         $merchantId = null;
-        if ($mode === 'merchant') {
-            $merchantId = $user->merchant->id ?? null;
+
+         if (!$isAdmin) {
+            $merchant = $user->merchant
+                ?? Merchant::where('user_id', $user->id)->firstOrFail();
+            $merchantId = $merchant->id;
         } elseif ($request->merchant_id) {
             $merchantId = $request->merchant_id;
         }
 
-        $payoutIds = $request->input('payout_ids', []);
+        $selectedMonth = $request->month ?? now('Asia/Kuala_Lumpur')->format('Y-m');
 
-        $query = MerchantSlotPayout::with(['slot.event', 'merchant.user']);
+        $allPayouts = $this->payoutService->getAllPayouts();
 
-        if ($merchantId) {
-            $query->where('merchant_id', $merchantId);
+       if ($merchantId) {
+            $allPayouts = array_filter(
+                $allPayouts,
+                fn ($p) => $p['payout']->merchant_id === $merchantId
+            );
         }
 
-        if (!empty($payoutIds)) {
-            $query->whereIn('id', $payoutIds);
-        }
+        $allPayouts = array_filter($allPayouts, function ($p) use ($selectedMonth) {
+            if (empty($p['slot_start'])) {
+                return false;
+            }
 
-        // Get last 6 months data grouped by month
-        $sixMonthsAgo = Carbon::now()->subMonths(6)->startOfMonth();
-        $query->where('calculated_at', '>=', $sixMonthsAgo);
-
-        $payouts = $query->orderBy('calculated_at', 'desc')->get();
-        
-        \Log::info('Payouts Found', [
-            'count' => $payouts->count(),
-        ]);
-
-        // Group by month
-        $groupedByMonth = $payouts->groupBy(function ($payout) {
-            return Carbon::parse($payout->calculated_at)->format('Y-m');
+            return $p['slot_start']->format('Y-m') === $selectedMonth;
         });
 
-        $monthlyData = [];
-        foreach ($groupedByMonth as $month => $monthPayouts) {
-            $monthName = Carbon::parse($month . '-01')->format('F Y');
-            
-            $payoutList = $monthPayouts->map(function($p) use ($mode) {
-                $meta = json_decode($p->meta, true) ?? [];
-                
-                \Log::info('Processing Payout', [
-                    'payout_id' => $p->id,
-                    'meta_is_array' => is_array($meta),
-                    'meta_count' => count($meta),
-                ]);
-                
-                $bookingDetails = [];
+        $monthEndTotal = collect($allPayouts)->sum('subtotal');
+        
+        if ($isAdmin) {
+        $grouped = collect($allPayouts)->groupBy(
+            fn ($p) => $p['payout']->merchant_id
+        );
 
-                foreach ($meta as $bookingMeta) {
-                    $items = [];
-                    
-                    if ($mode === 'admin') {
-                        $internalItems = $bookingMeta['internal']['credit_items'] ?? [];
-                        $bookingGross = $bookingMeta['internal']['rm']['gross'] ?? 0;
-                        $totalQuantity = array_sum(array_column($internalItems, 'quantity'));
-                        
-                        foreach ($internalItems as $item) {
-                            $pricePerUnit = $totalQuantity > 0 ? $bookingGross / $totalQuantity : 0;
-                            
-                            $items[] = [
-                                'age_group' => $item['age_group_label'] ?? 'Unknown',
-                                'quantity' => $item['quantity'] ?? 0,
-                                'price_per_unit' => round($pricePerUnit, 2),
-                                'paid_credits' => $item['paid_total'] ?? 0,
-                                'free_credits' => $item['free_total'] ?? 0,
-                            ];
-                        }
-                    } else {
-                        $merchantItems = $bookingMeta['items'] ?? [];
-                        $bookingGross = $bookingMeta['internal']['rm']['gross'] ?? 0;
-                        $totalQuantity = array_sum(array_column($merchantItems, 'quantity'));
-                        
-                        foreach ($merchantItems as $item) {
-                            $pricePerUnit = $totalQuantity > 0 ? $bookingGross / $totalQuantity : 0;
-                            
-                            $items[] = [
-                                'age_group' => $item['age_group'] ?? 'Unknown',
-                                'quantity' => $item['quantity'] ?? 0,
-                                'price_per_unit' => round($pricePerUnit, 2),
-                            ];
-                        }
-                    }
+        $rows = $grouped->map(function ($items) {
+            $first = $items->first();
+            $merchant = $first['payout']->merchant;
 
-                    $bookingDetails[] = [
-                        'booking_code' => $bookingMeta['booking_code'] ?? 'N/A',
-                        'items' => $items,
-                    ];
-                }
+            return [
+                'id' => $merchant->id,
+                'merchant_company' => $merchant->company_name,
+                'total_payout' => $items->sum('subtotal'),
+                'status' => $items->every(
+                    fn ($i) => $i['status'] === 'paid'
+                ) ? 'paid' : 'pending',
+                // keep for navigation / actions
+                'payout_ids' => $items->pluck('payout.id')->all(),
+            ];
+        })->values()->all();
+        } else {
+            $grouped = collect($allPayouts)->groupBy(
+                fn ($p) => $p['payout']->slot->event_id
+            );
+
+            $rows = $grouped->map(function ($items) {
+                $first = $items->first();
+                $event = $first['payout']->slot->event;
 
                 return [
-                    'id' => $p->id,
-                    'event_title' => $p->slot->event->title ?? '-',
-                    'date' => $p->slot->date ?? optional($p->slot->event->dates->first())->start_date,
-                    'total_bookings' => $p->total_bookings,
-                    'total_paid_credits' => $p->total_paid_credits,
-                    'total_amount' => $p->net_amount_in_rm,
-                    'status' => $p->status,
-                    'booking_details' => $bookingDetails,
+                    'id' => $event->id,
+                    'event_title' => $event->title,
+                    'total_payout' => $items->sum('subtotal'),
+                    'status' => $items->every(
+                        fn ($i) => $i['status'] === 'paid'
+                    ) ? 'paid' : 'pending',
+                    // keep for navigation / actions
+                    'payout_ids' => $items->pluck('payout.id')->all(),
                 ];
-            })->toArray();
-
-            $monthlyData[$monthName] = [
-                'payouts' => $payoutList,
-                'total_amount' => $monthPayouts->sum('net_amount_in_rm'),
-                'total_bookings' => $monthPayouts->sum('total_bookings'),
-            ];
+            })->values()->all();
         }
 
-        $merchant = $merchantId ? Merchant::with('user')->find($merchantId) : null;
-
-        \Log::info('PDF Data Prepared', [
-            'monthly_data_count' => count($monthlyData),
-            'merchant' => $merchant ? $merchant->company_name : 'All',
+        /**
+         * STEP 5: Return index data
+         */
+        return Inertia::render('MerchantSlotPayout/Index', [
+            'rows' => $rows,
+            'role' => $user->role,
+            'month' => $selectedMonth,
+            'month_end_total' => $monthEndTotal,
         ]);
-
-        try {
-            $pdf = Pdf::loadView('merchant_payout_report', [
-                'monthlyData' => $monthlyData,
-                'mode' => $mode,
-                'merchant' => $merchant,
-                'generatedAt' => now()->format('Y-m-d H:i:s'),
-            ])->setPaper('a4', 'portrait');
-
-            $filename = 'merchant_payout_report_' . now()->format('Ymd_His') . '.pdf';
-            
-            Log::info('PDF Generated Successfully', ['filename' => $filename]);
-            
-            // Use the same pattern as your working customer transaction export
-            return $pdf->download($filename);
-        } catch (\Exception $e) {
-            Log::error('PDF Generation Failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            
-            return back()->withErrors(['message' => 'Failed to generate PDF: ' . $e->getMessage()]);
-        }
     }
 
-    public function markPaid(Request $request, $payoutId)
+    /**
+     * Display a specific payout.
+     */
+    public function show(Request $request)
     {
-        $payout = MerchantSlotPayout::findOrFail($payoutId);
-        
-        // Update payout status
-        $payout->status = 'paid';
-        $payout->save();
+        $user = Auth::user();
+        $isAdmin = $user->role === 'admin';
 
-        // Find and update the related payout request if exists
-        $payoutRequest = MerchantPayoutRequest::where('payout_ids', 'like', '%"' . $payoutId . '"%')
-            ->where('status', 'pending')
-            ->first();
+        $id = $request->id;
+        $selectedMonth = $request->month ?? now('Asia/Kuala_Lumpur')->format('Y-m');
 
-        if ($payoutRequest) {
-            // Check if all payouts in this request are now paid
-            $allPayoutIds = $payoutRequest->payout_ids;
-            $allPaid = MerchantSlotPayout::whereIn('id', $allPayoutIds)
-                ->where('status', '!=', 'paid')
-                ->count() === 0;
+        if (!$id) {
+            abort(404);
+        }
 
-            if ($allPaid) {
-                $payoutRequest->status = 'paid';
-                $payoutRequest->paid_at = now();
-                $payoutRequest->save();
+        if (!$isAdmin) {
+            $merchant = $user->merchant;
+            if (!$merchant) {
+                abort(403);
             }
         }
 
-        return redirect()->back()->with('success', 'Payout marked as paid');
+        $allPayouts = collect($this->payoutService->getAllPayouts())
+            ->map(function ($p) {
+                // Ensure relationships are loaded
+                if (isset($p['payout']) && $p['payout'] instanceof MerchantSlotPayout) {
+                    $p['payout']->loadMissing('merchant', 'slot.event');
+                }
+                return $p;
+            });
+
+        // Log all payouts to inspect
+        Log::info('All Payouts Loaded', ['all_payouts' => $allPayouts->toArray()]);
+
+        if ($isAdmin) {
+            $merchantPayouts = $allPayouts
+                ->filter(fn ($p) =>
+                    $p['payout']->merchant_id === $id &&
+                    $p['slot_start']?->format('Y-m') === $selectedMonth
+                )
+                ->groupBy(fn ($p) => $p['payout']->slot->event->id);
+
+            if ($merchantPayouts->isEmpty()) {
+                abort(404);
+            }
+
+            $events = $merchantPayouts->map(function ($eventPayouts) {
+                $firstPayout = $eventPayouts->first()['payout'];
+                $event = $firstPayout->slot->event;
+                $merchant = $firstPayout->merchant;
+
+                // Log first payout details
+                Log::info('First Payout for Event', [
+                    'payout_id' => $firstPayout->id,
+                    'merchant' => $merchant ? $merchant->toArray() : null,
+                    'event' => $event->toArray(),
+                ]);
+
+                return [
+                    'event_id' => $event->id,
+                    'event_title' => $event->title,
+                    'merchant_company' => $merchant->company_name ?? 'N/A',
+                    'total_amount' => $eventPayouts->sum('subtotal'),
+                    'slots' => $eventPayouts->map(function ($p) {
+                        return [
+                            'slot_start' => $p['slot_start']?->format('Y-m-d H:i:s'),
+                            'slot_end' => $p['slot_end']?->format('Y-m-d H:i:s'),
+                            'subtotal' => $p['subtotal'],
+                            'booking_breakdown' => $this->mapBookingBreakdown($p),
+                        ];
+                    })->values(),
+                ];
+            })->values();
+
+            return Inertia::render('MerchantSlotPayout/Show', [
+                'role' => 'admin',
+                'month' => $selectedMonth,
+                'events' => $events,
+            ]);
+        }
+
+        // MERCHANT VIEW
+        $eventPayouts = $allPayouts
+            ->filter(fn ($p) =>
+                $p['payout']->merchant_id === $merchant->id &&
+                $p['payout']->slot->event->id === $id &&
+                $p['slot_start']?->format('Y-m') === $selectedMonth
+            );
+
+        if ($eventPayouts->isEmpty()) {
+            abort(404);
+        }
+
+        $event = $eventPayouts->first()['payout']->slot->event;
+
+        // Log merchant view details
+        Log::info('Merchant Event Payouts', [
+            'merchant' => $merchant->toArray(),
+            'event' => $event->toArray(),
+            'payouts' => $eventPayouts->toArray(),
+        ]);
+
+        return Inertia::render('MerchantSlotPayout/Show', [
+            'role' => 'merchant',
+            'month' => $selectedMonth,
+            'event' => [
+                'event_id' => $event->id,
+                'event_title' => $event->title,
+                'merchant_company' => $merchant->company_name ?? 'N/A',
+                'total_amount' => $eventPayouts->sum('subtotal'),
+                'slots' => $eventPayouts->map(function ($p) {
+                    return [
+                        'slot_start' => $p['slot_start']?->format('Y-m-d H:i:s'),
+                        'slot_end' => $p['slot_end']?->format('Y-m-d H:i:s'),
+                        'subtotal' => $p['subtotal'],
+                        'booking_breakdown' => $this->mapBookingBreakdown($p),
+                    ];
+                })->values(),
+            ],
+        ]);
+    }
+
+    private function mapBookingBreakdown(array $p)
+    {
+        return array_map(function ($item) {
+            $quantity = $item['quantity'] ?? 1;
+
+            return [
+                'age_group_id' => $item['age_group_id'] ?? null,
+                'age_group_label' => $item['age_group_label'] ?? 'General',
+                'quantity' => $quantity,
+                'price_in_rm' => $quantity
+                    ? ($item['total_amount'] / $quantity)
+                    : $item['total_amount'],
+                'total_amount' => $item['total_amount'] ?? 0,
+            ];
+        }, $p['booking_breakdown'] ?? []);
+    }
+
+    public function markAsPaid(Request $request)
+    {
+        $user = Auth::user();
+
+        if ($user->role !== 'admin') {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $payoutIds = $request->input('payout_ids', []);
+        $updated = 0;
+
+        foreach ($payoutIds as $id) {
+            $payout = MerchantSlotPayout::find($id);
+            if ($payout && $payout->status !== 'paid') {
+                $payout->status = 'paid';
+                $payout->paid_at = now('Asia/Kuala_Lumpur');
+                $payout->save();
+                $updated++;
+                Log::info('Payout marked as paid by admin', [
+                    'payout_id' => $payout->id,
+                    'admin_user_id' => $user->id,
+                    'paid_at' => $payout->paid_at,
+                ]);
+            }
+        }
+
+        if ($updated === 0) {
+            return back()->with('error', 'No payouts were marked as paid.');
+        }
+
+        return back()->with('success', "$updated payout(s) marked as paid successfully.");
+    }
+
+    /**
+     * Export payouts to PDF.
+     */
+    public function exportSlotPayoutPdf(Request $request)
+    {
+        $user = Auth::user();
+        $isAdmin = $user->role === 'admin';
+        $merchant = null;
+        $merchantId = null;
+
+        if (!$isAdmin) {
+            $merchant = $user->merchant
+                ?? Merchant::where('user_id', $user->id)->firstOrFail();
+            $merchantId = $merchant->id;
+        } elseif ($request->merchant_id) {
+            $merchantId = $request->merchant_id;
+        }
+
+        $month = $request->input(
+            'month',
+            Carbon::now('Asia/Kuala_Lumpur')->format('Y-m')
+        );
+
+        $allPayouts = collect($this->payoutService->getAllPayouts())
+            ->map(function ($p) {
+                if (isset($p['payout']) && $p['payout'] instanceof MerchantSlotPayout) {
+                    $p['payout']->loadMissing('merchant', 'slot.event');
+                }
+                return $p;
+            })
+            ->filter(function ($p) use ($month, $merchantId, $isAdmin, $user, &$merchant) {
+                // Filter by merchant
+                if (!$isAdmin && $p['payout']->merchant_id !== $merchant?->id) {
+                    return false;
+                }
+                if ($isAdmin && $merchantId && $p['payout']->merchant_id !== $merchantId) {
+                    return false;
+                }
+
+                // Filter by month
+                return $p['slot_start']?->format('Y-m') === $month;
+            });
+
+        $monthData = [];
+        // Filter by month and merchant
+        $filtered = collect($allPayouts)
+            ->filter(function ($p) use ($merchantId, $month) {
+                if (empty($p['slot_start'])) return false;
+                return $p['slot_start']->format('Y-m') === $month
+                    && (!$merchantId || $p['payout']->merchant_id === $merchantId);
+            });
+
+        if ($isAdmin) {
+            // Admin: group by merchant, then events and slots
+            $groupedByMerchant = $filtered->groupBy(fn($p) => $p['payout']->merchant_id);
+
+            $payouts = $groupedByMerchant->map(function ($items, $mId) {
+                $merchant = $items->first()['payout']->merchant;
+                $events = $items->groupBy(fn($p) => $p['payout']->slot->event->id)
+                    ->map(function ($eventPayouts) {
+                        $event = $eventPayouts->first()['payout']->slot->event;
+                        $slots = $eventPayouts->map(function ($p) {
+                            return [
+                                'slot_start' => $p['slot_start']?->format('Y-m-d H:i:s'),
+                                'slot_end' => $p['slot_end']?->format('Y-m-d H:i:s'),
+                                'subtotal' => $p['subtotal'],
+                                'total_bookings' => count($p['booking_breakdown'] ?? []),
+                                'booking_breakdown' => $this->mapBookingBreakdown($p),
+                            ];
+                        })->values();
+
+                        return [
+                            'event_title' => $event->title,
+                            'total_amount' => $eventPayouts->sum('subtotal'),
+                            'total_bookings' => $eventPayouts->sum(fn($s) => count($s['booking_breakdown'] ?? [])),
+                            'slots' => $slots,
+                        ];
+                    })->values();
+
+                return [
+                    'merchant_company' => $merchant->company_name ?? 'N/A',
+                    'total_amount' => $items->sum('subtotal'),
+                    'total_bookings' => $items->sum(fn($i) => count($i['booking_breakdown'] ?? [])),
+                    'events' => $events,
+                ];
+            })->values();
+        } else {
+            // Merchant: group by event only
+            $groupedByEvent = $filtered->groupBy(fn($p) => $p['payout']->slot->event->id);
+
+            $payouts = $groupedByEvent->map(function ($eventPayouts) use ($merchant) {
+                $event = $eventPayouts->first()['payout']->slot->event;
+
+                $slots = $eventPayouts->map(function ($p) {
+                    return [
+                        'slot_start' => $p['slot_start']?->format('Y-m-d H:i:s'),
+                        'slot_end' => $p['slot_end']?->format('Y-m-d H:i:s'),
+                        'subtotal' => $p['subtotal'],
+                        'booking_breakdown' => $this->mapBookingBreakdown($p),
+                    ];
+                })->values();
+
+                return [
+                    'event_title' => $event->title,
+                    'total_amount' => $eventPayouts->sum('subtotal'),
+                    'slots' => $slots,
+                ];
+            })->values();
+        }
+
+        $monthData = [
+            'total_amount' => $filtered->sum('subtotal'),
+            'payouts' => $payouts,
+        ];
+
+        $pdf = Pdf::loadView('merchant_slot_payouts', [
+            'month'       => Carbon::createFromFormat('Y-m', $month)->format('F Y'),
+            'monthData'   => $monthData,
+            'merchant'    => $merchant,
+            'generatedAt' => now('Asia/Kuala_Lumpur')->format('l, F j, Y \a\t g:i A'),
+            'mode'        => $isAdmin ? 'admin' : 'merchant',
+        ]);
+
+        return $pdf->download("merchant_slot_payouts_{$month}.pdf");
     }
 }

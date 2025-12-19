@@ -118,7 +118,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/payouts', [MerchantPayoutController::class, 'index'])->name('payouts.index');
         Route::get('/payouts/export-pdf', [MerchantPayoutController::class, 'exportSlotPayoutPdf'])->name('payouts.export.pdf');          
         Route::get('/payouts/{payout}', [MerchantPayoutController::class, 'show'])->name('payouts.show');
-        Route::post('/payouts/{payout}/mark-paid', [MerchantPayoutController::class, 'markAsPaid'])->name('payouts.mark-paid');
+        Route::post('/payouts/mark-paid', [MerchantPayoutController::class, 'markAsPaid'])->name('payouts.mark-paid');
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
     });
 
@@ -140,7 +140,7 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/payouts/export-pdf', [MerchantPayoutController::class, 'exportSlotPayoutPdf'])->name('payouts.export.pdf');          
         Route::get('/payouts', [MerchantPayoutController::class, 'index'])->name('payouts.index');
-        Route::get('/payouts/{payout}', [MerchantPayoutController::class, 'show'])->name('payouts.show');
+        Route::get('/payouts/show', [MerchantPayoutController::class, 'show'])->name('payouts.show');
         
         Route::get('/dashboard', [MerchantDashboardController::class, 'index'])->name('dashboard');
     });

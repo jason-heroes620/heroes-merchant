@@ -6,10 +6,13 @@ use Illuminate\Http\Request;
 use App\Models\EventSlot;
 use App\Models\Booking;
 use App\Models\Attendance;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class AttendanceController extends Controller
 {
-    public function scanQr(Request $request)
+
+     public function scanPreview(Request $request)
     {
         $user = $request->user();
         $merchant = $user->merchant ?? null;
@@ -23,50 +26,141 @@ class AttendanceController extends Controller
         ]);
 
         $payload = json_decode($data['qr_code_content'], true);
-        if (!isset($payload['booking_id'])) {
+        if (!isset($payload['code'])) {
             return response()->json(['message' => 'Invalid QR code'], 422);
         }
 
-        $booking = Booking::with('event')->find($payload['booking_id']);
+        // Fetch booking
+        $booking = Booking::with('event')->where('booking_code', $payload['code'])->first();
         if (!$booking) {
             return response()->json(['message' => 'Booking not found'], 404);
         }
 
+        // Ensure booking belongs to this merchant
         if (!$booking->event || $booking->event->merchant_id !== $merchant->id) {
             return response()->json(['message' => 'Booking does not belong to this merchant'], 403);
         }
 
-        $attendance = Attendance::updateOrCreate(
-            ['booking_id' => $booking->id, 'slot_id' => $booking->slot_id],
-            [
-                'customer_id' => $booking->customer_id,
-                'event_id' => $booking->event_id,
-                'status' => 'attended',
-                'scanned_at' => now(),
-            ]
-        );
+        $alreadyClaimed = Attendance::where('booking_id', $booking->id)
+        ->where('slot_id', $booking->slot_id)
+        ->where('status', 'attended')
+        ->whereNotNull('scanned_at')
+        ->exists();
 
-        $attendances = Attendance::with('customer')
-            ->where('slot_id', $booking->slot_id)
-            ->orderBy('scanned_at', 'asc')
-            ->get();
+        $media = $booking->event->media->map(fn($m) => [
+            'id' => $m->id,
+            'type' => $m->type,
+            'file_path' => $m->url,
+        ]);
+
+        $displayStart = $booking->slot->display_start;
+        $displayEnd = $booking->slot->display_end;
+
+        if (!$displayStart || !$displayEnd) {
+            $eventDate = $booking->slot->date;
+            if ($eventDate) {
+                $startDate = $eventDate->start_date ? Carbon::parse($eventDate->start_date)->format('Y-m-d') : null;
+                $endDate = $eventDate->end_date ? Carbon::parse($eventDate->end_date)->format('Y-m-d') : null;
+
+                $startTime = $booking->slot->start_time?->format('H:i:s') ?? '00:00:00';
+                $endTime = $booking->slot->end_time?->format('H:i:s') ?? '23:59:59';
+
+                $displayStart = $startDate ? Carbon::createFromFormat('Y-m-d H:i:s', "$startDate $startTime", 'Asia/Kuala_Lumpur') : null;
+                $displayEnd = $endDate ? Carbon::createFromFormat('Y-m-d H:i:s', "$endDate $endTime", 'Asia/Kuala_Lumpur') : null;
+            }
+        }
 
         return response()->json([
-            'message' => 'Attendance recorded',
-            'attendance_status' => $attendance->status,
-            'scanned_at' => $attendance->scanned_at,
-            'attendance_list' => $attendances->map(fn($a) => [
-                'customer_name' => $a->customer->full_name,
-                'status' => $a->status,
-                'scanned_at' => $a->scanned_at,
-            ]),
+            'booking' => [
+                'booking_id' => $booking->id,
+                'booking_code' => $booking->booking_code,
+                'customer_name' => $booking->customer->user->full_name,
+                'slot_id' => $booking->slot_id,
+                'slot_start' => $displayStart?->toDateTimeString(),
+                'slot_end' => $displayEnd?->toDateTimeString(),
+                'items' => $booking->items->map(fn ($item) => [
+                    'id' => $item->id,
+                    'label' => $item->ageGroup?->label ?? 'General',
+                    'quantity' => $item->quantity,
+                    'quantity_attended' => $item->quantity_attended ?? 0,
+                ]),
+                'media' => $media,
+            ],
+            'already_claimed' => $alreadyClaimed,
         ]);
     }
 
-    public function markAttendance(Request $request, $bookingId)
+    public function claimAttendance(Request $request)
     {
         $user = $request->user();
-        $merchant = $user->merchant ?? null;
+        $merchant = $user->merchant;
+
+        if (!$merchant) {
+            return response()->json(['message' => 'Merchant record not found'], 404);
+        }
+
+        $data = $request->validate([
+            'booking_id' => 'required|uuid',
+            'items' => 'required|array|min:1',
+            'items.*.id' => 'required|uuid|exists:booking_items,id',
+            'items.*.quantity_attended' => 'required|integer|min:0',
+        ]);
+
+        $booking = Booking::with(['slot.event', 'items'])
+            ->find($data['booking_id']);
+
+        if (
+            !$booking ||
+            !$booking->slot ||
+            !$booking->slot->event ||
+            $booking->slot->event->merchant_id !== $merchant->id
+        ) {
+            return response()->json(['message' => 'Booking not found or unauthorized'], 404);
+        }
+
+        DB::transaction(function () use ($booking, $data) {
+            foreach ($data['items'] as $itemData) {
+                $bookingItem = $booking->items->firstWhere('id', $itemData['id']);
+
+                if (!$bookingItem) {
+                    continue;
+                }
+
+                $attendedQty = min(
+                    $itemData['quantity_attended'],
+                    $bookingItem->quantity
+                );
+
+                $bookingItem->update([
+                    'quantity_attended' => $attendedQty,
+                ]);
+
+                Attendance::updateOrCreate(
+                    [
+                        'booking_id' => $booking->id,
+                        'slot_id' => $booking->slot_id,
+                        'booking_item_id' => $bookingItem->id,
+                    ],
+                    [
+                        'customer_id' => $booking->customer_id,
+                        'event_id' => $booking->event_id,
+                        'status' => $attendedQty > 0 ? 'attended' : 'absent',
+                        'scanned_at' => $attendedQty > 0 ? now() : null,
+                    ]
+                );
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Attendance claimed successfully',
+        ]);
+    }
+
+    public function manualClaim(Request $request, $bookingId)
+    {
+        $user = $request->user();
+        $merchant = $user->merchant;
 
         if (!$merchant) {
             return response()->json(['message' => 'Merchant record not found'], 404);
@@ -75,9 +169,9 @@ class AttendanceController extends Controller
         $booking = Booking::with('slot.event', 'items')->find($bookingId);
 
         if (
-            !$booking || 
-            !$booking->slot || 
-            !$booking->slot->event || 
+            !$booking ||
+            !$booking->slot ||
+            !$booking->slot->event ||
             $booking->slot->event->merchant_id !== $merchant->id
         ) {
             return response()->json(['message' => 'Booking not found or unauthorized'], 404);
@@ -86,7 +180,7 @@ class AttendanceController extends Controller
         $data = $request->validate([
             'status' => 'required|in:pending,attended,absent',
             'booking_item_id' => 'required|exists:booking_items,id',
-            'quantity' => 'nullable|integer|min:0', // ✅ Allow 0 for no-shows
+            'quantity' => 'nullable|integer|min:0',
         ]);
 
         $bookingItem = $booking->items->firstWhere('id', $data['booking_item_id']);
@@ -95,62 +189,41 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Booking item not found'], 404);
         }
 
-        // Prevent merchant tampering with other booking's items
-        if ($bookingItem->booking_id !== $booking->id) {
-            return response()->json(['message' => 'Invalid booking item'], 400);
-        }
+        DB::transaction(function () use ($booking, $bookingItem, $data) {
 
-        // ✅ Find existing Attendance record regardless of current status
-        // This allows toggling between attended/pending/absent
-        $attendance = Attendance::where('booking_item_id', $bookingItem->id)
-            ->where('slot_id', $booking->slot_id)
-            ->first();
+            $attendance = Attendance::updateOrCreate(
+                [
+                    'booking_id' => $booking->id,
+                    'slot_id' => $booking->slot_id,
+                    'booking_item_id' => $bookingItem->id,
+                ],
+                [
+                    'customer_id' => $booking->customer_id,
+                    'event_id' => $booking->event_id,
+                ]
+            );
 
-        if (!$attendance) {
-            return response()->json(['message' => 'No attendance record found'], 404);
-        }
-
-        \DB::transaction(function () use ($bookingItem, $attendance, $data) {
-            // Update attendance status and scanned_at
-            $attendance->status = $data['status'];
-            $attendance->scanned_at = $data['status'] === 'attended' ? now() : null;
-            $attendance->save();
-
-            // Update quantity_attended based on status
             if ($data['status'] === 'attended') {
-                // ✅ Use provided quantity (can be 0), default to full quantity if not provided
-                $bookingItem->quantity_attended = isset($data['quantity'])
+                $qty = isset($data['quantity'])
                     ? min($data['quantity'], $bookingItem->quantity)
                     : $bookingItem->quantity;
-            } else {
-                // ✅ Reset to 0 for pending or absent
-                $bookingItem->quantity_attended = 0;
-            }
-            
-            $bookingItem->save();
-        });
 
-        \Log::info('Attendance updated', [
-            'merchant_id' => $merchant->id ?? null,
-            'booking_id' => $booking->id,
-            'slot_id' => $booking->slot_id,
-            'event_id' => $booking->slot->event->id ?? null,
-            'customer_id' => $booking->customer_id,
-            'booking_item_id' => $bookingItem->id,
-            'status' => $data['status'],
-            'quantity_provided' => $data['quantity'] ?? null,
-            'quantity_attended_after' => $bookingItem->quantity_attended,
-            'quantity_total' => $bookingItem->quantity,
-        ]);
+                $bookingItem->quantity_attended = $qty;
+                $attendance->scanned_at = now();
+            } else {
+                $bookingItem->quantity_attended = 0;
+                $attendance->scanned_at = null;
+            }
+
+            $attendance->status = $data['status'];
+
+            $bookingItem->save();
+            $attendance->save();
+        });
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'booking_item_id' => $bookingItem->id,
-                'status' => $attendance->status,
-                'quantity_attended' => $bookingItem->quantity_attended,
-                'quantity_total' => $bookingItem->quantity,
-            ],
+            'message' => 'Attendance updated successfully',
         ]);
     }
 
@@ -205,104 +278,6 @@ class AttendanceController extends Controller
                 'slot_end' => optional($slot->display_end)?->setTimezone('Asia/Kuala_Lumpur')->toDateTimeString(),
                 'attendance' => $attendance,
             ],
-        ]);
-    }
-
-    public function getAttendances(Request $request)
-    {
-        $user = $request->user();
-        $merchant = $user->merchant ?? null;
-
-        if (!$merchant) {
-            return response()->json(['message' => 'Merchant record not found'], 404);
-        }
-
-        $bookings = Booking::with([
-                'slot.event.location',
-                'slot.event.media',
-                'items.ageGroup',
-                'customer.user',
-                'attendance',
-            ])
-            ->whereHas('event', fn($q) => $q->where('merchant_id', $merchant->id))
-            ->where('status', 'confirmed') 
-            ->get();
-
-        $grouped = $bookings->map(function($booking) {
-            // Handle null slot gracefully
-            if (!$booking->slot) {
-                return null;
-            }
-
-            $event = $booking->slot->event ?? $booking->event;
-            
-            if (!$event) {
-                return null;
-            }
-
-            // Get first media URL if available
-            $eventMedia = null;
-            if ($event->media && $event->media->isNotEmpty()) {
-                $eventMedia = $event->media->first()->url ?? null;
-            }
-
-            // Get location data
-            $eventLocation = null;
-            if ($event->location) {
-                $eventLocation = [
-                    'id' => $event->location->id,
-                    'location_name' => $event->location->location_name,
-                    'latitude' => $event->location->latitude,
-                    'longitude' => $event->location->longitude,
-                ];
-            }
-
-            return [
-                'booking_id' => $booking->id,
-                'booking_code' => $booking->booking_code,
-                'event_id' => $event->id,
-                'event_title' => $event->title,
-                'event_type' => $event->type ?? 'one-time',
-                'event_media' => $eventMedia,
-                'event_location' => $eventLocation,
-                'slot_id' => $booking->slot->id,
-                'slot_start' => $booking->slot->display_start 
-                    ? $booking->slot->display_start->setTimezone('Asia/Kuala_Lumpur')->toDateTimeString()
-                    : null,
-                'slot_end' => $booking->slot->display_end 
-                    ? $booking->slot->display_end->setTimezone('Asia/Kuala_Lumpur')->toDateTimeString()
-                    : null,
-                'customer' => [
-                    'id' => $booking->customer->id,
-                    'name' => $booking->customer->user->full_name ?? 'Unknown',
-                    'email' => $booking->customer->user->email ?? '',
-                ],
-                'booking_items' => $booking->items->map(function($item) use ($booking) {
-                    $attendances = $booking->attendance
-                        ->where('booking_item_id', $item->id)
-                        ->map(function($a) {
-                            return [
-                                'status' => $a->status,
-                                'scanned_at' => $a->scanned_at 
-                                    ? $a->scanned_at->setTimezone('Asia/Kuala_Lumpur')->toDateTimeString()
-                                    : null,
-                            ];
-                        })->values();
-
-                    return [
-                        'item_id' => $item->id,
-                        'age_group' => $item->ageGroup?->label ?? 'General',
-                        'quantity' => $item->quantity,
-                        'quantity_attended' => $item->quantity_attended ?? 0,
-                        'attendances' => $attendances,
-                    ];
-                })->values(),
-            ];
-        })->filter()->values(); 
-
-        return response()->json([
-            'success' => true,
-            'data' => $grouped,
         ]);
     }
 }

@@ -7,73 +7,101 @@ use App\Models\{
     Event,
 };
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class MerchantEventController extends Controller
 {
-    public function merchantEvents(Request $request)
+    public function merchantSlots(Request $request)
     {
-        $today = now('Asia/Kuala_Lumpur'); 
+        $tz = 'Asia/Kuala_Lumpur';
+        $todayStart = Carbon::now($tz)->startOfDay();
+        $todayEnd   = Carbon::now($tz)->endOfDay();
+
         $user = $request->user();
         $merchant = Merchant::where('user_id', $user->id)->firstOrFail();
 
-        $status = $request->query('status', 'upcoming'); 
+        $events = Event::with([
+                'media',
+                'slots.bookings.items',
+                'slots.date',
+                'slots.prices',
+            ])
+            ->where('status', 'active')
+            ->where('merchant_id', $merchant->id)
+            ->get();
 
-        $query = Event::with([
-            'location',
-            'prices',
-            'ageGroups',
-            'frequencies',
-            'slots' => fn($q) => $q->orderBy('date'),
-            'media',
-        ])
-        ->where('status', 'active')
-        ->where('merchant_id', $merchant->id);
+        $slotsList = collect();
 
-        if ($status === 'upcoming') {
-            $query->where(function ($q) use ($today) {
-                $q->whereHas('slots', fn($slotQ) =>
-                    $slotQ->whereDate('date', '>=', $today->toDateString())
-                )
-                ->orWhereHas('dates', fn($dateQ) =>
-                    $dateQ->whereDate('end_date', '>=', $today->toDateString())
-                );
+        foreach ($events as $event) {
+            // Filter today's slots
+            $todaySlots = $event->slots->filter(function ($s) use ($todayStart, $todayEnd, $tz) {
+                $displayStart = $s->display_start ? Carbon::parse($s->display_start)->setTimezone($tz) : null;
+                $displayEnd   = $s->display_end   ? Carbon::parse($s->display_end)->setTimezone($tz) : null;
+
+                if (!$displayStart || !$displayEnd) {
+                    $eventDate = $s->date;
+                    if (!$eventDate) return false;
+
+                    $startDate = $eventDate->start_date?->format('Y-m-d');
+                    $endDate   = $eventDate->end_date?->format('Y-m-d');
+
+                    $startTime = $s->start_time?->format('H:i:s') ?? '00:00:00';
+                    $endTime   = $s->end_time?->format('H:i:s') ?? '23:59:59';
+
+                    $displayStart = $startDate
+                        ? Carbon::createFromFormat('Y-m-d H:i:s', "$startDate $startTime", $tz)
+                        : null;
+
+                    $displayEnd = $endDate
+                        ? Carbon::createFromFormat('Y-m-d H:i:s', "$endDate $endTime", $tz)
+                        : null;
+                }
+
+                return $displayStart && $displayEnd
+                    && $displayStart <= $todayEnd
+                    && $displayEnd >= $todayStart;
             });
-        } elseif ($status === 'past') {
-            $query->where(function ($q) use ($today) {
-                $q->whereHas('slots', fn($slotQ) =>
-                    $slotQ->whereDate('date', '<', $today->toDateString())
-                )
-                ->orWhereHas('dates', fn($dateQ) =>
-                    $dateQ->whereDate('end_date', '<', $today->toDateString())
-                );
-            });
+
+            foreach ($todaySlots as $slot) {
+                // Aggregate booking data
+                $totalBookings = 0;
+                $expectedAttendees = 0;
+
+                foreach ($slot->bookings as $booking) {
+                    if ($booking->status !== 'confirmed') continue;
+
+                    $totalBookings++;
+
+                    foreach ($booking->items as $item) {
+                        $expectedAttendees += (int) $item->quantity;
+                    }
+                }
+
+                // Transform media
+                $media = $event->media->map(fn($m) => [
+                    'id' => $m->id,
+                    'url' => $m->url,
+                    'file_path' => $m->url,
+                    'type' => $m->type,
+                ])->values();
+
+                $slotsList->push([
+                    'slot_id' => $slot->id,
+                    'event_id' => $event->id,
+                    'event_title' => $event->title,
+                    'media' => $media,
+                    'slot_start' => $slot->display_start ? Carbon::parse($slot->display_start)->setTimezone($tz)->format('Y-m-d H:i:s') : null,
+                    'slot_end' => $slot->display_end ? Carbon::parse($slot->display_end)->setTimezone($tz)->format('Y-m-d H:i:s') : null,
+                    'total_bookings' => $totalBookings,
+                    'expected_attendees' => $expectedAttendees,
+                ]);
+            }
         }
-
-        $events = $query->orderByDesc('featured')
-                        ->orderBy('created_at', 'desc')
-                        ->get();
-
-        $events->transform(function ($event) {
-            $event->slots->transform(function ($slot) {
-                $slot->available_seats = $slot->is_unlimited
-                    ? null
-                    : $slot->capacity - $slot->booked_quantity;
-                return $slot;
-            });
-
-            $event->slotPrices = $event->slots->flatMap(fn($slot) => $slot->prices)->values();
-            $event->media->transform(function ($media) {
-                $media->file_path = $media->url;
-                return $media;
-            });
-
-            return $event;
-        });
 
         return response()->json([
             'success' => true,
-            'count' => $events->count(),
-            'events' => $events,
+            'count' => $slotsList->count(),
+            'slots' => $slotsList->values(),
         ]);
     }
 }

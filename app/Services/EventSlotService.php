@@ -163,12 +163,13 @@ class EventSlotService
         $pricingType = $event->prices()->first()?->pricing_type ?? 'fixed';
         $ageGroups = $event->ageGroups;
 
-        if (in_array($pricingType, ['age_based', 'mixed']) && $ageGroups->count()) {
-            // Only create the relevant price per slot based on day type
+        if ($ageGroups->count()) {
             foreach ($ageGroups as $ageGroup) {
+                // Try to find price for this age group; fallback to general price if none exists
                 $priceRow = $event->prices()
                     ->where('event_age_group_id', $ageGroup->id)
-                    ->first();
+                    ->first() 
+                    ?? $event->prices()->whereNull('event_age_group_id')->first();
 
                 if (!$priceRow) continue;
 
@@ -177,6 +178,7 @@ class EventSlotService
                     'mixed' => $isWeekend
                         ? ($priceRow->weekend_price_in_rm ?? $priceRow->fixed_price_in_rm ?? 0)
                         : ($priceRow->weekday_price_in_rm ?? $priceRow->fixed_price_in_rm ?? 0),
+                    'fixed', 'day_type' => $priceRow->fixed_price_in_rm ?? 0,
                     default => 0,
                 };
 
@@ -187,7 +189,7 @@ class EventSlotService
                 ]);
             }
         } else {
-            // Fixed or day_type pricing without age groups
+            // No age groups: create one slot price
             $price = $this->resolvePrice($event, $isWeekend, null);
             EventSlotPrice::create([
                 'event_slot_id' => $slot->id,

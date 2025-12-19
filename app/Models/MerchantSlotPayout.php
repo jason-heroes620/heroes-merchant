@@ -12,29 +12,21 @@ class MerchantSlotPayout extends Model
 
     protected $table = 'merchant_slot_payouts';
 
+    protected $keyType = 'string';
+    public $incrementing = false;
+
     protected $fillable = [
-        'id',
         'merchant_id',
-        'event_id',
         'slot_id',
-        'total_paid_credits',
-        'total_free_credits', 
-        'gross_amount_in_rm',
-        'platform_fee_in_rm',
-        'net_amount_in_rm',
-        'total_bookings',
-        'booking_ids',             
-        'meta', 
-        'calculated_at',
-        'available_at',
+        'booking_id',
+        'total_amount_in_rm',
         'status',
+        'paid_at',
     ];
 
     protected $casts = [
-        'calculated_at' => 'datetime',
-        'available_at' => 'datetime',
-        'booking_ids' => 'array',  
-        'meta' => 'array', 
+        'paid_at' => 'datetime',
+        'total_amount_in_rm' => 'decimal:2',
     ];
 
     public function merchant()
@@ -45,5 +37,15 @@ class MerchantSlotPayout extends Model
     public function slot()
     {
         return $this->belongsTo(EventSlot::class, 'slot_id');
+    }
+
+    public function booking()
+    {
+        return $this->belongsTo(Booking::class);
+    }
+
+    public function items()
+    {
+        return $this->hasMany(MerchantSlotPayoutItem::class, 'payout_id');
     }
 }

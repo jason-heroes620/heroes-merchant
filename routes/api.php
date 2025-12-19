@@ -76,13 +76,12 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 Route::middleware('auth:sanctum')->prefix('merchant')->group(function () {
-    Route::get('/events', [MerchantEventController::class, 'merchantEvents']);
-    Route::get('/events/{event}', [MerchantEventController::class, 'showMerchantEvent']);
-    Route::post('/scan-qr', [AttendanceController::class, 'scanQr']);
-    Route::get('/bookings/event/{eventId}', [MerchantBookingController::class, 'apiBookingsByEvent']);
-    Route::get('/attendances', [AttendanceController::class, 'getAttendances']);
-    Route::post('/attendances/{bookingId}/mark', [AttendanceController::class, 'markAttendance']);
+    Route::get('/events', [MerchantEventController::class, 'merchantSlots']);
+    Route::post('/scan-qr', [AttendanceController::class, 'scanPreview']);
+    Route::post('/attendance/claim', [AttendanceController::class, 'claimAttendance']);
     Route::get('/attendances/slot/{slotId}', [AttendanceController::class, 'getSlotAttendances']);
+    Route::get('/bookings/event/{eventId}', [MerchantBookingController::class, 'apiBookingsByEvent']);
+    Route::post('/attendances/{bookingId}/manual-claim', [AttendanceController::class, 'manualClaim']);
 });
 
 //Public Events
