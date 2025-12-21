@@ -146,8 +146,7 @@ class AdminDashboardService
             ->where('created_at', '>=', $startDate)
             ->sum('amount_in_rm');
 
-        $payouts = MerchantSlotPayout::where('calculated_at', '>=', $startDate)
-            ->sum('gross_amount_in_rm');
+        $payouts = MerchantSlotPayout::sum('total_amount_in_rm');
 
         return [
             'totalPurchases' => $purchases,
@@ -183,12 +182,9 @@ class AdminDashboardService
                 ->get(),
 
             'payoutTrend' => MerchantSlotPayout::selectRaw("
-                    DATE(calculated_at) as date,
-                    SUM(net_amount_in_rm) as amount
+                    SUM(total_amount_in_rm) as amount
                 ")
-                ->where('calculated_at', '>=', now()->subDays(7))
-                ->groupBy('date')
-                ->orderBy('date')
+                ->where('created_at', '>=', now()->subDays(30))
                 ->get(),
         ];
     }
@@ -199,9 +195,9 @@ class AdminDashboardService
     protected function getTables()
     {
         return [
-            'payoutRequests' => MerchantSlotPayout::where('status', 'requested')
+            'payoutRequests' => MerchantSlotPayout::where('status', 'pending')
                 ->with(['merchant.user'])
-                ->orderBy('available_at')
+                ->orderBy('created_at')
                 ->get(),
 
             'topEvents' => Event::withCount(['bookings' => fn($q) => $q->where('status', 'confirmed')])
@@ -270,7 +266,7 @@ class AdminDashboardService
             ->whereHas('merchant')
             ->with(['merchant' => function($q) {
                 $q->withCount('events')
-                  ->withSum('payouts', 'net_amount_in_rm');
+                  ->withSum('payouts', 'total_amount_in_rm');
             }])
             ->get()
             ->map(fn($u) => [
@@ -278,7 +274,7 @@ class AdminDashboardService
                 'name' => $u->full_name,
                 'email' => $u->email,
                 'total_events' => (int) ($u->merchant->events_count ?? 0),
-                'total_earned' => (float) ($u->merchant->payouts_sum_net_amount_in_rm ?? 0),
+                'total_earned' => (float) ($u->merchant->payouts_sum_total_amount_in_rm ?? 0),
             ])
             ->sortByDesc('total_earned')
             ->take(10)

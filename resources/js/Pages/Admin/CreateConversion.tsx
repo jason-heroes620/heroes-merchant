@@ -36,6 +36,7 @@ interface Errors {
 
 const ConversionsCreate: React.FC = () => {
     const { props } = usePage<any>();
+    const { flash } = props;
     const { post, data, setData } = useForm<FormData>({
         credits: "",
         rm: "",
@@ -49,6 +50,15 @@ const ConversionsCreate: React.FC = () => {
         valid_until: "",
     });
     const errors = props.errors as Errors;
+
+    useEffect(() => {
+        if (flash?.error) {
+            toast.error(flash.error);
+        }
+        if (flash?.success) {
+            toast.success(flash.success);
+        }
+    }, [flash]);
 
     // Auto-calculate credits_per_rm when credits or rm changes
     useEffect(() => {
@@ -67,13 +77,13 @@ const ConversionsCreate: React.FC = () => {
 
     // Calculate preview credits
     useEffect(() => {
-        const creditsPerRM = parseFloat(data.credits_per_rm);
-        if (!isNaN(creditsPerRM) && creditsPerRM > 0) {
-            const minPaidCredits = Math.ceil(creditsPerRM);
-            const calculatedPaid = Math.ceil(
-                creditsPerRM * (data.paid_credit_percentage / 100)
-            );
-            const paidCredits = Math.max(calculatedPaid, minPaidCredits);
+        const credits = parseFloat(data.credits);
+
+        if (!isNaN(credits) && credits > 0) {
+            // Paid credits is simply the credits input
+            const paidCredits = Math.ceil(credits);
+
+            // Free credits calculated from paid credits
             const freeCredits = Math.ceil(
                 (paidCredits / data.paid_credit_percentage) *
                     data.free_credit_percentage
@@ -92,7 +102,7 @@ const ConversionsCreate: React.FC = () => {
             }));
         }
     }, [
-        data.credits_per_rm,
+        data.credits,
         data.paid_credit_percentage,
         data.free_credit_percentage,
         setData,
@@ -127,9 +137,6 @@ const ConversionsCreate: React.FC = () => {
         e.preventDefault();
 
         post("/admin/conversions", {
-            onSuccess: () => {
-                toast.success("Conversion rate created successfully. Standard Package has been created.");
-            },
             onError: (errors) => {
                 Object.values(errors).forEach((error) =>
                     toast.error(error as string)
@@ -334,7 +341,7 @@ const ConversionsCreate: React.FC = () => {
                                         <div className="flex items-center gap-2 text-amber-600">
                                             <Repeat className="w-5 h-5" />
                                             <h2 className="text-lg font-semibold text-gray-800">
-                                                Conversion Rule (Fallback)
+                                                Paid to Free Ratio
                                             </h2>
                                         </div>
 
@@ -350,9 +357,6 @@ const ConversionsCreate: React.FC = () => {
                                             </p>
 
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Paid to Free Ratio
-                                                </label>
                                                 <div className="flex items-center gap-3">
                                                     <input
                                                         type="number"
@@ -454,13 +458,25 @@ const ConversionsCreate: React.FC = () => {
                                         {/* Main Rate Display */}
                                         {data.credits_per_rm ? (
                                             <>
-                                                <div className="text-center pb-2 border-b border-gray-100">
-                                                    <div className="text-5xl font-bold text-gray-800 mb-2">
-                                                        {data.credits_per_rm}
+                                                <div className="text-center pb-4 border-b border-gray-100">
+                                                    <div className="text-5xl font-bold text-orange-600 mb-1">
+                                                        RM {data.rm || "—"}
                                                     </div>
-                                                    <div className="text-sm text-gray-500 font-medium">
-                                                        Credits per RM
+                                                    <div className="text-sm text-gray-500 font-medium mb-3">
+                                                        Standard Package
                                                     </div>
+                                                    {data.rm &&
+                                                        data.credits_per_rm && (
+                                                            <div className="inline-flex items-center gap-2 bg-gray-50 px-4 py-2 rounded-lg border border-gray-200">
+                                                                <span className="text-xs text-gray-600 font-semibold">
+                                                                    {
+                                                                        data.credits_per_rm
+                                                                    }{" "}
+                                                                    credits per
+                                                                    RM
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                 </div>
 
                                                 {/* Credit Breakdown */}
@@ -548,8 +564,7 @@ const ConversionsCreate: React.FC = () => {
                                                             <div className="bg-white rounded-lg p-3 mb-2">
                                                                 <p className="text-xs text-gray-600 mb-2 font-medium">
                                                                     Purchase
-                                                                    Package (RM
-                                                                    1):
+                                                                    Package:
                                                                 </p>
                                                                 <div className="flex items-center justify-center gap-2">
                                                                     <div className="flex items-center gap-1">

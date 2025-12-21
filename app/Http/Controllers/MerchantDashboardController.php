@@ -124,13 +124,13 @@ class MerchantDashboardController extends Controller
         // Payouts
         // -----------------------------
         $availablePayouts = MerchantSlotPayout::where('merchant_id', $merchant->id)
-            ->where('status', 'pending')
-            ->where('available_at', '<=', now())
-            ->sum('net_amount_in_rm');
+            ->where('status', 'paid')
+            ->where('paid_at', '<=', now())
+            ->sum('total_amount_in_rm');
 
         $pendingPayouts = MerchantSlotPayout::where('merchant_id', $merchant->id)
-            ->where('status', 'requested')
-            ->sum('net_amount_in_rm');
+            ->where('status', 'pending')
+            ->sum('total_amount_in_rm');
 
         // -----------------------------
         // Dashboard stats
@@ -138,7 +138,7 @@ class MerchantDashboardController extends Controller
         $monthlySales = MerchantSlotPayout::where('merchant_id', $merchant->id)
             ->where('status', 'pending')
             ->whereBetween('calculated_at', [$startOfMonth, $endOfMonth])
-            ->sum('gross_amount_in_rm');
+            ->sum('total_amount_in_rm');
 
         $lastMonthStart = $startOfMonth->copy()->subMonth()->startOfMonth();
         $lastMonthEnd = $startOfMonth->copy()->subMonth()->endOfMonth();
@@ -146,7 +146,7 @@ class MerchantDashboardController extends Controller
         $lastMonthSales = MerchantSlotPayout::where('merchant_id', $merchant->id)
             ->where('status', 'pending')
             ->whereBetween('calculated_at', [$lastMonthStart, $lastMonthEnd])
-            ->sum('gross_amount_in_rm');
+            ->sum('total_amount_in_rm');
 
         $monthlyPercentageIncrease = $lastMonthSales > 0
             ? (($monthlySales - $lastMonthSales) / $lastMonthSales) * 100
@@ -158,7 +158,7 @@ class MerchantDashboardController extends Controller
         $weeklySales = MerchantSlotPayout::where('merchant_id', $merchant->id)
             ->where('status', 'pending')
             ->whereBetween('calculated_at', [$startOfWeek, $endOfWeek])
-            ->sum('gross_amount_in_rm');
+            ->sum('total_amount_in_rm');
 
         $lastWeekStart = $startOfWeek->copy()->subWeek();       
         $lastWeekEnd = $startOfWeek->copy()->subWeek()->endOfWeek();
@@ -166,7 +166,7 @@ class MerchantDashboardController extends Controller
         $lastWeekSales = MerchantSlotPayout::where('merchant_id', $merchant->id)
             ->where('status', 'pending')
             ->whereBetween('calculated_at', [$lastWeekStart, $lastWeekEnd])
-            ->sum('gross_amount_in_rm');
+            ->sum('total_amount_in_rm');
 
         $weeklyPercentageIncrease = $lastWeekSales > 0
             ? (($weeklySales - $lastWeekSales) / $lastWeekSales) * 100

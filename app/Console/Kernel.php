@@ -23,6 +23,7 @@ class Kernel extends ConsoleKernel
         $schedule->command('payouts:calculate')->hourly();
         $schedule->command('attendance:update-status')->hourly();
         $schedule->command('wallet:expire-credits')->dailyAt('00:10');
+        $schedule->command('conversions:apply-scheduled')->dailyAt('00:00');
     }
 
     protected function commands()

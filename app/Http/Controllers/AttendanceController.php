@@ -41,11 +41,15 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Booking does not belong to this merchant'], 403);
         }
 
-        $alreadyClaimed = Attendance::where('booking_id', $booking->id)
-        ->where('slot_id', $booking->slot_id)
-        ->where('status', 'attended')
-        ->whereNotNull('scanned_at')
-        ->exists();
+        $totalQuantity = $booking->items->sum('quantity');
+        $attendedQuantity = $booking->items->sum('quantity_attended');
+
+        $attendanceStatus =
+            $attendedQuantity === 0
+                ? 'not_claimed'
+                : ($attendedQuantity < $totalQuantity
+                    ? 'partially_claimed'
+                    : 'fully_claimed');
 
         $media = $booking->event->media->map(fn($m) => [
             'id' => $m->id,
@@ -86,7 +90,11 @@ class AttendanceController extends Controller
                 ]),
                 'media' => $media,
             ],
-            'already_claimed' => $alreadyClaimed,
+            'attendance' => [
+                'status' => $attendanceStatus,
+                'attended_quantity' => $attendedQuantity,
+                'total_quantity' => $totalQuantity,
+            ],
         ]);
     }
 

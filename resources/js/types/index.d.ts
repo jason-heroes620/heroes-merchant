@@ -22,6 +22,10 @@ export type PageProps<
     };
     customers: Customer[];
     merchants: Merchant[];
+    flash?: {
+        success?: string;
+        error?: string;
+    };
 };
 
 export type Entity = Merchant | Customer;

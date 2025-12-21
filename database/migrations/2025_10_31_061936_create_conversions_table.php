@@ -8,7 +8,8 @@ return new class extends Migration {
     public function up(): void {
         Schema::create('conversions', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            
+
+            $table->decimal('rm', 10, 2)->default(1);
             $table->decimal('credits_per_rm', 5, 2);
             $table->decimal('paid_to_free_ratio', 5, 2);
 
@@ -17,7 +18,7 @@ return new class extends Migration {
             
             $table->datetime('effective_from');
             $table->datetime('valid_until')->nullable();
-            $table->enum('status',['active','inactive'])->default('inactive');
+            $table->enum('status',['active','inactive', 'scheduled'])->default('active');
             
             $table->timestamps();
         });

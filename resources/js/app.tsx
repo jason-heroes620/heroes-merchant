@@ -9,29 +9,12 @@ import React, { useEffect } from "react";
 
 const appName = import.meta.env.VITE_APP_NAME || "Heroes";
 
-// ✅ Custom wrapper to handle flash messages globally
 function AppWrapper({ App, props }: any) {
-    const { flash } = props.initialPage.props;
+    const { flash } = props.initialPage.props; 
 
     useEffect(() => {
-        if (flash?.success) {
-            toast.success(flash.success, {
-                icon: '✓',
-                iconTheme: {
-                    primary: '#10B981',
-                    secondary: '#fff',
-                },
-            });
-        }
-        if (flash?.error) {
-            toast.error(flash.error, {
-                icon: '✕',
-                iconTheme: {
-                    primary: '#EF4444',
-                    secondary: '#fff',
-                },
-            });
-        }
+        if (flash?.success) toast.success(flash.success);
+        if (flash?.error) toast.error(flash.error);
     }, [flash]);
 
     return (
@@ -48,7 +31,8 @@ function AppWrapper({ App, props }: any) {
                         borderRadius: "12px",
                         fontSize: "14px",
                         fontWeight: "500",
-                        boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+                        boxShadow:
+                            "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
                         border: "1px solid #E5E7EB",
                         maxWidth: "420px",
                     },

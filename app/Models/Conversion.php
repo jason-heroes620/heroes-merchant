@@ -10,7 +10,12 @@ class Conversion extends Model
 {
     use HasFactory, HasUuids;
 
+    protected $primaryKey = 'id';
+    protected $keyType = 'string';
+    public $incrementing = false;
+
     protected $fillable = [
+        'rm',
         'credits_per_rm',
         'paid_to_free_ratio',
         'paid_credit_percentage',
@@ -20,7 +25,12 @@ class Conversion extends Model
         'status',
     ];
 
+    protected $attributes = [
+        'status' => 'active',
+    ];
+
     protected $casts = [
+        'rm' => 'float',
         'credits_per_rm' => 'float',
         'paid_to_free_ratio' => 'float',
         'paid_credit_percentage' => 'float',
