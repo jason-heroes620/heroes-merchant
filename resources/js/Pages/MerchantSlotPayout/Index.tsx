@@ -158,16 +158,6 @@ const MerchantPayoutsIndex: React.FC<Props> = ({
                                     {getSubtitle()}
                                 </p>
                             </div>
-                            <div className="hidden md:flex items-center gap-3 text-orange-200">
-                                <div className="text-right">
-                                    <p className="text-sm uppercase tracking-wider text-orange-100">
-                                        Total Rows
-                                    </p>
-                                    <p className="text-3xl font-bold text-white">
-                                        {rows.length}
-                                    </p>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>

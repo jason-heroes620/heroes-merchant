@@ -8,31 +8,36 @@ use App\Models\Event;
 use App\Models\Booking;
 use App\Models\Merchant;
 use App\Models\Customer;
-use App\Models\Conversion;
 use App\Models\PurchasePackage;
 use App\Models\CustomerCreditTransaction;
 use App\Models\MerchantSlotPayout;
+use App\Services\ConversionService;
+
 
 class AdminDashboardService
 {
     protected $today;
     protected $weekStart;
     protected $monthStart;
+    protected $selectedMonth; 
 
-    public function __construct()
+    protected ConversionService $conversionService;
+
+    public function __construct(ConversionService $conversionService)
     {
+        $this->conversionService = $conversionService;
         $this->today = Carbon::today('Asia/Kuala_Lumpur');
         $this->weekStart = Carbon::now('Asia/Kuala_Lumpur')->startOfWeek();
         $this->monthStart = Carbon::now('Asia/Kuala_Lumpur')->startOfMonth();
     }
-
-    /**
-     * MAIN ENTRY
-     */
-    public function getDashboardData()
+    public function getDashboardData(?string $month = null)
     {
+        $this->selectedMonth = $month 
+            ? Carbon::createFromFormat('Y-m', $month, 'Asia/Kuala_Lumpur')->startOfMonth()
+            : Carbon::now('Asia/Kuala_Lumpur')->startOfMonth();
+
         return [
-            'currentConversions' => $this->getActiveConversions(),
+            'currentConversion' => $this->getActiveConversion(),
             'currentPackages' => $this->getActivePackages(),
 
             'period' => [
@@ -44,20 +49,16 @@ class AdminDashboardService
             'charts' => $this->getCharts(),
             'tables' => $this->getTables(),
             'merchantStats' => $this->getMerchantStats(),
-            'customerStats' => $this->getCustomerStats(),
             'packageSales' => $this->getPackageSales(),
         ];
     }
 
     /* ---------------------------------------------
-     * ACTIVE CONVERSIONS & PACKAGES
+     * ACTIVE CONVERSIONS
      * --------------------------------------------- */
-    protected function getActiveConversions()
+    protected function getActiveConversion()
     {
-        return Conversion::where('status', 'active')
-            ->where('effective_from', '<=', $this->today)
-            ->where(fn($q) => $q->whereNull('valid_until')->orWhere('valid_until', '>=', $this->today))
-            ->get();
+        return $this->conversionService->getActiveConversion();
     }
 
     protected function getActivePackages()
@@ -112,7 +113,7 @@ class AdminDashboardService
     }
 
     /* ---------------------------------------------
-     * USER STATS - Updated with newReferrals
+     * USER STATS
      * --------------------------------------------- */
     protected function getUserStats($startDate)
     {
@@ -146,7 +147,8 @@ class AdminDashboardService
             ->where('created_at', '>=', $startDate)
             ->sum('amount_in_rm');
 
-        $payouts = MerchantSlotPayout::sum('total_amount_in_rm');
+        $payouts = MerchantSlotPayout::where('created_at', '>=', $startDate)
+            ->sum('total_amount_in_rm');
 
         return [
             'totalPurchases' => $purchases,
@@ -155,55 +157,66 @@ class AdminDashboardService
         ];
     }
 
-    /* ---------------------------------------------
-     * CHARTS - Updated for 7-day payout trend
-     * --------------------------------------------- */
+   /* ---------------------------------------------
+    * CHARTS
+    * --------------------------------------------- */
     protected function getCharts()
     {
+        $startOfMonth = $this->selectedMonth->copy()->startOfMonth();
+        $endOfMonth = $this->selectedMonth->copy()->endOfMonth();
+        $today = Carbon::today('Asia/Kuala_Lumpur');
+        
+        if ($startOfMonth->isAfter($today)) {
+            return [
+                'bookingsOverTime' => collect(),
+            ];
+        }
+        
+        if ($endOfMonth->isAfter($today)) {
+            $endOfMonth = $today;
+        }
+        
+        $allDays = collect();
+        $currentDay = $startOfMonth->copy();
+        
+        while ($currentDay <= $endOfMonth) {
+            $allDays->push($currentDay->format('Y-m-d'));
+            $currentDay->addDay();
+        }
+
+        $bookings = Booking::selectRaw("
+                DATE(booked_at) as date,
+                COUNT(*) as count
+            ")
+            ->where('status', 'confirmed')
+            ->whereBetween('booked_at', [$startOfMonth, $endOfMonth->copy()->endOfDay()])
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get()
+            ->keyBy('date');
+
+        $bookingsOverTime = $allDays->map(function ($day) use ($bookings) {
+            return [
+                'date' => $day,
+                'count' => $bookings->get($day)?->count ?? 0,
+            ];
+        });
+
         return [
-            'bookingsOverTime' => Booking::selectRaw("
-                    DATE(booked_at) as date,
-                    COUNT(*) as count
-                ")
-                ->where('status', 'confirmed')
-                ->where('booked_at', '>=', now()->subDays(30))
-                ->groupBy('date')
-                ->orderBy('date')
-                ->get(),
-
-            'purchasesOverTime' => CustomerCreditTransaction::selectRaw("
-                    DATE(created_at) as date,
-                    SUM(amount_in_rm) as amount
-                ")
-                ->where('type', 'purchase')
-                ->where('created_at', '>=', now()->subDays(30))
-                ->groupBy('date')
-                ->orderBy('date')
-                ->get(),
-
-            'payoutTrend' => MerchantSlotPayout::selectRaw("
-                    SUM(total_amount_in_rm) as amount
-                ")
-                ->where('created_at', '>=', now()->subDays(30))
-                ->get(),
+            'bookingsOverTime' => $bookingsOverTime->values(),
         ];
     }
 
     /* ---------------------------------------------
-     * TABLES - Updated with merchant info in activity
+     * TABLES
      * --------------------------------------------- */
     protected function getTables()
     {
         return [
-            'payoutRequests' => MerchantSlotPayout::where('status', 'pending')
-                ->with(['merchant.user'])
-                ->orderBy('created_at')
-                ->get(),
-
             'topEvents' => Event::withCount(['bookings' => fn($q) => $q->where('status', 'confirmed')])
                 ->having('bookings_count', '>', 0)
                 ->orderBy('bookings_count', 'desc')
-                ->with(['merchant.user', 'media', 'location'])
+                ->with(['merchant.user'])
                 ->limit(5)
                 ->get(),
 
@@ -282,50 +295,40 @@ class AdminDashboardService
     }
 
     /* ---------------------------------------------
-     * CUSTOMER ENGAGEMENT
-     * --------------------------------------------- */
-    protected function getCustomerStats()
-    {
-        $totalCustomers = User::where('role', 'customer')->count();
-
-        $activeCustomers = User::where('role', 'customer')
-            ->where(function ($q) {
-                $q->whereHas('customer.bookings', fn($b) =>
-                    $b->where('status', 'confirmed')
-                    ->where('booked_at', '>=', now()->subDays(30))
-                )
-                ->orWhereHas('customer.likedEvents', fn($l) =>
-                    $l->where('event_likes.created_at', '>=', now()->subDays(30))
-                );
-            })
-            ->count();
-
-        $totalConfirmedBookings = Booking::where('status', 'confirmed')->count();
-        $uniqueCustomers = Booking::where('status', 'confirmed')->distinct('customer_id')->count('customer_id');
-
-        return [
-            'totalCustomers' => $totalCustomers,
-            'activeCustomers' => $activeCustomers,
-            'averageBookingsPerCustomer' =>
-                $uniqueCustomers > 0 ? round($totalConfirmedBookings / $uniqueCustomers, 2) : 0,
-        ];
-    }
-
-    /* ---------------------------------------------
-     * PACKAGE SALES
-     * --------------------------------------------- */
+    * PACKAGE SALES
+    * --------------------------------------------- */
     protected function getPackageSales()
     {
-        return PurchasePackage::withCount('transactions')
-            ->withSum('transactions', 'amount_in_rm')
+        $startOfMonth = $this->selectedMonth->copy()->startOfMonth();
+        $endOfMonth = $this->selectedMonth->copy()->endOfMonth();
+        $today = Carbon::today('Asia/Kuala_Lumpur');
+        
+        if ($startOfMonth->isAfter($today)) {
+            return collect();
+        }
+        
+        if ($endOfMonth->isAfter($today)) {
+            $endOfMonth = $today;
+        }
+
+        return PurchasePackage::withCount([
+                'transactions' => function ($q) use ($startOfMonth, $endOfMonth) {
+                    $q->whereBetween('created_at', [$startOfMonth, $endOfMonth->copy()->endOfDay()]);
+                }
+            ])
+            ->withSum([
+                'transactions' => function ($q) use ($startOfMonth, $endOfMonth) {
+                    $q->whereBetween('created_at', [$startOfMonth, $endOfMonth->copy()->endOfDay()]);
+                }
+            ], 'amount_in_rm')
             ->get()
             ->map(fn($p) => [
                 'package_name' => $p->name,
                 'price_in_rm' => $p->price_in_rm,
                 'paid_credits' => $p->paid_credits,
                 'free_credits' => $p->free_credits,
-                'total_sold' => $p->purchase_transactions_count ?? 0,
-                'revenue' => $p->purchase_transactions_sum_amount_in_rm ?? 0,
+                'total_sold' => $p->transactions_count ?? 0,
+                'revenue' => $p->transactions_sum_amount_in_rm ?? 0,
             ]);
     }
 }

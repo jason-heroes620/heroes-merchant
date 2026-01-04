@@ -199,12 +199,14 @@ export interface Event {
 
 export interface Conversion {
     id: string;
+    rm: number;
     credits_per_rm: number;
-    free_credit_percentage: number;
+    paid_to_free_ratio: number;
     paid_credit_percentage: number;
+    free_credit_percentage: number;
     effective_from: string;
-    valid_until: string | null;
-    status: "active" | "inactive";
+    valid_until?: string | null;
+    status: "active" | "inactive" | "scheduled";
 }
 
 export interface Customer {

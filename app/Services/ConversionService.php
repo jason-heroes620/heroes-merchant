@@ -6,7 +6,6 @@ use App\Models\Conversion;
 use App\Models\PurchasePackage;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
 
 
 class ConversionService
@@ -19,6 +18,7 @@ class ConversionService
         $now = now('Asia/Kuala_Lumpur');
 
         return Conversion::query()
+            ->where('status', 'active')
             ->where('effective_from', '<=', $now)
             ->where(fn ($q) =>
                 $q->whereNull('valid_until')
