@@ -358,10 +358,6 @@ class EventController extends Controller
                     $event,
                     $validated['claim_configuration']
                 );
-                Log::info('💾 ClaimConfiguration saved', [
-                    'event_id' => $event->id,
-                    'data' => $validated['claim_configuration'],
-                ]);
             }
 
             // Age groups
@@ -728,12 +724,12 @@ class EventController extends Controller
 
             'location' => 'sometimes|array',
             'location.location_name' => 'required_with:location|string',
-            'location.latitude' => 'nullable|numeric|between:-90,90',
-            'location.longitude' => 'nullable|numeric|between:-180,180',
-            'location.viewport' => 'nullable|array',
-            'location.raw_place' => 'nullable|array',
-
             'location.how_to_get_there' => 'nullable|string',
+
+            'media' => 'nullable|array',
+            'media.*' => 'nullable',
+            'new_media' => 'nullable|array',
+            'new_media.*' => 'file|mimes:jpeg,jpg,png,gif,mp4,mov|max:10240',
 
             'age_groups' => 'sometimes|array',
             'age_groups.*.id' => 'nullable|uuid',
@@ -765,12 +761,14 @@ class EventController extends Controller
             'event_dates.*.slots.*.end_time' => 'required_with:event_dates.*.slots|string',
             'event_dates.*.slots.*.capacity' => 'nullable|integer',
             'event_dates.*.slots.*.is_unlimited' => 'boolean',
+            'claim_configuration' => 'nullable|array', 
         ]);
+
+        Log::info('✅ Validated payload', $validated);
 
         DB::beginTransaction();
 
         try {
-            // Determine is_recurring
             $isRecurring = !empty($validated['frequencies']) &&
                 $validated['frequencies'][0]['type'] !== 'one_time';
 
@@ -786,13 +784,25 @@ class EventController extends Controller
                 'is_recurring' => $isRecurring,
             ]);
 
+            if (array_key_exists('claim_configuration', $validated)) {
+                $this->claimConfigService->saveConfiguration(
+                    $event,
+                    $validated['claim_configuration']
+                );
+
+                Log::info('💾 ClaimConfiguration updated', [
+                    'event_id' => $event->id,
+                    'data' => $validated['claim_configuration'],
+                ]);
+            }
+
             /* =======================
             * LOCATION (UPSERT)
             * ======================= */
             if (!empty($validated['location'])) {
                 $locationData = $validated['location'];
 
-                if (isset($locationData['raw_place'])) {
+                if (isset($locationData['raw_place']) && is_array($locationData['raw_place'])) {
                     $locationData['raw_place'] = json_encode($locationData['raw_place']);
                 }
 
@@ -802,12 +812,42 @@ class EventController extends Controller
                 );
             }
 
+            if (!empty($validated['removed_media'])) {
+                $mediaToRemove = EventMedia::where('event_id', $event->id)
+                    ->whereIn('id', $validated['removed_media'])
+                    ->get();
+
+                foreach ($mediaToRemove as $media) {
+                    // Delete file from storage
+                    if (Storage::disk('public')->exists($media->file_path)) {
+                        Storage::disk('public')->delete($media->file_path);
+                    }
+                    // Delete database record
+                    $media->delete();
+                }
+                Log::info('🗑️ Removed media', ['count' => count($validated['removed_media'])]);
+            }
+
+            if ($request->hasFile('media')) {
+                foreach ($request->file('media') as $file) {
+                    $filename = Str::uuid() . '_' . $file->getClientOriginalName();
+                    $path = $file->storeAs('event_media', $filename, 'public');
+
+                    EventMedia::create([
+                        'event_id' => $event->id,
+                        'file_path' => $path,
+                        'file_type' => $file->getClientMimeType(),
+                        'file_size' => $file->getSize(),
+                    ]);
+                }
+                Log::info('📸 New media uploaded', ['count' => count($request->file('media'))]);
+            }
+
             /* =======================
             * AGE GROUPS (RESET)
             * ======================= */
             $existingAgeGroupIds = EventAgeGroup::where('event_id', $event->id)->pluck('id')->toArray();
             $sentAgeGroupIds = [];
-            $ageGroupModels = [];
 
             foreach ($validated['age_groups'] ?? [] as $g) {
                 if (!empty($g['id']) && in_array($g['id'], $existingAgeGroupIds)) {
@@ -838,118 +878,154 @@ class EventController extends Controller
             /* =======================
             * PRICES (RESET)
             * ======================= */
-            $existingPriceIds = EventPrice::where('event_id', $event->id)->pluck('id')->toArray();
-            $sentPriceIds = [];
+            if (array_key_exists('prices', $validated)) {
 
-            foreach ($validated['prices'] ?? [] as $p) {
-                if (!empty($p['id']) && in_array($p['id'], $existingPriceIds)) {
-                    $price = EventPrice::find($p['id']);
-                    $price->update([
-                        'event_age_group_id' => $p['event_age_group_id'] ?? null,
-                        'pricing_type' => $p['pricing_type'],
-                        'fixed_price_in_rm' => $p['fixed_price_in_rm'] ?? 0,
-                        'weekday_price_in_rm' => $p['weekday_price_in_rm'] ?? 0,
-                        'weekend_price_in_rm' => $p['weekend_price_in_rm'] ?? 0,
-                    ]);
-                    $sentPriceIds[] = $p['id'];
-                } else {
-                    $price = EventPrice::create([
-                        'event_id' => $event->id,
-                        'event_age_group_id' => $p['event_age_group_id'] ?? null,
-                        'pricing_type' => $p['pricing_type'],
-                        'fixed_price_in_rm' => $p['fixed_price_in_rm'] ?? 0,
-                        'weekday_price_in_rm' => $p['weekday_price_in_rm'] ?? 0,
-                        'weekend_price_in_rm' => $p['weekend_price_in_rm'] ?? 0,
-                    ]);
-                    $sentPriceIds[] = $price->id;
+                $existingPriceIds = EventPrice::where('event_id', $event->id)
+                    ->pluck('id')
+                    ->toArray();
+
+                $sentPriceIds = [];
+
+                foreach ($validated['prices'] as $p) {
+
+                    // UPDATE
+                    if (!empty($p['id']) && in_array($p['id'], $existingPriceIds)) {
+
+                        $price = EventPrice::find($p['id']);
+
+                        $price->update([
+                            'event_age_group_id' => $p['event_age_group_id'] ?? null,
+                            'pricing_type' => $p['pricing_type'],
+                            'fixed_price_in_rm' => $p['fixed_price_in_rm'] ?? 0,
+                            'weekday_price_in_rm' => $p['weekday_price_in_rm'] ?? 0,
+                            'weekend_price_in_rm' => $p['weekend_price_in_rm'] ?? 0,
+                        ]);
+
+                        $sentPriceIds[] = $price->id;
+
+                    // CREATE
+                    } else {
+
+                        $price = EventPrice::create([
+                            'event_id' => $event->id,
+                            'event_age_group_id' => $p['event_age_group_id'] ?? null,
+                            'pricing_type' => $p['pricing_type'],
+                            'fixed_price_in_rm' => $p['fixed_price_in_rm'] ?? 0,
+                            'weekday_price_in_rm' => $p['weekday_price_in_rm'] ?? 0,
+                            'weekend_price_in_rm' => $p['weekend_price_in_rm'] ?? 0,
+                        ]);
+
+                        $sentPriceIds[] = $price->id;
+                    }
                 }
+
+                // DELETE removed prices
+                EventPrice::where('event_id', $event->id)
+                    ->whereNotIn('id', $sentPriceIds)
+                    ->delete();
             }
 
-            EventPrice::where('event_id', $event->id)
-                ->whereNotIn('id', $sentPriceIds)
-                ->delete();
+            if (array_key_exists('frequencies', $validated)) {
 
             /* =======================
-            * DELETE ALL EXISTING SLOTS & SLOT PRICES
+            * DELETE DEPENDENT DATA
             * ======================= */
-            // Delete all slot prices first (foreign key constraint)
-            EventSlotPrice::whereIn('event_slot_id', function($query) use ($event) {
+
+            EventSlotPrice::whereIn('event_slot_id', function ($query) use ($event) {
                 $query->select('id')
                     ->from('event_slots')
                     ->where('event_id', $event->id);
             })->delete();
 
-            // Delete all slots
             EventSlot::where('event_id', $event->id)->delete();
-
-            // Delete all event dates
             EventDate::where('event_id', $event->id)->delete();
 
-            /* =======================
-            * FREQUENCIES (RESET)
-            * ======================= */
-            EventFrequency::where('event_id', $event->id)->delete();
+            $existingFrequencyIds = EventFrequency::where('event_id', $event->id)
+                ->pluck('id')
+                ->toArray();
 
-            $frequencyIds = [];
+            $sentFrequencyIds = [];
             $frequencyModels = [];
 
-            if (!empty($validated['frequencies'])) {
-                foreach ($validated['frequencies'] as $freq) {
+            foreach ($validated['frequencies'] as $freq) {
+
+                // UPDATE
+                if (!empty($freq['id']) && in_array($freq['id'], $existingFrequencyIds)) {
+
+                    $frequency = EventFrequency::find($freq['id']);
+
+                    $frequency->update([
+                        'type' => $freq['type'],
+                        'days_of_week' => $freq['days_of_week'] ?? null,
+                        'selected_dates' => $freq['selected_dates'] ?? null,
+                    ]);
+
+                // CREATE
+                } else {
+
                     $frequency = EventFrequency::create([
                         'event_id' => $event->id,
                         'type' => $freq['type'],
                         'days_of_week' => $freq['days_of_week'] ?? null,
                         'selected_dates' => $freq['selected_dates'] ?? null,
                     ]);
-
-                    $frequencyIds[] = $frequency->id;
-                    $frequencyModels[] = $frequency;
                 }
+
+                $sentFrequencyIds[] = $frequency->id;
+                $frequencyModels[] = $frequency;
             }
+
+            // DELETE removed frequencies
+            EventFrequency::where('event_id', $event->id)
+                ->whereNotIn('id', $sentFrequencyIds)
+                ->delete();
+
 
             /* =======================
             * CUSTOM FREQUENCY HANDLING
             * ======================= */
-            if ($hasCustomFreq) {
-                Log::info("🔹 Handling custom frequency dates in update");
+                if ($hasCustomFreq) {
+                    Log::info("🔹 Handling custom frequency dates in update");
 
-                foreach ($frequencyModels as $freqModel) {
-                    if ($freqModel->type !== 'custom') continue;
+                    foreach ($frequencyModels as $freqModel) {
+                        if ($freqModel->type !== 'custom') continue;
 
-                    $selectedDates = $freqModel->selected_dates ?? [];
-                    if (empty($selectedDates)) {
-                        Log::warning("No selected_dates found for custom frequency {$freqModel->id}");
-                        continue;
+                        foreach ($freqModel->selected_dates ?? [] as $dateEntry) {
+                            $dateStr = is_array($dateEntry)
+                                ? ($dateEntry['date'] ?? null)
+                                : $dateEntry;
+
+                            if (!$dateStr) continue;
+
+                            $eventDate = EventDate::create([
+                                'event_id' => $event->id,
+                                'event_frequency_id' => $freqModel->id,
+                                'start_date' => $dateStr,
+                                'end_date' => $dateStr,
+                            ]);
+
+                            $templateSlots = $validated['event_dates'][0]['slots'] ?? [];
+
+                            $slotService->generateSlotsForEventDate(
+                                $event,
+                                $eventDate,
+                                $dateStr,
+                                $templateSlots
+                            );
+                        }
                     }
 
-                    foreach ($selectedDates as $dateEntry) {
-                        $dateStr = is_array($dateEntry) ? ($dateEntry['date'] ?? null) : $dateEntry;
-                        if (!$dateStr) continue;
-
-                        $eventDate = EventDate::create([
-                            'event_id' => $event->id,
-                            'event_frequency_id' => $freqModel->id,
-                            'start_date' => $dateStr,
-                            'end_date' => $dateStr,
-                        ]);
-
-                        $templateSlots = !empty($validated['event_dates'][0]['slots'] ?? [])
-                            ? $validated['event_dates'][0]['slots']
-                            : [];
-
-                        $slotService->generateSlotsForEventDate($event, $eventDate, $dateStr, $templateSlots);
-                    }
+                    DB::commit();
+                    return redirect()->route('merchant.events.index')
+                        ->with('success', 'Event updated successfully!');
                 }
-
-                DB::commit();
-                return redirect()->route('merchant.events.index')
-                    ->with('success', 'Event updated successfully!');
             }
 
             /* =======================
             * EVENT DATES + SLOTS (REGENERATE)
             * ======================= */
-            foreach ($validated['event_dates'] as $dateIndex => $date) {
+            $eventDates = $validated['event_dates'] ?? [];
+            foreach ($eventDates as $dateIndex => $date) {
                 $eventDate = EventDate::create([
                     'event_id' => $event->id,
                     'event_frequency_id' => $isRecurring ? ($frequencyIds[$dateIndex] ?? $frequencyIds[0] ?? null) : null,
