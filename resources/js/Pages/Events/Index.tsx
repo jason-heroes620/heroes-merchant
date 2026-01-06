@@ -161,10 +161,10 @@ export default function EventsIndexPage() {
     };
 
     const getFrequencyLabel = (event?: EventType) => {
-        if (!event?.is_recurring) return "Session";
+        if (!event?.is_recurring) return "One-Time Event";
 
-        const freq = event.frequency?.[0];
-        if (!freq) return "Sessions";
+        const freqType = event.frequency?.type;
+        if (!freqType) return "Session";
 
         const labels: Record<string, string> = {
             daily: "Daily",
@@ -175,7 +175,7 @@ export default function EventsIndexPage() {
             custom: "Custom Dates",
         };
 
-        return labels[freq.type] ?? freq.type;
+        return labels[freqType] ?? freqType;
     };
 
     const handleDeactivate = (id: string) => {
@@ -423,7 +423,7 @@ export default function EventsIndexPage() {
                             tab={tab}
                         />
                     ) : (
-                        /* Grid View - Compact Cards */
+                        /* Grid View */
                         <GridView
                             userRole={userRole}
                             router={router}

@@ -44,7 +44,7 @@ export default function TableView({
                                 Age Groups
                             </th>
                             <th className="px-20 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                                Dates
+                                Schedule
                             </th>
                             <th className="px-4 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                                 Status

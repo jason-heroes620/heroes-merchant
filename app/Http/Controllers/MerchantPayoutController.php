@@ -74,7 +74,6 @@ class MerchantPayoutController extends Controller
                 'status' => $items->every(
                     fn ($i) => $i['status'] === 'paid'
                 ) ? 'paid' : 'pending',
-                // keep for navigation / actions
                 'payout_ids' => $items->pluck('payout.id')->all(),
             ];
         })->values()->all();
@@ -94,15 +93,11 @@ class MerchantPayoutController extends Controller
                     'status' => $items->every(
                         fn ($i) => $i['status'] === 'paid'
                     ) ? 'paid' : 'pending',
-                    // keep for navigation / actions
                     'payout_ids' => $items->pluck('payout.id')->all(),
                 ];
             })->values()->all();
         }
 
-        /**
-         * STEP 5: Return index data
-         */
         return Inertia::render('MerchantSlotPayout/Index', [
             'rows' => $rows,
             'role' => $user->role,
@@ -135,14 +130,12 @@ class MerchantPayoutController extends Controller
 
         $allPayouts = collect($this->payoutService->getAllPayouts())
             ->map(function ($p) {
-                // Ensure relationships are loaded
                 if (isset($p['payout']) && $p['payout'] instanceof MerchantSlotPayout) {
                     $p['payout']->loadMissing('merchant', 'slot.event');
                 }
                 return $p;
             });
 
-        // Log all payouts to inspect
         Log::info('All Payouts Loaded', ['all_payouts' => $allPayouts->toArray()]);
 
         if ($isAdmin) {
@@ -162,7 +155,6 @@ class MerchantPayoutController extends Controller
                 $event = $firstPayout->slot->event;
                 $merchant = $firstPayout->merchant;
 
-                // Log first payout details
                 Log::info('First Payout for Event', [
                     'payout_id' => $firstPayout->id,
                     'merchant' => $merchant ? $merchant->toArray() : null,
@@ -192,7 +184,6 @@ class MerchantPayoutController extends Controller
             ]);
         }
 
-        // MERCHANT VIEW
         $eventPayouts = $allPayouts
             ->filter(fn ($p) =>
                 $p['payout']->merchant_id === $merchant->id &&

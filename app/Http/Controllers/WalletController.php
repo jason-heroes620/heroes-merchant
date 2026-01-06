@@ -56,6 +56,7 @@ class WalletController extends Controller
             ->where('free_credits_remaining', '>', 0)
             ->where('paid_credits_remaining', '>', 0)
             ->where('expires_at', '>=', now())
+            ->whereHas('purchasePackage')
             ->with('purchasePackage')
             ->orderBy('expires_at', 'desc')
             ->first();

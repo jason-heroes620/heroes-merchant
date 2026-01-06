@@ -166,7 +166,7 @@ export interface EventType {
     click_count?: number;
     slotPrices?: EventSlotPrice[];
     dates?: EventDate[];
-    frequency?: Frequency[];
+    frequency?: Frequency;
     is_upcoming: boolean;
     is_past: boolean;
     all_slots?: SlotWithDisplay[];

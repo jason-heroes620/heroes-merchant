@@ -31,6 +31,7 @@ import {
     ComposedChart,
 } from "recharts";
 import AuthenticatedLayout from "@/AuthenticatedLayout";
+import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import type { Conversion } from "@/types/events";
 
 interface Package {
@@ -238,19 +239,11 @@ const AdminDashboard = ({
 
     return (
         <AuthenticatedLayout>
-            <div className="min-h-screen bg-gray-50">
-                {/* Header with Orange Gradient */}
-                <div className="bg-linear-to-r from-orange-500 via-orange-600 to-red-500 shadow-lg">
-                    <div className="max-w-[1600px] mx-auto px-8 py-8">
-                        <h1 className="text-3xl font-bold text-white">
-                            Admin Dashboard
-                        </h1>
-                        <p className="text-orange-100 mt-2">
-                            Overview of platform performance and operations
-                        </p>
-                    </div>
-                </div>
-
+            <DashboardLayout
+                title="Admin Dashboard"
+                userRole="admin"
+                subtitle="Overview of platform performance and operations"
+            >
                 <div className="max-w-[1600px] mx-auto px-8 py-8 space-y-8">
                     {/* Action Required  */}
                     <div className="bg-white rounded-xl p-6 border-2 border-orange-200 shadow-lg">
@@ -569,9 +562,7 @@ const AdminDashboard = ({
                                                 size={18}
                                             />
                                             <span className="text-xl font-bold text-orange-600">
-                                                {
-                                                    paidCredits + freeCredits
-                                                }
+                                                {paidCredits + freeCredits}
                                             </span>
                                             <span className="text-xs text-gray-500">
                                                 credits
@@ -643,7 +634,8 @@ const AdminDashboard = ({
                                                 <div className="text-lg font-bold text-blue-600">
                                                     {
                                                         currentConversion.paid_to_free_ratio
-                                                    } PAID
+                                                    }{" "}
+                                                    PAID
                                                 </div>
                                             </div>
                                             <ArrowRight
@@ -685,7 +677,9 @@ const AdminDashboard = ({
                                             onChange={(e) =>
                                                 Inertia.get(
                                                     route("admin.dashboard"),
-                                                    { month: e.target.value }
+                                                    {
+                                                        month: e.target.value,
+                                                    }
                                                 )
                                             }
                                             className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-10 text-sm font-medium text-gray-700 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent cursor-pointer"
@@ -987,7 +981,9 @@ const AdminDashboard = ({
                                                 RM{" "}
                                                 {merchant.total_earned.toLocaleString(
                                                     "en-MY",
-                                                    { minimumFractionDigits: 2 }
+                                                    {
+                                                        minimumFractionDigits: 2,
+                                                    }
                                                 )}
                                             </p>
                                         </div>
@@ -1164,7 +1160,7 @@ const AdminDashboard = ({
                         </div>
                     </div>
                 </div>
-            </div>
+            </DashboardLayout>
         </AuthenticatedLayout>
     );
 };

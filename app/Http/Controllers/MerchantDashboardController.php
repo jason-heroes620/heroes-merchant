@@ -14,9 +14,27 @@ class MerchantDashboardController extends Controller
     public function index(Request $request)
     {
         $merchant = $request->user()->merchant;
-        $today = Carbon::today('Asia/Kuala_Lumpur'); 
-        $startOfMonth = Carbon::now('Asia/Kuala_Lumpur')->startOfMonth();
-        $endOfMonth = Carbon::now('Asia/Kuala_Lumpur')->endOfMonth();
+        $today = Carbon::today('Asia/Kuala_Lumpur');
+        
+        // Time ranges
+        $startOfToday = $today->copy()->startOfDay();
+        $endOfToday = $today->copy()->endOfDay();
+        
+        $startOfWeek = $today->copy()->startOfWeek();
+        $endOfWeek = $today->copy()->endOfWeek();
+        
+        $startOfMonth = $today->copy()->startOfMonth();
+        $endOfMonth = $today->copy()->endOfMonth();
+        
+        // Previous periods for comparison
+        $startOfYesterday = $today->copy()->subDay()->startOfDay();
+        $endOfYesterday = $today->copy()->subDay()->endOfDay();
+        
+        $startOfLastWeek = $today->copy()->subWeek()->startOfWeek();
+        $endOfLastWeek = $today->copy()->subWeek()->endOfWeek();
+        
+        $startOfLastMonth = $today->copy()->subMonth()->startOfMonth();
+        $endOfLastMonth = $today->copy()->subMonth()->endOfMonth();
 
         $merchantEventIds = $merchant->events()->pluck('id')->toArray();
 
@@ -35,33 +53,23 @@ class MerchantDashboardController extends Controller
         foreach ($events as $event) {
             $isActive = false;
 
-            // --- Non-recurring events ---
             if (!$event->is_recurring) {
                 $date = $event->dates->first();
-
                 if ($date && Carbon::parse($date->end_date)->gte($today)) {
                     $isActive = true;
                 }
-            }
-
-            // --- Recurring events (use slot date + end_time) ---
-            else {
+            } else {
                 foreach ($event->slots as $slot) {
-                    if (!$slot->date || !$slot->end_time) {
-                        continue;
-                    }
+                    if (!$slot->date || !$slot->end_time) continue;
 
                     try {
                         $normalizedDate = Carbon::parse($slot->date)
                             ->setTimezone('Asia/Kuala_Lumpur')
                             ->format('Y-m-d');
-
-                        $normalizedTime = Carbon::parse($slot->end_time)
-                            ->format('H:i:s');
-
+                        $normalizedTime = Carbon::parse($slot->end_time)->format('H:i:s');
                         $slotEnd = Carbon::parse("{$normalizedDate} {$normalizedTime}", 'Asia/Kuala_Lumpur');
                     } catch (\Exception $e) {
-                        continue; 
+                        continue;
                     }
 
                     if ($slotEnd->gte($today)) {
@@ -79,13 +87,8 @@ class MerchantDashboardController extends Controller
         }
 
         // -----------------------------
-        // Bookings
+        // All Bookings
         // -----------------------------
-        $startOfToday = $today->copy()->startOfDay();
-        $endOfToday   = $today->copy()->endOfDay();
-
-        $startOfWeek = $today->copy()->subDays(7)->startOfDay();
-
         $allBookings = Booking::where('status', 'confirmed')
             ->whereHas('slot', fn($q) => $q->whereIn('event_id', $merchantEventIds))
             ->with(['event.media', 'attendance.customer', 'customer.user', 'event.ageGroups', 'slot'])
@@ -93,89 +96,80 @@ class MerchantDashboardController extends Controller
             ->get();
 
         $allBookings->transform(function ($booking) {
-            $attendance = $booking->attendance
-                ->firstWhere('customer_id', $booking->customer_id);
+            $attendance = $booking->attendance->firstWhere('customer_id', $booking->customer_id);
             $booking->attendance_status = $attendance->status ?? 'pending';
-            return $booking;
-        });
-
-        $allBookings->transform(function ($booking) {
+            
             $slot = $booking->slot;
-
             if ($slot) {
                 $booking->slot_start = optional($slot->display_start)->toDateTimeString();
                 $booking->slot_end = optional($slot->display_end)->toDateTimeString();
             }
-
+            
             return $booking;
         });
 
+        // -----------------------------
+        // Bookings by Period
+        // -----------------------------
         $todayBookings = $allBookings->filter(function($b) use ($startOfToday, $endOfToday) {
             $bookedAt = Carbon::parse($b->booked_at);
             return $bookedAt->between($startOfToday, $endOfToday);
         })->values();
 
-        $weekBookings = $allBookings->filter(function($b) use ($startOfWeek, $endOfToday) {
+        $weekBookings = $allBookings->filter(function($b) use ($startOfWeek, $endOfWeek) {
             $bookedAt = Carbon::parse($b->booked_at);
-            return $bookedAt->between($startOfWeek, $endOfToday);
+            return $bookedAt->between($startOfWeek, $endOfWeek);
+        })->values();
+
+        $monthBookings = $allBookings->filter(function($b) use ($startOfMonth, $endOfMonth) {
+            $bookedAt = Carbon::parse($b->booked_at);
+            return $bookedAt->between($startOfMonth, $endOfMonth);
         })->values();
 
         // -----------------------------
-        // Payouts
+        // Revenue Calculations
         // -----------------------------
-        $availablePayouts = MerchantSlotPayout::where('merchant_id', $merchant->id)
-            ->where('status', 'paid')
-            ->where('paid_at', '<=', now())
-            ->sum('total_amount_in_rm');
+        $todayRevenue = $todayBookings->sum('total_amount_in_rm');
+        $yesterdayRevenue = $allBookings->filter(function($b) use ($startOfYesterday, $endOfYesterday) {
+            $bookedAt = Carbon::parse($b->booked_at);
+            return $bookedAt->between($startOfYesterday, $endOfYesterday);
+        })->sum('total_amount_in_rm');
+        
+        $weekRevenue = $weekBookings->sum('total_amount_in_rm');
+        $lastWeekRevenue = $allBookings->filter(function($b) use ($startOfLastWeek, $endOfLastWeek) {
+            $bookedAt = Carbon::parse($b->booked_at);
+            return $bookedAt->between($startOfLastWeek, $endOfLastWeek);
+        })->sum('total_amount_in_rm');
+        
+        $monthRevenue = $monthBookings->sum('total_amount_in_rm');
+        $lastMonthRevenue = $allBookings->filter(function($b) use ($startOfLastMonth, $endOfLastMonth) {
+            $bookedAt = Carbon::parse($b->booked_at);
+            return $bookedAt->between($startOfLastMonth, $endOfLastMonth);
+        })->sum('total_amount_in_rm');
 
-        $pendingPayouts = MerchantSlotPayout::where('merchant_id', $merchant->id)
-            ->where('status', 'pending')
-            ->sum('total_amount_in_rm');
+        // Percentage increases
+        $todayPercentage = $yesterdayRevenue > 0 
+            ? (($todayRevenue - $yesterdayRevenue) / $yesterdayRevenue) * 100 
+            : 0;
+            
+        $weekPercentage = $lastWeekRevenue > 0 
+            ? (($weekRevenue - $lastWeekRevenue) / $lastWeekRevenue) * 100 
+            : 0;
+            
+        $monthPercentage = $lastMonthRevenue > 0 
+            ? (($monthRevenue - $lastMonthRevenue) / $lastMonthRevenue) * 100 
+            : 0;
 
         // -----------------------------
-        // Dashboard stats
+        // This Month Payout (Pending payouts for current month)
         // -----------------------------
-        $monthlySales = MerchantSlotPayout::where('merchant_id', $merchant->id)
+        $thisMonthPayout = MerchantSlotPayout::where('merchant_id', $merchant->id)
             ->where('status', 'pending')
-            ->whereBetween('calculated_at', [$startOfMonth, $endOfMonth])
+            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
             ->sum('total_amount_in_rm');
 
-        $lastMonthStart = $startOfMonth->copy()->subMonth()->startOfMonth();
-        $lastMonthEnd = $startOfMonth->copy()->subMonth()->endOfMonth();
-
-        $lastMonthSales = MerchantSlotPayout::where('merchant_id', $merchant->id)
-            ->where('status', 'pending')
-            ->whereBetween('calculated_at', [$lastMonthStart, $lastMonthEnd])
-            ->sum('total_amount_in_rm');
-
-        $monthlyPercentageIncrease = $lastMonthSales > 0
-            ? (($monthlySales - $lastMonthSales) / $lastMonthSales) * 100
-            : null;
-
-        $startOfWeek = $today->copy()->startOfWeek(); // Monday start
-        $endOfWeek = $today->copy()->endOfWeek();
-
-        $weeklySales = MerchantSlotPayout::where('merchant_id', $merchant->id)
-            ->where('status', 'pending')
-            ->whereBetween('calculated_at', [$startOfWeek, $endOfWeek])
-            ->sum('total_amount_in_rm');
-
-        $lastWeekStart = $startOfWeek->copy()->subWeek();       
-        $lastWeekEnd = $startOfWeek->copy()->subWeek()->endOfWeek();
-
-        $lastWeekSales = MerchantSlotPayout::where('merchant_id', $merchant->id)
-            ->where('status', 'pending')
-            ->whereBetween('calculated_at', [$lastWeekStart, $lastWeekEnd])
-            ->sum('total_amount_in_rm');
-
-        $weeklyPercentageIncrease = $lastWeekSales > 0
-            ? (($weeklySales - $lastWeekSales) / $lastWeekSales) * 100
-            : null;
-
-        $totalBookingsThisMonth = Booking::where('status', 'confirmed')
-            ->whereHas('slot', fn($q) => $q->whereIn('event_id', $merchantEventIds))
-            ->whereBetween('booked_at', [$startOfMonth, $endOfMonth])
-            ->count();
+        // Payout date (last day of current month)
+        $payoutDate = $endOfMonth->format('F j, Y');
 
         // -----------------------------
         // Render Inertia
@@ -186,16 +180,21 @@ class MerchantDashboardController extends Controller
             'allBookings' => $allBookings,
             'todayBookings' => $todayBookings,
             'weekBookings' => $weekBookings,
-            'monthlySales' => $monthlySales,
-            'weeklySales' => $weeklySales,
-            'lastMonthSales' => $lastMonthSales,
-            'monthlyPercentageIncrease' => $monthlyPercentageIncrease,
-            'weeklyPercentageIncrease' => $weeklyPercentageIncrease,
-            'availablePayouts' => $availablePayouts,
-            'pendingPayouts' => $pendingPayouts,
-            'totalBookingsThisMonth' => $totalBookingsThisMonth,
+            'monthBookings' => $monthBookings,
+            
+            // Revenue data
+            'todayRevenue' => $todayRevenue,
+            'weekRevenue' => $weekRevenue,
+            'monthRevenue' => $monthRevenue,
+            'todayPercentage' => $todayPercentage,
+            'weekPercentage' => $weekPercentage,
+            'monthPercentage' => $monthPercentage,
+            
+            // Payout data
+            'thisMonthPayout' => $thisMonthPayout,
+            'payoutDate' => $payoutDate,
+            
             'userRole' => $request->user()->role,
         ]);
     }
 }
-

@@ -68,6 +68,7 @@ export default function EventFormWrapper({
                     removeMedia={form.removeMedia}
                     ageGroups={form.ageGroups}
                     addAgeGroup={form.addAgeGroup}
+                    removeAgeGroup={form.removeAgeGroup}
                     updateAgeGroup={form.updateAgeGroup}
                     canEditAgeGroups={canEditAgeGroups}
                 />

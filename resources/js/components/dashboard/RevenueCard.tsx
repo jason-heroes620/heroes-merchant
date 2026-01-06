@@ -3,33 +3,40 @@ import { TrendingUp, DollarSign } from "lucide-react";
 import FilterButton from "./FilterButton";
 
 interface Props {
-    weeklySales: number;
-    monthlySales: number;
-    weeklyPercentage: number;
-    monthlyPercentage: number;
+    todayRevenue: number;
+    weekRevenue: number;
+    monthRevenue: number;
+    todayPercentage: number;
+    weekPercentage: number;
+    monthPercentage: number;
 }
 
 const RevenueCard: React.FC<Props> = ({
-    weeklySales,
-    monthlySales,
-    weeklyPercentage,
-    monthlyPercentage,
+    todayRevenue,
+    weekRevenue,
+    monthRevenue,
+    todayPercentage,
+    weekPercentage,
+    monthPercentage,
 }) => {
-    const [revenueFilter, setRevenueFilter] = useState<"week" | "month">(
-        "week"
-    );
+    const [revenueFilter, setRevenueFilter] = useState<
+        "today" | "week" | "month"
+    >("today");
 
-    const displayedRevenue = useMemo(
-        () => (revenueFilter === "week" ? weeklySales : monthlySales),
-        [revenueFilter, weeklySales, monthlySales]
-    );
-    const displayedPercentage = useMemo(
-        () => (revenueFilter === "week" ? weeklyPercentage : monthlyPercentage),
-        [revenueFilter, weeklyPercentage, monthlyPercentage]
-    );
+    const displayedRevenue = useMemo(() => {
+        if (revenueFilter === "today") return todayRevenue;
+        if (revenueFilter === "week") return weekRevenue;
+        return monthRevenue;
+    }, [revenueFilter, todayRevenue, weekRevenue, monthRevenue]);
+
+    const displayedPercentage = useMemo(() => {
+        if (revenueFilter === "today") return todayPercentage;
+        if (revenueFilter === "week") return weekPercentage;
+        return monthPercentage;
+    }, [revenueFilter, todayPercentage, weekPercentage, monthPercentage]);
 
     return (
-        <div className="md:col-span-2 bg-linear-to-r from-orange-400 via-orange-500 to-red-500 text-white rounded-3xl p-8 relative cursor-pointer hover:shadow-3xl transition-all hover:scale-[1.02] group">
+        <div className="bg-linear-to-r from-orange-400 via-orange-500 to-red-500 text-white rounded-2xl p-8 relative overflow-hidden hover:shadow-2xl transition-all hover:scale-[1.02] group">
             <div className="absolute top-0 right-0 opacity-10">
                 <DollarSign size={120} className="text-yellow-100" />
             </div>
@@ -39,6 +46,12 @@ const RevenueCard: React.FC<Props> = ({
                         Revenue
                     </span>
                     <div className="flex items-center gap-2">
+                        <FilterButton
+                            active={revenueFilter === "today"}
+                            onClick={() => setRevenueFilter("today")}
+                        >
+                            Today
+                        </FilterButton>
                         <FilterButton
                             active={revenueFilter === "week"}
                             onClick={() => setRevenueFilter("week")}
@@ -66,7 +79,11 @@ const RevenueCard: React.FC<Props> = ({
                             {displayedPercentage.toFixed(1)}%
                         </span>
                     </div>
-                    <span> vs last {revenueFilter}</span>
+                    <span>
+                        {revenueFilter === "today"
+                            ? "vs yesterday"
+                            : `vs last ${revenueFilter}`}
+                    </span>
                 </div>
             </div>
         </div>

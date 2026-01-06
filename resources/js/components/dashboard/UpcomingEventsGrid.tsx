@@ -87,7 +87,7 @@ const UpcomingEventsGrid: React.FC<Props> = ({
                     displayEvents.map((event) => (
                         <div
                             key={event.id}
-                            onClick={() => handleNavigate(event.id)}
+                            onClick={() => handleNavigate(Number(event.id))}
                             className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-xl hover:border-orange-300 hover:scale-105 transition-all cursor-pointer group"
                         >
                             <div className="relative h-70 bg-linear-to-br from-orange-400 to-red-400 rounded-lg flex items-center justify-center mb-4 overflow-hidden">

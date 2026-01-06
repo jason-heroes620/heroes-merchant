@@ -2,7 +2,7 @@ import EventTypeSection from "./EventTypeSection";
 import LocationSection from "./LocationSection";
 import MediaUploader from "./MediaUploader";
 import type { AgeGroup } from "../../../types/events";
-import { FileText, Tag, User, AlertCircle } from "lucide-react";
+import { FileText, Tag, User, AlertCircle, Trash2 } from "lucide-react";
 import EventDetailsSection from "./EventDetailsSection";
 import CategorySection from "./CategorySection";
 
@@ -16,6 +16,7 @@ interface BasicDetailsTabProps {
     ageGroups: AgeGroup[];
     addAgeGroup: () => void;
     updateAgeGroup: (i: number, f: keyof AgeGroup, v: any) => void;
+    removeAgeGroup: (index: number) => void;
     canEditAgeGroups: boolean;
 }
 
@@ -29,6 +30,7 @@ export default function BasicDetailsTab({
     ageGroups,
     addAgeGroup,
     updateAgeGroup,
+    removeAgeGroup,
     canEditAgeGroups,
 }: BasicDetailsTabProps) {
     return (
@@ -114,10 +116,10 @@ export default function BasicDetailsTab({
                         {ageGroups.map((group, index) => (
                             <div
                                 key={index}
-                                className="grid md:grid-cols-3 gap-6 mb-4"
+                                className="flex items-center gap-4 mb-4"
                             >
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                                <div className="flex items-center gap-2 flex-1">
+                                    <label className="text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">
                                         Group Name
                                     </label>
                                     <input
@@ -132,12 +134,12 @@ export default function BasicDetailsTab({
                                         }
                                         disabled={!canEditAgeGroups}
                                         placeholder="e.g., Kids, Teens, Adults"
-                                        className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm transition-all"
+                                        className="flex-1 px-3 py-3 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm transition-all"
                                     />
                                 </div>
 
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                                <div className="flex items-center gap-2">
+                                    <label className="text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">
                                         Min Age
                                     </label>
                                     <input
@@ -153,14 +155,14 @@ export default function BasicDetailsTab({
                                             )
                                         }
                                         disabled={!canEditAgeGroups}
-                                        placeholder="e.g., 3"
-                                        className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm transition-all"
+                                        placeholder="3"
+                                        className="w-24 px-3 py-3 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm transition-all"
                                         min="0"
                                     />
                                 </div>
 
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+                                <div className="flex items-center gap-2">
+                                    <label className="text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">
                                         Max Age
                                     </label>
                                     <input
@@ -176,11 +178,22 @@ export default function BasicDetailsTab({
                                             )
                                         }
                                         disabled={!canEditAgeGroups}
-                                        placeholder="e.g., 10"
-                                        className="w-full px-5 py-4 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm transition-all"
+                                        placeholder="12"
+                                        className="w-24 px-3 py-3 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm transition-all"
                                         min="0"
                                     />
                                 </div>
+
+                                {canEditAgeGroups && (
+                                    <button
+                                        type="button"
+                                        onClick={() => removeAgeGroup(index)}
+                                        className="p-3 bg-red-500 text-white rounded-xl shadow hover:bg-red-600 transition"
+                                        title="Delete age group"
+                                    >
+                                        <Trash2 size={20} />
+                                    </button>
+                                )}
                             </div>
                         ))}
 
