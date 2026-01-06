@@ -110,11 +110,21 @@ export interface EventFormShape {
 
     is_recurring: boolean;
     frequencies: Frequency[];
-    event_dates: EventDate[];
-    slots: EventSlot[];
+
+    event_dates: EventDateForm[];
+
+    claim_configuration: ClaimConfigurationForm;
 
     status?: EventStatus;
     featured?: boolean;
+}
+
+export interface ClaimConfigurationForm {
+    total_redemption_type: "unlimited" | "limited";
+    total_redemption_limit: number | null;
+
+    daily_redemption_type: "once" | "multiple";
+    daily_redemption_limit: number | null;
 }
 
 export interface EventSubmissionData
@@ -135,13 +145,13 @@ export interface SyntheticSlot {
 }
 
 type SlotWithDisplay = {
-  display_start: string; 
-  display_end: string;
-  raw: {
-    is_unlimited?: boolean;
-    capacity?: number;
-    booked_quantity?: number;
-  };
+    display_start: string;
+    display_end: string;
+    raw: {
+        is_unlimited?: boolean;
+        capacity?: number;
+        booked_quantity?: number;
+    };
 };
 
 export interface EventType {
@@ -171,7 +181,6 @@ export interface EventType {
     is_past: boolean;
     all_slots?: SlotWithDisplay[];
 }
-
 
 export interface Event {
     id: string;
@@ -288,4 +297,20 @@ interface BookingType {
     slot?: EventSlot;
     booked_at: string;
     created_at: string;
+}
+
+export interface EventSlotForm {
+    id?: string;
+    date: string;
+    start_time: string;
+    end_time: string;
+    capacity: number | null;
+    is_unlimited: boolean;
+}
+
+export interface EventDateForm {
+    id?: string;
+    start_date: string;
+    end_date: string;
+    slots: EventSlotForm[];
 }

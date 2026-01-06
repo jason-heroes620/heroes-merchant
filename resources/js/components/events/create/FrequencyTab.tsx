@@ -3,6 +3,7 @@ import { Check } from "lucide-react";
 import type { Frequency, EventDate, EventSlot } from "../../../types/events";
 import OneTimeEvent from "./OneTimeEvent";
 import RecurringEvent from "./RecurringEvent";
+import RedemptionLimitsSection from "./RedemptionLimitsSection";
 
 interface FrequencyTabProps {
     data: any;
@@ -170,6 +171,8 @@ export default function FrequencyTab({
                         updateFrequency={updateFrequency}
                     />
                 )}
+
+                <RedemptionLimitsSection data={data} setData={setData} />
             </div>
         </div>
     );

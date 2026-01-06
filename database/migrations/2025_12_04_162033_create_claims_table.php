@@ -18,6 +18,7 @@ return new class extends Migration
             $table->foreignUuid('slot_id')->constrained('event_slots')->onDelete('cascade');
             $table->foreignUuid('event_id')->constrained('events')->onDelete('cascade');
             $table->foreignUuid('customer_id')->constrained('customers')->onDelete('cascade');
+            $table->foreignUuid('configuration_id')->nullable()->constrained('claim_configurations')->onDelete('set null');
 
             $table->enum('status', ['pending', 'claimed', 'expired'])->default('pending');
             $table->timestamp('scanned_at')->nullable();

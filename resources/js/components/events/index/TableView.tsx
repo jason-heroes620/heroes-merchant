@@ -123,10 +123,6 @@ export default function TableView({
                                                                     "No Merchant"}
                                                             </span>
                                                         </p>
-
-                                                        <p className="text-[10px] text-gray-400 tracking-wide">
-                                                            {event.merchant?.id}
-                                                        </p>
                                                     </div>
                                                 )}
                                             </div>

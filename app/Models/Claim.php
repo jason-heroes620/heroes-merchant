@@ -16,6 +16,7 @@ class Claim extends Model
         'slot_id',
         'event_id',
         'customer_id',
+        'configuration_id',
         'status',
         'scanned_at',
     ];
@@ -49,5 +50,10 @@ class Claim extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function configuration()
+    {
+        return $this->belongsTo(ClaimConfiguration::class, 'configuration_id');
     }
 }
