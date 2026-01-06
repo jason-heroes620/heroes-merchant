@@ -214,7 +214,7 @@ class MerchantPayoutService
                     'age_group_id' => $item->bookingItem->age_group_id ?? null,
                     'age_group_label' => $item->bookingItem->ageGroup?->label ?? 'N/A',
                     'quantity' => $item->bookingItem->quantity ?? 0,
-                    'attended' => $item->bookingItem->quantity_attended ?? null,
+                    'claimed' => $item->bookingItem->quantity_claimed ?? null,
                     'price_in_rm' => $item->bookingItem->eventSlotPrice?->price_in_rm ?? 0,
                     'total_amount' => $item->amount_in_rm,
                 ])->toArray(),

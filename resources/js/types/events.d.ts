@@ -240,7 +240,7 @@ export interface Booking {
     items: BookingItem[];
     transactions?: Transaction[] | null;
     customer?: Customer | null;
-    attendance?: BookingAttendance;
+    claim?: BookingClaim;
 }
 
 export interface Transaction {
@@ -251,25 +251,25 @@ export interface Transaction {
     created_at: string;
 }
 
-export type BookingAttendance = {
-    summary: AttendanceSummary;
-    list: Attendance[];
+export type BookingClaim = {
+    summary: ClaimSummary;
+    list: Claim[];
 };
 
-export type AttendanceSummary = {
+export type ClaimSummary = {
     total: number;
-    attended: number;
+    claimed: number;
     pending: number;
     absent: number;
 };
 
-export type Attendance = {
+export type Claim = {
     id: string;
     booking_id: string;
     slot_id: string;
     event_id: string;
     customer_id: string;
-    status: "pending" | "attended" | "absent";
+    status: "pending" | "claimed" | "expired";
     scanned_at?: string | null;
     created_at: string;
     updated_at: string;
@@ -284,7 +284,7 @@ interface BookingType {
     event?: { title: string };
     quantity?: number;
     total_amount?: number;
-    attendance_status?: "pending" | "attended" | "absent";
+    claim_status?: "pending" | "claimed" | "expired";
     slot?: EventSlot;
     booked_at: string;
     created_at: string;

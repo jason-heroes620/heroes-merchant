@@ -7,7 +7,7 @@ use App\Services\BookingService;
 use App\Services\WalletService;
 use App\Http\Resources\BookingResource;
 use App\Models\Booking;
-use App\Models\Attendance;
+use App\Models\Claim;
 use App\Models\EventSlot;
 use App\Models\Conversion;
 use Illuminate\Support\Facades\Log;
@@ -71,7 +71,7 @@ class BookingController extends Controller
                 }
             }
 
-            $booking->_is_upcoming = $displayStart && $displayStart->gte($now);
+            $booking->_is_upcoming = $displayEnd && $displayEnd->gte($now);
             $booking->_is_completed = $displayEnd && $displayEnd->lt($now);
 
             return $booking;
@@ -163,7 +163,7 @@ class BookingController extends Controller
             $bookingModel = $bookingResponse['booking'];
 
             foreach ($bookingModel->items as $item) {
-                Attendance::create([
+                Claim::create([
                     'id' => Str::uuid(),
                     'booking_id' => $bookingModel->id,
                     'booking_item_id' => $item->id,
@@ -227,7 +227,7 @@ class BookingController extends Controller
 
             Log::info("Cancel result prepared", ['result' => $result]);
 
-            Attendance::where('booking_id', $booking->id)->delete();
+            Claim::where('booking_id', $booking->id)->delete();
 
             return response()->json($result, 200);
         } catch (\Exception $e) {

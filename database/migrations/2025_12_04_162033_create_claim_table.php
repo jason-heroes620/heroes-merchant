@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('attendances', function (Blueprint $table) {
+        Schema::create('claims', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('booking_id')->constrained('bookings')->onDelete('cascade');
             $table->foreignUuid('booking_item_id')->constrained('booking_items')->onDelete('cascade');
@@ -19,7 +19,7 @@ return new class extends Migration
             $table->foreignUuid('event_id')->constrained('events')->onDelete('cascade');
             $table->foreignUuid('customer_id')->constrained('customers')->onDelete('cascade');
 
-            $table->enum('status', ['pending', 'attended', 'absent'])->default('pending');
+            $table->enum('status', ['pending', 'claimed', 'expired'])->default('pending');
             $table->timestamp('scanned_at')->nullable();
 
             $table->timestamps();
@@ -33,6 +33,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('attendance');
+        Schema::dropIfExists('claims');
     }
 };

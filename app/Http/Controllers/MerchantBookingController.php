@@ -23,7 +23,7 @@ class MerchantBookingController extends Controller
             'event.media',
             'items.ageGroup',
             'customer.user',
-            'attendance',
+            'claim',
         ]);
 
         if ($user->role === 'merchant') {
@@ -138,10 +138,10 @@ class MerchantBookingController extends Controller
                     'expected_attendees' => $confirmedBookings->sum('quantity'),
                     'cancelled_count' => $cancelledBookings->count(),
                     'actual_attendees' => $isCompleted ? $confirmedBookings->sum(fn($b) => 
-                        $b->attendance?->where('status', 'attended')->count() ?? 0
+                        $b->claim?->where('status', 'claimed')->count() ?? 0
                     ) : null,
                     'absent_count' => $isCompleted ? $confirmedBookings->sum(fn($b) =>
-                        $b->attendance?->where('status', 'absent')->count() ?? 0
+                        $b->claim?->where('status', 'expired')->count() ?? 0
                     ) : null,
                 ];
             }
@@ -195,7 +195,7 @@ class MerchantBookingController extends Controller
             'items.ageGroup',
             'customer.user',
             'transactions',
-            'attendance'
+            'claim'
         ])->whereHas('slot', function($q) use ($eventId) {
             $q->where('event_id', $eventId);
         });
@@ -265,7 +265,7 @@ class MerchantBookingController extends Controller
         $user = $request->user();
         $event = Event::with(['slots', 'media'])->findOrFail($eventId);
 
-        $query = Booking::with(['slot', 'customer', 'attendances'])
+        $query = Booking::with(['slot', 'customer', 'claims'])
             ->whereHas('slot', fn($q) => $q->where('event_id', $eventId))
             ->whereHas('event', fn($q) => $q->where('merchant_id', $user->merchant->id));
 
@@ -284,7 +284,7 @@ class MerchantBookingController extends Controller
                 'slot_date' => $b->slot->date ?? null,
                 'slot_start_time' => $b->slot->start_time ?? null,
                 'status' => $b->status,
-                'attendance_status' => $b->attendances->first()->status ?? 'pending',
+                'claim_status' => $b->claims->first()->status ?? 'pending',
             ]),
         ]);
     }

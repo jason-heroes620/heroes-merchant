@@ -91,13 +91,13 @@ class MerchantDashboardController extends Controller
         // -----------------------------
         $allBookings = Booking::where('status', 'confirmed')
             ->whereHas('slot', fn($q) => $q->whereIn('event_id', $merchantEventIds))
-            ->with(['event.media', 'attendance.customer', 'customer.user', 'event.ageGroups', 'slot'])
+            ->with(['event.media', 'claim.customer', 'customer.user', 'event.ageGroups', 'slot'])
             ->orderBy('booked_at', 'desc')
             ->get();
 
         $allBookings->transform(function ($booking) {
-            $attendance = $booking->attendance->firstWhere('customer_id', $booking->customer_id);
-            $booking->attendance_status = $attendance->status ?? 'pending';
+            $claim = $booking->claim->firstWhere('customer_id', $booking->customer_id);
+            $booking->claim_status = $claim->status ?? 'pending';
             
             $slot = $booking->slot;
             if ($slot) {
