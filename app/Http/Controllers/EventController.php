@@ -728,8 +728,6 @@ class EventController extends Controller
 
             'media' => 'nullable|array',
             'media.*' => 'nullable',
-            'new_media' => 'nullable|array',
-            'new_media.*' => 'file|mimes:jpeg,jpg,png,gif,mp4,mov|max:10240',
 
             'age_groups' => 'sometimes|array',
             'age_groups.*.id' => 'nullable|uuid',
@@ -789,11 +787,6 @@ class EventController extends Controller
                     $event,
                     $validated['claim_configuration']
                 );
-
-                Log::info('💾 ClaimConfiguration updated', [
-                    'event_id' => $event->id,
-                    'data' => $validated['claim_configuration'],
-                ]);
             }
 
             /* =======================
@@ -812,22 +805,23 @@ class EventController extends Controller
                 );
             }
 
+            // ===== MEDIA HANDLING =====
             if (!empty($validated['removed_media'])) {
                 $mediaToRemove = EventMedia::where('event_id', $event->id)
                     ->whereIn('id', $validated['removed_media'])
                     ->get();
 
                 foreach ($mediaToRemove as $media) {
-                    // Delete file from storage
                     if (Storage::disk('public')->exists($media->file_path)) {
                         Storage::disk('public')->delete($media->file_path);
                     }
-                    // Delete database record
                     $media->delete();
                 }
+
                 Log::info('🗑️ Removed media', ['count' => count($validated['removed_media'])]);
             }
 
+            // Add new media uploaded in the request
             if ($request->hasFile('media')) {
                 foreach ($request->file('media') as $file) {
                     $filename = Str::uuid() . '_' . $file->getClientOriginalName();
@@ -840,6 +834,7 @@ class EventController extends Controller
                         'file_size' => $file->getSize(),
                     ]);
                 }
+
                 Log::info('📸 New media uploaded', ['count' => count($request->file('media'))]);
             }
 
