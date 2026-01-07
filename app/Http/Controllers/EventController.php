@@ -1115,25 +1115,36 @@ class EventController extends Controller
                     throw new \Exception('No active conversion found.');
                 }
 
+                $activationMode = $request->input('activation_mode', 'convert_credits');
+
                 foreach ($validated['slot_prices'] as $sp) {
                     $slot = EventSlotPrice::find($sp['id']);
                     $price = $slot->price_in_rm ? (float) $slot->price_in_rm : 0.00;
-                    Log::info('Processing slot price', ['slot' => $slot->toArray(), 'submitted' => $sp]);
 
-                    $recommended = app(ConversionService::class)->calculateCredits($price, $conversion);
+                    if ($activationMode === 'convert_credits') {
+                        $conversion = app(ConversionService::class)->getActiveConversion();
+                        $recommended = app(ConversionService::class)->calculateCredits($price, $conversion);
 
-                    if ($sp['paid_credits'] < $recommended['paid_credits']) {
-                        throw new \Exception("Paid credits for slot #{$sp['id']} cannot be lower than minimum ({$recommended['paid_credits']}) to prevent loss.");
+                        if ($sp['paid_credits'] < $recommended['paid_credits']) {
+                            throw new \Exception("Paid credits for slot #{$sp['id']} cannot be lower than minimum ({$recommended['paid_credits']}) to prevent loss.");
+                        }
+
+                        EventSlotPrice::where('id', $sp['id'])->update([
+                            'paid_credits' => $sp['paid_credits'],
+                            'free_credits' => $sp['free_credits'] ?? $recommended['free_credits'],
+                            'conversion_id' => $conversion->id,
+                        ]);
+                    } elseif ($activationMode === 'custom_free_credits') {
+                        EventSlotPrice::where('id', $sp['id'])->update([
+                            'paid_credits' => null,
+                            'free_credits' => $sp['free_credits'], 
+                        ]);
+                    } elseif ($activationMode === 'keep_rm') {
+                        EventSlotPrice::where('id', $sp['id'])->update([
+                            'paid_credits' => null,
+                            'free_credits' => null,
+                        ]);
                     }
-
-                    EventSlotPrice::where('id', $sp['id'])->update([
-                        'paid_credits' => $sp['paid_credits'],
-                        'free_credits' => $sp['free_credits'] ?? $recommended['free_credits'],
-                        'conversion_id' => $conversion->id,
-                    ]);
-
-                    $updatedSlot = EventSlotPrice::find($sp['id']);
-                    Log::info('Slot price updated', ['slot' => $updatedSlot->toArray()]);
                 }
             }
 

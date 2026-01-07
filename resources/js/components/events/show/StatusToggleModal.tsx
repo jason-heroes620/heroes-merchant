@@ -53,7 +53,6 @@ interface RadioGroupProps {
     options: RadioOption[];
 }
 
-// Shadcn-style components with orange theme
 const Select: React.FC<SelectProps> = ({
     value,
     onValueChange,
@@ -121,7 +120,7 @@ const StatusToggleModal: React.FC<Props> = ({
 }) => {
     const [newStatus, setNewStatus] = useState<EventStatus>(event.status);
     const [rejectedReason, setRejectedReason] = useState("");
-    const [activationMode, setActivationMode] = useState("keep_rm"); // 'keep_rm' or 'convert_credits' or 'custom_free_credits'
+    const [activationMode, setActivationMode] = useState("keep_rm"); 
     const [bulkPaidCredits, setBulkPaidCredits] = useState<number | "">("");
     const [bulkFreeCredits, setBulkFreeCredits] = useState<number | "">("");
     const [applyToAll, setApplyToAll] = useState(false);
@@ -135,7 +134,7 @@ const StatusToggleModal: React.FC<Props> = ({
 
     const ageGroups = event.age_groups || [];
 
-    // Calculate credits based on conversion service logic - DEFINE THIS FIRST
+    // Calculate credits based on conversion service logic
     const calculateCredits = (priceInRM: number) => {
         if (!conversion) return { paid: 0, free: 0 };
 
@@ -217,7 +216,6 @@ const StatusToggleModal: React.FC<Props> = ({
 
     const sortedDates = Object.keys(slotsByDate).sort();
 
-    // Manual update functions - user can edit freely
     const updatePaidCredits = (priceRowId: string, paidValue: number) => {
         setCredits((prev) =>
             prev.map((c) =>
@@ -338,6 +336,7 @@ const StatusToggleModal: React.FC<Props> = ({
 
         const payload: Record<string, any> = {
             status: statusToUpdate,
+            activation_mode: activationMode, 
         };
 
         if (statusToUpdate === "rejected") {
@@ -345,24 +344,24 @@ const StatusToggleModal: React.FC<Props> = ({
         }
 
         if (statusToUpdate === "active" || event.status === "active") {
-            if (activationMode === "custom_free_credits") {
-                payload.slot_prices = credits.map((c) => ({
-                    id: c.id,
-                    paid_credits: null,
-                    free_credits: c.free_credits,
-                }));
-            }
-
-            if (activationMode === "convert_credits") {
-                payload.slot_prices = credits;
-            }
-
-            if (activationMode === "keep_rm") {
-                payload.slot_prices = credits.map((c) => ({
-                    id: c.id,
-                    paid_credits: null,
-                    free_credits: null,
-                }));
+            switch (activationMode) {
+                case "custom_free_credits":
+                    payload.slot_prices = credits.map((c) => ({
+                        id: c.id,
+                        paid_credits: null,
+                        free_credits: c.free_credits,
+                    }));
+                    break;
+                case "convert_credits":
+                    payload.slot_prices = credits;
+                    break;
+                case "keep_rm":
+                    payload.slot_prices = credits.map((c) => ({
+                        id: c.id,
+                        paid_credits: null,
+                        free_credits: null,
+                    }));
+                    break;
             }
         }
 
@@ -508,8 +507,8 @@ const StatusToggleModal: React.FC<Props> = ({
                                                                     conversionDisplay.paid
                                                                 }{" "}
                                                                 Paid Credits
-                                                            </span>
-                                                            {" "}+{" "}
+                                                            </span>{" "}
+                                                            +{" "}
                                                             <span className="font-bold text-green-700">
                                                                 {
                                                                     conversionDisplay.free
@@ -532,7 +531,7 @@ const StatusToggleModal: React.FC<Props> = ({
                                             <Calendar className="w-4 h-4 text-orange-600" />
                                             {activationMode ===
                                             "custom_free_credits"
-                                                ? "Add Custom Free Credits"
+                                                ? "Add Free Rewards"
                                                 : "Review Credit Conversion"}
                                         </h4>
 
@@ -1038,7 +1037,6 @@ const StatusToggleModal: React.FC<Props> = ({
                                                 </div>
                                             )}
 
-                                            {/* Suggestedurring Events */}
                                             {event.is_recurring && (
                                                 <div className="space-y-3">
                                                     {sortedDates.map((date) => (
