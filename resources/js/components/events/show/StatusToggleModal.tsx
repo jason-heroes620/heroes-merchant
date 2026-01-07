@@ -503,14 +503,19 @@ const StatusToggleModal: React.FC<Props> = ({
                                                         </span>
                                                         <span className="font-bold text-orange-700">
                                                             RM 1 ={" "}
-                                                            {
-                                                                conversionDisplay.paid
-                                                            }{" "}
-                                                            Paid Credits +{" "}
-                                                            {
-                                                                conversionDisplay.free
-                                                            }{" "}
-                                                            Free Credits
+                                                            <span className="font-bold text-blue-700">
+                                                                {
+                                                                    conversionDisplay.paid
+                                                                }{" "}
+                                                                Paid Credits
+                                                            </span>
+                                                            {" "}+{" "}
+                                                            <span className="font-bold text-green-700">
+                                                                {
+                                                                    conversionDisplay.free
+                                                                }{" "}
+                                                                Free Credits
+                                                            </span>
                                                         </span>
                                                     </div>
                                                 </div>
