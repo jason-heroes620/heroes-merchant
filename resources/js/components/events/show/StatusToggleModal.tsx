@@ -864,9 +864,24 @@ const StatusToggleModal: React.FC<Props> = ({
                                                                                             }
                                                                                             className="flex items-center gap-3 text-sm"
                                                                                         >
-                                                                                            <div className="w-20 text-xs font-medium text-gray-600">
+                                                                                            <div className="w-23 text-xs font-medium text-gray-600">
                                                                                                 {ageGroup
-                                                                                                    ? ageGroup.label
+                                                                                                    ? `${
+                                                                                                          ageGroup.label
+                                                                                                      }${
+                                                                                                          ageGroup.min_age !=
+                                                                                                              null ||
+                                                                                                          ageGroup.max_age !=
+                                                                                                              null
+                                                                                                              ? ` (${
+                                                                                                                    ageGroup.min_age ??
+                                                                                                                    "–"
+                                                                                                                }–${
+                                                                                                                    ageGroup.max_age ??
+                                                                                                                    "+"
+                                                                                                                })`
+                                                                                                              : ""
+                                                                                                      }`
                                                                                                     : "General"}
                                                                                             </div>
                                                                                             <div className="w-20 font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded text-xs">
@@ -911,9 +926,24 @@ const StatusToggleModal: React.FC<Props> = ({
                                                                                             }
                                                                                             className="flex items-center gap-3 text-sm"
                                                                                         >
-                                                                                            <div className="w-20 text-xs font-medium text-gray-600">
+                                                                                            <div className="w-23 text-xs font-medium text-gray-600">
                                                                                                 {ageGroup
-                                                                                                    ? ageGroup.label
+                                                                                                    ? `${
+                                                                                                          ageGroup.label
+                                                                                                      }${
+                                                                                                          ageGroup.min_age !=
+                                                                                                              null ||
+                                                                                                          ageGroup.max_age !=
+                                                                                                              null
+                                                                                                              ? ` (${
+                                                                                                                    ageGroup.min_age ??
+                                                                                                                    "–"
+                                                                                                                }–${
+                                                                                                                    ageGroup.max_age ??
+                                                                                                                    "+"
+                                                                                                                })`
+                                                                                                              : ""
+                                                                                                      }`
                                                                                                     : "General"}
                                                                                             </div>
                                                                                             <div className="w-20 font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded text-xs">
@@ -931,6 +961,7 @@ const StatusToggleModal: React.FC<Props> = ({
                                                                                                             {
                                                                                                                 recommended.paid
                                                                                                             }
+
                                                                                                             )
                                                                                                         </span>
                                                                                                     </label>
@@ -963,6 +994,7 @@ const StatusToggleModal: React.FC<Props> = ({
                                                                                                             {
                                                                                                                 recommended.free
                                                                                                             }
+
                                                                                                             )
                                                                                                         </span>
                                                                                                     </label>
@@ -1092,9 +1124,24 @@ const StatusToggleModal: React.FC<Props> = ({
                                                                                                         }
                                                                                                         className="flex items-center gap-3 text-sm"
                                                                                                     >
-                                                                                                        <div className="w-20 text-xs font-medium text-gray-600">
+                                                                                                        <div className="w-23 text-xs font-medium text-gray-600">
                                                                                                             {ageGroup
-                                                                                                                ? ageGroup.label
+                                                                                                                ? `${
+                                                                                                                      ageGroup.label
+                                                                                                                  }${
+                                                                                                                      ageGroup.min_age !=
+                                                                                                                          null ||
+                                                                                                                      ageGroup.max_age !=
+                                                                                                                          null
+                                                                                                                          ? ` (${
+                                                                                                                                ageGroup.min_age ??
+                                                                                                                                "–"
+                                                                                                                            }–${
+                                                                                                                                ageGroup.max_age ??
+                                                                                                                                "+"
+                                                                                                                            })`
+                                                                                                                          : ""
+                                                                                                                  }`
                                                                                                                 : "General"}
                                                                                                         </div>
                                                                                                         <div className="w-20 font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded text-xs">
@@ -1139,9 +1186,24 @@ const StatusToggleModal: React.FC<Props> = ({
                                                                                                         }
                                                                                                         className="flex items-center gap-3 text-sm"
                                                                                                     >
-                                                                                                        <div className="w-20 text-xs font-medium text-gray-600">
+                                                                                                        <div className="w-23 text-xs font-medium text-gray-600">
                                                                                                             {ageGroup
-                                                                                                                ? ageGroup.label
+                                                                                                                ? `${
+                                                                                                                      ageGroup.label
+                                                                                                                  }${
+                                                                                                                      ageGroup.min_age !=
+                                                                                                                          null ||
+                                                                                                                      ageGroup.max_age !=
+                                                                                                                          null
+                                                                                                                          ? ` (${
+                                                                                                                                ageGroup.min_age ??
+                                                                                                                                "–"
+                                                                                                                            }–${
+                                                                                                                                ageGroup.max_age ??
+                                                                                                                                "+"
+                                                                                                                            })`
+                                                                                                                          : ""
+                                                                                                                  }`
                                                                                                                 : "General"}
                                                                                                         </div>
                                                                                                         <div className="w-20 font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded text-xs">
@@ -1159,6 +1221,7 @@ const StatusToggleModal: React.FC<Props> = ({
                                                                                                                         {
                                                                                                                             recommended.paid
                                                                                                                         }
+
                                                                                                                         )
                                                                                                                     </span>
                                                                                                                 </label>
@@ -1191,6 +1254,7 @@ const StatusToggleModal: React.FC<Props> = ({
                                                                                                                         {
                                                                                                                             recommended.free
                                                                                                                         }
+
                                                                                                                         )
                                                                                                                     </span>
                                                                                                                 </label>
