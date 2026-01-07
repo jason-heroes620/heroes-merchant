@@ -92,9 +92,9 @@ export default function EventsIndexPage() {
 
     const getEventTypeLabel = (type: string) => {
         const labels: Record<string, string> = {
-            event: "Event",
-            trial_class: "Trial Class",
-            location_based: "Field Trip",
+            workshop: "Event / Workshop",
+            trial: "Trial Class",
+            pass: "Ticket / Pass",
         };
         return labels[type] || type;
     };
@@ -417,6 +417,8 @@ export default function EventsIndexPage() {
                             filteredEvents={filteredEvents}
                             statusColors={statusColors}
                             getEventTypeLabel={getEventTypeLabel}
+                            getFrequencyLabel={getFrequencyLabel}
+                            getPriceRange={getPriceRange}
                             userRole={userRole}
                             router={router}
                             handleDeactivate={handleDeactivate}

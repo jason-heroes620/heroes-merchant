@@ -6,7 +6,7 @@ import {
     Edit,
     BadgeX,
     Heart,
-    Star
+    Star,
 } from "lucide-react";
 import type {
     EventType,
@@ -106,6 +106,20 @@ export default function GridView({
                                 {event.title}
                             </h3>
 
+                            <div className="flex items-center gap-4 mb-4 text-sm text-gray-600">
+                                <div className="flex items-center gap-1">
+                                    <Eye size={14} className="text-gray-400" />
+                                    <span>{event.click_count || 0}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <Heart
+                                        size={14}
+                                        className="text-gray-400"
+                                    />
+                                    <span>{event.like_count || 0}</span>
+                                </div>
+                            </div>
+
                             {userRole === "admin" && (
                                 <>
                                     <div className="text-sm font-medium">
@@ -175,20 +189,6 @@ export default function GridView({
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-4 mb-4 text-sm text-gray-600">
-                                <div className="flex items-center gap-1">
-                                    <Eye size={14} className="text-gray-400" />
-                                    <span>{event.click_count || 0}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <Heart
-                                        size={14}
-                                        className="text-gray-400"
-                                    />
-                                    <span>{event.like_count || 0}</span>
-                                </div>
-                            </div>
-
                             {/* Dates */}
                             {(event.all_slots ?? []).length > 0 && (
                                 <div className="mb-4 p-3 bg-orange-50 rounded-lg border border-orange-200 text-sm text-gray-600">
@@ -198,138 +198,111 @@ export default function GridView({
                                     </p>
 
                                     <div className="space-y-1">
-                                        {event.all_slots && (
-                                            <>
-                                                {event.all_slots
-                                                    .filter((slot) => {
-                                                        const end = new Date(
-                                                            slot.display_end
-                                                        );
-                                                        const now = new Date();
-                                                        return tab ===
-                                                            "upcoming"
-                                                            ? end >= now
-                                                            : end < now;
-                                                    })
-                                                    .slice(0, 3)
-                                                    .map((slot, idx) => {
-                                                        const start = new Date(
-                                                            slot.display_start
-                                                        );
-                                                        const end = new Date(
-                                                            slot.display_end
-                                                        );
+                                        {event.all_slots &&
+                                            event.all_slots.length > 0 &&
+                                            (() => {
+                                                const now = new Date();
 
-                                                        const sameDate =
-                                                            start.toDateString() ===
-                                                            end.toDateString();
+                                                // Filter slots based on tab
+                                                const filteredSlots =
+                                                    event.all_slots.filter(
+                                                        (slot) => {
+                                                            const end =
+                                                                new Date(
+                                                                    slot.display_end
+                                                                );
+                                                            return tab ===
+                                                                "upcoming"
+                                                                ? end >= now
+                                                                : end < now;
+                                                        }
+                                                    );
 
-                                                        const dateStr =
-                                                            start.toLocaleDateString(
-                                                                "en-MY",
-                                                                {
-                                                                    day: "2-digit",
-                                                                    month: "short",
-                                                                    year: "numeric",
-                                                                }
-                                                            );
+                                                if (filteredSlots.length === 0)
+                                                    return null;
 
-                                                        const startTimeStr =
-                                                            start.toLocaleTimeString(
-                                                                "en-MY",
-                                                                {
-                                                                    hour: "2-digit",
-                                                                    minute: "2-digit",
-                                                                    hour12: false,
-                                                                }
-                                                            );
+                                                // Pick the first upcoming or most recent past slot
+                                                const slot =
+                                                    tab === "upcoming"
+                                                        ? filteredSlots[0]
+                                                        : filteredSlots[
+                                                              filteredSlots.length -
+                                                                  1
+                                                          ];
 
-                                                        const endTimeStr =
-                                                            end.toLocaleTimeString(
-                                                                "en-MY",
-                                                                {
-                                                                    hour: "2-digit",
-                                                                    minute: "2-digit",
-                                                                    hour12: false,
-                                                                }
-                                                            );
+                                                const start = new Date(
+                                                    slot.display_start
+                                                );
+                                                const end = new Date(
+                                                    slot.display_end
+                                                );
 
-                                                        const availability =
-                                                            slot.raw
-                                                                .is_unlimited
-                                                                ? " • Unlimited"
-                                                                : slot.raw
-                                                                      .capacity !=
-                                                                  null
-                                                                ? ` • ${
-                                                                      slot.raw
-                                                                          .capacity -
-                                                                      (slot.raw
-                                                                          .booked_quantity ||
-                                                                          0)
-                                                                  }/${
-                                                                      slot.raw
-                                                                          .capacity
-                                                                  } left`
-                                                                : "";
+                                                const sameDate =
+                                                    start.toDateString() ===
+                                                    end.toDateString();
 
-                                                        return (
-                                                            <p
-                                                                key={idx}
-                                                                className="text-xs text-gray-700"
-                                                            >
-                                                                {sameDate
-                                                                    ? `${dateStr} • ${startTimeStr} - ${endTimeStr}`
-                                                                    : `${dateStr} - ${end.toLocaleDateString(
-                                                                          "en-MY",
-                                                                          {
-                                                                              day: "2-digit",
-                                                                              month: "short",
-                                                                              year: "numeric",
-                                                                          }
-                                                                      )} ${startTimeStr} -  ${endTimeStr}`}
-                                                                <span className="text-orange-600">
-                                                                    {
-                                                                        availability
-                                                                    }
-                                                                </span>
-                                                            </p>
-                                                        );
-                                                    })}
+                                                const dateStr =
+                                                    start.toLocaleDateString(
+                                                        "en-MY",
+                                                        {
+                                                            day: "2-digit",
+                                                            month: "short",
+                                                            year: "numeric",
+                                                        }
+                                                    );
 
-                                                {event.all_slots.filter(
-                                                    (slot) => {
-                                                        const end = new Date(
-                                                            slot.display_end
-                                                        );
-                                                        const now = new Date();
-                                                        return tab ===
-                                                            "upcoming"
-                                                            ? end >= now
-                                                            : end < now;
-                                                    }
-                                                ).length > 3 && (
-                                                    <div className="text-xs text-gray-400">
-                                                        +{" "}
-                                                        {event.all_slots.filter(
-                                                            (slot) => {
-                                                                const end =
-                                                                    new Date(
-                                                                        slot.display_end
-                                                                    );
-                                                                const now =
-                                                                    new Date();
-                                                                return tab ===
-                                                                    "upcoming"
-                                                                    ? end >= now
-                                                                    : end < now;
-                                                            }
-                                                        ).length - 3}{" "}
-                                                        more
-                                                    </div>
-                                                )}
-                                            </>
-                                        )}
+                                                const startTimeStr =
+                                                    start.toLocaleTimeString(
+                                                        "en-MY",
+                                                        {
+                                                            hour: "2-digit",
+                                                            minute: "2-digit",
+                                                            hour12: false,
+                                                        }
+                                                    );
+
+                                                const endTimeStr =
+                                                    end.toLocaleTimeString(
+                                                        "en-MY",
+                                                        {
+                                                            hour: "2-digit",
+                                                            minute: "2-digit",
+                                                            hour12: false,
+                                                        }
+                                                    );
+
+                                                const availability = slot.raw
+                                                    .is_unlimited
+                                                    ? " • Unlimited"
+                                                    : slot.raw.capacity != null
+                                                    ? ` • ${
+                                                          slot.raw.capacity -
+                                                          (slot.raw
+                                                              .booked_quantity ||
+                                                              0)
+                                                      }/${
+                                                          slot.raw.capacity
+                                                      } left`
+                                                    : "";
+
+                                                return (
+                                                    <p className="text-xs text-gray-700">
+                                                        {sameDate
+                                                            ? `${dateStr} • ${startTimeStr} - ${endTimeStr}`
+                                                            : `${dateStr} - ${end.toLocaleDateString(
+                                                                  "en-MY",
+                                                                  {
+                                                                      day: "2-digit",
+                                                                      month: "short",
+                                                                      year: "numeric",
+                                                                  }
+                                                              )} ${startTimeStr} - ${endTimeStr}`}
+                                                        <span className="text-orange-600">
+                                                            {availability}
+                                                        </span>
+                                                    </p>
+                                                );
+                                            })()}
                                     </div>
                                 </div>
                             )}

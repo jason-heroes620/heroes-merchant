@@ -88,41 +88,55 @@ class EventController extends Controller
             // Build all_slots for display
             // ---------------------------
             $all = $event->slots->map(function ($s) {
-                $displayStart = $s->display_start;
-                $displayEnd = $s->display_end;
+            $displayStart = $s->display_start;
+            $displayEnd = $s->display_end;
 
-                // Fallback for one-time events
-                if (!$displayStart || !$displayEnd) {
-                    $eventDate = $s->date; // related EventDate
-                    if ($eventDate) {
-                        $startDate = $eventDate->start_date?->format('Y-m-d');
-                        $endDate = $eventDate->end_date?->format('Y-m-d');
+            // Fallback for one-time events
+            if (!$displayStart || !$displayEnd) {
+                $eventDate = $s->date; // related EventDate
+                if ($eventDate) {
+                    $startDate = $eventDate->start_date?->format('Y-m-d');
+                    $endDate = $eventDate->end_date?->format('Y-m-d');
 
-                        $startTime = $s->start_time?->format('H:i:s') ?? '00:00:00';
-                        $endTime = $s->end_time?->format('H:i:s') ?? '23:59:59';
+                    $startTime = $s->start_time?->format('H:i:s') ?? '00:00:00';
+                    $endTime = $s->end_time?->format('H:i:s') ?? '23:59:59';
 
-                        $displayStart = $startDate ? Carbon::createFromFormat('Y-m-d H:i:s', "$startDate $startTime", 'Asia/Kuala_Lumpur') : null;
-                        $displayEnd = $endDate ? Carbon::createFromFormat('Y-m-d H:i:s', "$endDate $endTime", 'Asia/Kuala_Lumpur') : null;
-                    }
+                    $displayStart = $startDate
+                        ? Carbon::createFromFormat('Y-m-d H:i:s', "$startDate $startTime", 'Asia/Kuala_Lumpur')
+                        : null;
+                    $displayEnd = $endDate
+                        ? Carbon::createFromFormat('Y-m-d H:i:s', "$endDate $endTime", 'Asia/Kuala_Lumpur')
+                        : null;
                 }
+            }
 
-                return (object)[
-                    'display_start' => $displayStart,
-                    'display_end' => $displayEnd,
-                    'raw' => $s,
-                ];
-            });
+            return (object)[
+                'display_start' => $displayStart,
+                'display_end' => $displayEnd,
+                'raw' => $s,
+            ];
+        });
 
-            // Filter out nulls and sort
-            $all = $all->filter(fn($s) => $s->display_start && $s->display_end)
+        // Filter nulls and sort by start
+        $all = $all->filter(fn($s) => $s->display_start && $s->display_end)
                 ->sortBy('display_start')
                 ->values();
 
-            $event->all_slots = $all;
-            $event->next_active_slot = $all->first(fn($s) => $s->display_end->greaterThanOrEqualTo($now));
+        $event->all_slots = $all;
 
-            $event->is_upcoming = $event->next_active_slot !== null;
-            $event->is_past = $event->next_active_slot === null;
+        // ---------------------------
+        // Find the "next slot" or most recent past slot
+        // ---------------------------
+        $nextSlot = $all->first(fn($s) => $s->display_end->greaterThanOrEqualTo($now));
+
+        // If no upcoming slot, pick the **latest past slot**
+        if (!$nextSlot && $all->count() > 0) {
+            $nextSlot = $all->last(); // sorted ascending, so last is most recent past
+        }
+
+        $event->next_active_slot = $nextSlot;
+        $event->is_upcoming = $nextSlot ? $nextSlot->display_end->greaterThanOrEqualTo($now) : false;
+        $event->is_past = !$event->is_upcoming;
 
             return $event;
         });

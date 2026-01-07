@@ -1,6 +1,14 @@
-import { Calendar, MapPin, Eye, Edit, BadgeX, Star } from "lucide-react";
+import {
+    Calendar,
+    MapPin,
+    Eye,
+    Edit,
+    BadgeX,
+    Star,
+    DollarSign,
+} from "lucide-react";
 import { router } from "@inertiajs/react";
-import type { EventType } from "../../../types/events";
+import type { EventType, EventSlotPrice } from "../../../types/events";
 
 interface TableViewProps {
     filteredEvents: EventType[];
@@ -13,6 +21,12 @@ interface TableViewProps {
         }
     >;
     getEventTypeLabel: (type: string) => string;
+    getFrequencyLabel: (event?: any) => string;
+    getPriceRange: (
+        slots?: EventSlotPrice[],
+        userRole?: "admin" | "merchant",
+        eventStatus?: string
+    ) => React.ReactNode | string;
     userRole: string;
     router: typeof router;
     handleDeactivate: (id: string) => void;
@@ -23,6 +37,8 @@ export default function TableView({
     filteredEvents,
     statusColors,
     getEventTypeLabel,
+    getFrequencyLabel,
+    getPriceRange,
     userRole,
     router,
     handleDeactivate,
@@ -42,6 +58,9 @@ export default function TableView({
                             </th>
                             <th className="px-10 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
                                 Age Groups
+                            </th>
+                            <th className="px-10 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                                Price
                             </th>
                             <th className="px-20 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
                                 Schedule
@@ -179,126 +198,118 @@ export default function TableView({
                                         </div>
                                     </td>
 
-                                    {/* Upcoming Dates / Past Dates Column */}
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-start gap-2 text-sm text-gray-600 max-w-xs">
+                                            <DollarSign
+                                                size={16}
+                                                className="text-orange-500 shrink-0"
+                                            />
+                                            <span>
+                                                {getPriceRange(
+                                                    event.slotPrices,
+                                                    userRole as
+                                                        | "admin"
+                                                        | "merchant",
+                                                    event.status
+                                                )}
+                                            </span>
+                                        </div>
+                                    </td>
+
+                                    {/* Single Upcoming / Past Date */}
                                     <td className="px-5 py-4">
-                                        <div className="space-y-1">
-                                            {event.all_slots && (
-                                                <>
-                                                    {event.all_slots
-                                                        .filter((slot) => {
-                                                            const end =
-                                                                new Date(
-                                                                    slot.display_end
-                                                                );
-                                                            const now =
-                                                                new Date();
-                                                            return tab ===
-                                                                "upcoming"
-                                                                ? end >= now
-                                                                : end < now;
-                                                        })
-                                                        .slice(0, 3)
-                                                        .map((slot, idx) => {
-                                                            const start =
-                                                                new Date(
-                                                                    slot.display_start
-                                                                );
-                                                            const end =
-                                                                new Date(
-                                                                    slot.display_end
-                                                                );
+                                        <p className="text-xs font-semibold text-orange-800 mb-2">
+                                            {getFrequencyLabel(event)}
+                                        </p>
 
-                                                            const sameDate =
-                                                                start.toDateString() ===
-                                                                end.toDateString();
+                                        {event.all_slots &&
+                                            event.all_slots.length > 0 &&
+                                            (() => {
+                                                const now = new Date();
 
-                                                            const dateStr =
-                                                                start.toLocaleDateString(
-                                                                    "en-MY",
-                                                                    {
-                                                                        day: "2-digit",
-                                                                        month: "short",
-                                                                        year: "numeric",
-                                                                    }
-                                                                );
-
-                                                            const startTimeStr =
-                                                                start.toLocaleTimeString(
-                                                                    "en-MY",
-                                                                    {
-                                                                        hour: "2-digit",
-                                                                        minute: "2-digit",
-                                                                        hour12: false,
-                                                                    }
-                                                                );
-
-                                                            const endTimeStr =
-                                                                end.toLocaleTimeString(
-                                                                    "en-MY",
-                                                                    {
-                                                                        hour: "2-digit",
-                                                                        minute: "2-digit",
-                                                                        hour12: false,
-                                                                    }
-                                                                );
-
-                                                            return (
-                                                                <p
-                                                                    key={idx}
-                                                                    className="text-xs text-gray-700"
-                                                                >
-                                                                    {sameDate
-                                                                        ? `${dateStr} • ${startTimeStr} - ${endTimeStr}`
-                                                                        : `${dateStr} - ${end.toLocaleDateString(
-                                                                              "en-MY",
-                                                                              {
-                                                                                  day: "2-digit",
-                                                                                  month: "short",
-                                                                                  year: "numeric",
-                                                                              }
-                                                                          )} ${startTimeStr} - ${endTimeStr}`}
-                                                                </p>
-                                                            );
-                                                        })}
-
-                                                    {event.all_slots.filter(
+                                                // Filter slots based on tab
+                                                const filteredSlots =
+                                                    event.all_slots.filter(
                                                         (slot) => {
                                                             const end =
                                                                 new Date(
                                                                     slot.display_end
                                                                 );
-                                                            const now =
-                                                                new Date();
                                                             return tab ===
                                                                 "upcoming"
                                                                 ? end >= now
                                                                 : end < now;
                                                         }
-                                                    ).length > 3 && (
-                                                        <div className="text-xs text-gray-400">
-                                                            +{" "}
-                                                            {event.all_slots.filter(
-                                                                (slot) => {
-                                                                    const end =
-                                                                        new Date(
-                                                                            slot.display_end
-                                                                        );
-                                                                    const now =
-                                                                        new Date();
-                                                                    return tab ===
-                                                                        "upcoming"
-                                                                        ? end >=
-                                                                              now
-                                                                        : end <
-                                                                              now;
-                                                                }
-                                                            ).length - 3}{" "}
-                                                            more
-                                                        </div>
-                                                    )}
-                                                </>
-                                            )}
-                                        </div>
+                                                    );
+
+                                                if (filteredSlots.length === 0)
+                                                    return null;
+
+                                                // Pick the first upcoming or last past slot
+                                                const slot =
+                                                    tab === "upcoming"
+                                                        ? filteredSlots[0] // next upcoming
+                                                        : filteredSlots[
+                                                              filteredSlots.length -
+                                                                  1
+                                                          ]; // most recent past
+
+                                                const start = new Date(
+                                                    slot.display_start
+                                                );
+                                                const end = new Date(
+                                                    slot.display_end
+                                                );
+
+                                                const sameDate =
+                                                    start.toDateString() ===
+                                                    end.toDateString();
+
+                                                const dateStr =
+                                                    start.toLocaleDateString(
+                                                        "en-MY",
+                                                        {
+                                                            day: "2-digit",
+                                                            month: "short",
+                                                            year: "numeric",
+                                                        }
+                                                    );
+
+                                                const startTimeStr =
+                                                    start.toLocaleTimeString(
+                                                        "en-MY",
+                                                        {
+                                                            hour: "2-digit",
+                                                            minute: "2-digit",
+                                                            hour12: false,
+                                                        }
+                                                    );
+
+                                                const endTimeStr =
+                                                    end.toLocaleTimeString(
+                                                        "en-MY",
+                                                        {
+                                                            hour: "2-digit",
+                                                            minute: "2-digit",
+                                                            hour12: false,
+                                                        }
+                                                    );
+
+                                                return (
+                                                    <p className="text-xs text-gray-700">
+                                                        {sameDate
+                                                            ? `${dateStr} • ${startTimeStr} - ${endTimeStr}`
+                                                            : `${dateStr} - ${end.toLocaleDateString(
+                                                                  "en-MY",
+                                                                  {
+                                                                      day: "2-digit",
+                                                                      month: "short",
+                                                                      year: "numeric",
+                                                                  }
+                                                              )} ${startTimeStr} - ${endTimeStr}`}
+                                                    </p>
+                                                );
+                                            })()}
                                     </td>
 
                                     {/* Status Column */}
