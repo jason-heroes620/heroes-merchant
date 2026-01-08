@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Orders extends Model
 {
@@ -13,12 +14,15 @@ class Orders extends Model
     protected $primaryKey = 'order_id';
     protected $fillable = [
         'order_number',
+        'invoice_number',
         'payment_id',
         'user_id',
-        'package_id',
-        'product',
-        'quantity',
-        'price',
+        'total',
         'order_status',
     ];
+
+    public function products(): HasMany
+    {
+        return $this->hasMany(OrderProducts::class, 'order_id', 'order_id');
+    }
 }

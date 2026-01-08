@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\OrderProducts;
 use App\Models\Orders;
 use App\Services\EghlService;
 use Illuminate\Http\Request;
@@ -61,23 +62,31 @@ class EghlPaymentController extends Controller
         $paymentId = $request->payment_id;
         $amount = $request->amount;
         $paymentDesc = $request->payment_desc;
-        $packageId = $request->package_id;
+        $productId = $request->package_id;
 
         $redirectScheme = env('APP_SCHEME') . '://payment/result';
 
         $desired_length = 6;
-        $order_number = 'ORD-' . sprintf("%0{$desired_length}d", Orders::whereYear('created_at', '=', date('Y'))->count() + 1);
+        $order_number = 'ORD' . date('ymd') . $this->generateCode($desired_length);
+
         Log::info('payment id' . $request);
         $order = Orders::create([
             'order_number' => $order_number,
             'payment_id' => $paymentId,
             'user_id' => Auth::id(),
-            'package_id' => $packageId,
-            'product' => $paymentDesc,
-            'quantity' => 1,
-            'price' => $amount,
+            'total' => $amount,
             'order_status' => 'pending_payment',
-        ]); // Load and validate order
+        ]);
+
+        OrderProducts::create([
+            'order_id' => $order->order_id,
+            'product_id' => $productId,
+            'product_name' => $paymentDesc,
+            'qty' => 1,
+            'uom' => 'unit',
+            'price' => $amount,
+            'total' => $amount,
+        ]);
 
         // The Deep Link URL for the Expo App
         $redirectScheme = env('APP_SCHEME') . "://payment/result?order_number={$order_number}";
@@ -112,5 +121,18 @@ class EghlPaymentController extends Controller
         $order = Orders::where('order_number', $order_number)->first()->order_status;
         Log::info('Order Status: ' . $order);
         return response()->json($order, 200);
+    }
+
+    private function generateCode($n)
+    {
+        $characters = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $randomString = '';
+
+        for ($i = 0; $i < $n; $i++) {
+            $index = rand(0, strlen($characters) - 1);
+            $randomString .= $characters[$index];
+        }
+
+        return $randomString;
     }
 }

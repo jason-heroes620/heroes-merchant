@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ArtFairController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProfileController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\EghlCallbackController;
 use App\Http\Controllers\EghlPaymentController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OrdersController;
 use App\Http\Controllers\PurchasePackageController;
 use App\Http\Controllers\SettingsController;
 
@@ -24,15 +26,11 @@ Route::post('/password/forgot', [AuthController::class, 'sendResetLinkEmail']);
 Route::post('/password/reset', [AuthController::class, 'resetPassword']);
 Route::post('/merchant/login', [AuthController::class, 'merchantLogin']);
 
-
 Route::get('/packages', [PurchasePackageController::class, 'index']);
-
 
 // EGHL Payment
 Route::post('/eghl/secure-callback', [EghlCallbackController::class, 'handleCallback'])->name('eghl.callback');
-// 2. The public browser redirect endpoint (GET). This is mostly just for final checks.
 Route::get('/payment/return', [EghlCallbackController::class, 'handleReturn'])->name('payment.return');
-
 
 // Authenticated routes (mobile)
 Route::middleware('auth:sanctum')->group(function () {
@@ -90,3 +88,8 @@ Route::prefix('events')->group(function () {
     Route::post('/{id}/click', [MobileEventController::class, 'incrementClickCount']);
     Route::get('/{event}', [MobileEventController::class, 'show']);
 });
+
+Route::get('/orders/{order}', [OrdersController::class, 'getOrderByOrderNumber']);
+Route::post('/artfair/register', [ArtFairController::class, 'createOrderAndRegistration']);
+Route::post('/artfair/callback', [ArtFairController::class, 'eghlCallback']);
+Route::post('/artfair/return', [ArtFairController::class, 'eghlReturn']);
