@@ -100,9 +100,9 @@ const MainBookingPage = () => {
 
     return (
         <AuthenticatedLayout>
-            <div className="min-h-screen bg-linear-to-br from-orange-50 via-white to-orange-50">
+            <div className="min-h-screen bg-linear-to-br from-orange-50 via-white to-orange-50 py-8 px-4">
                 {/* Header */}
-                <div className="bg-linear-to-r from-orange-500 to-orange-600 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 shadow-lg">
+                <div className="bg-linear-to-r from-orange-500 to-orange-600 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 shadow-lg rounded-2xl">
                     <div className="max-w-7xl mx-auto">
                         <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">
                             Booking Dashboard
@@ -240,7 +240,10 @@ const MainBookingPage = () => {
                                     </div>
                                     {eventSummary.event.location && (
                                         <div className="flex items-start gap-2 text-gray-600 text-xs sm:text-sm mb-4">
-                                            <MapPin size={14} className="mt-0.5 shrink-0" />
+                                            <MapPin
+                                                size={14}
+                                                className="mt-0.5 shrink-0"
+                                            />
                                             <span className="line-clamp-2">
                                                 {eventSummary.event.location}
                                             </span>
@@ -260,11 +263,14 @@ const MainBookingPage = () => {
                                                         Total Slots
                                                     </div>
                                                     <div className="text-lg sm:text-xl font-bold text-gray-900">
-                                                        {eventSummary.summary.total_slots}
+                                                        {
+                                                            eventSummary.summary
+                                                                .total_slots
+                                                        }
                                                     </div>
                                                 </div>
                                             </div>
-                                            
+
                                             <div className="flex items-center text-center gap-4 p-2 sm:p-3 bg-white rounded-lg">
                                                 <CheckCircle
                                                     size={24}
@@ -275,7 +281,10 @@ const MainBookingPage = () => {
                                                         Confirmed
                                                     </div>
                                                     <div className="text-lg sm:text-xl font-bold text-green-600">
-                                                        {eventSummary.summary.confirmed}
+                                                        {
+                                                            eventSummary.summary
+                                                                .confirmed
+                                                        }
                                                     </div>
                                                 </div>
                                             </div>
@@ -290,22 +299,28 @@ const MainBookingPage = () => {
                                                         Expected
                                                     </div>
                                                     <div className="text-lg sm:text-xl font-bold text-blue-600">
-                                                        {eventSummary.summary.expected}
+                                                        {
+                                                            eventSummary.summary
+                                                                .expected
+                                                        }
                                                     </div>
                                                 </div>
                                             </div>
-                                            
+
                                             <div className="flex items-center text-center gap-4 p-2 sm:p-3 bg-white rounded-lg">
-                                                <Ban 
-                                                    size={24} 
-                                                    className="text-red-600 shrink-0" 
+                                                <Ban
+                                                    size={24}
+                                                    className="text-red-600 shrink-0"
                                                 />
                                                 <div className="min-w-0">
                                                     <div className="text-xs text-gray-500 truncate">
                                                         Cancelled
                                                     </div>
                                                     <div className="text-lg sm:text-xl font-bold text-red-600">
-                                                        {eventSummary.summary.cancelled}
+                                                        {
+                                                            eventSummary.summary
+                                                                .cancelled
+                                                        }
                                                     </div>
                                                 </div>
                                             </div>
