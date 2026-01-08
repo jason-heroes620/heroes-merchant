@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\{
     Customer,
     Event,
+    EventSlotPrice,
+    EventLike
 };
 use App\Services\ConversionService;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class MobileEventController extends Controller
 {
@@ -22,41 +24,37 @@ class MobileEventController extends Controller
     /**
      * List all active events for mobile.
      */
-    public function index(Request $request)
+    public function index()
     {
-        $today = now('Asia/Kuala_Lumpur'); 
+        $today = now('Asia/Kuala_Lumpur');
+        $user = Auth::guard('sanctum')->user();
 
         $events = Event::with([
+            'merchant:id,company_name',
             'location',
-            'prices',
             'ageGroups',
             'frequencies',
+            'media',
             'slots' => fn($q) =>
                 $q->whereDate('date', '>=', $today->toDateString()) 
                 ->orderBy('date'),
-            'media',
+            'slots.prices.ageGroup',
         ])
         ->where('status', 'active')
         ->where(function ($query) use ($today) {
-
-            // --- Non-recurring events ---
+            // Non-recurring events
             $query->where(function ($q) use ($today) {
                 $q->where('is_recurring', false)
                 ->whereHas('dates', function ($dateQ) use ($today) {
                     $dateQ->whereDate('end_date', '>=', $today->toDateString());
                 });
             })
-
-            // --- Recurring events ---
+            // Recurring events
             ->orWhere(function ($q) use ($today) {
                 $q->where('is_recurring', true)
                 ->whereHas('slots', function ($slotQ) use ($today) {
                     $slotQ->where(function ($q) use ($today) {
-
-                        // future slots (date is after today)
                         $q->whereDate('date', '>', $today->toDateString())
-
-                        // OR today's slot but end_time is still upcoming
                         ->orWhere(function ($q2) use ($today) {
                             $q2->whereDate('date', '=', $today->toDateString())
                             ->whereTime('end_time', '>=', $today->format('H:i:s'));
@@ -69,8 +67,39 @@ class MobileEventController extends Controller
         ->orderBy('created_at', 'desc')
         ->get();
 
-        // --- Transform events ---
-        $events->transform(function ($event) {
+        // Get customer if authenticated
+        $customer = null;
+        if ($user && $user->role === 'customer') {
+            $customer = Customer::where('user_id', $user->id)->first();
+        }
+
+        // Get event IDs for bulk price loading
+        $eventIds = $events->pluck('id');
+        
+        // Load representative prices
+        $allEventPrices = DB::table('event_slot_prices')
+            ->join('event_slots', 'event_slot_prices.event_slot_id', '=', 'event_slots.id')
+            ->whereIn('event_slots.event_id', $eventIds)
+            ->select(
+                'event_slots.event_id',
+                'event_slot_prices.*',
+                DB::raw('ROW_NUMBER() OVER (PARTITION BY event_slots.event_id, event_slot_prices.event_age_group_id ORDER BY event_slot_prices.free_credits, event_slot_prices.paid_credits) as rn')
+            )
+            ->get()
+            ->where('rn', 1)
+            ->groupBy('event_id');
+
+        // Get all liked event IDs for this customer (bulk query)
+        $likedEventIds = [];
+        if ($customer) {
+            $likedEventIds = EventLike::where('customer_id', $customer->id)
+                ->whereIn('event_id', $eventIds)
+                ->pluck('event_id')
+                ->toArray();
+        }
+
+        // Transform events
+        $events = $events->map(function ($event) use ($allEventPrices, $likedEventIds) {
             $event->slots->transform(function ($slot) {
                 $slot->available_seats = $slot->is_unlimited
                     ? null
@@ -78,14 +107,28 @@ class MobileEventController extends Controller
                 return $slot;
             });
 
-            $event->slotPrices = $event->slots->flatMap(fn($slot) => $slot->prices)->values();
-
             $event->media->transform(function ($media) {
                 $media->file_path = $media->url;
                 return $media;
             });
 
-            return $event;
+            $slotPrices = $event->slots
+                ->flatMap(fn($slot) => $slot->prices)
+                ->values();
+
+            if ($slotPrices->isEmpty() && isset($allEventPrices[$event->id])) {
+                $slotPrices = collect($allEventPrices[$event->id])->map(function($price) {
+                    return EventSlotPrice::with('ageGroup')->find($price->id);
+                })->filter();
+            }
+
+            $eventArray = $event->toArray();
+            $eventArray['slotPrices'] = $slotPrices->toArray();
+            
+            // Check if this event is in the liked events array
+            $eventArray['liked'] = in_array($event->id, $likedEventIds);
+
+            return $eventArray;
         });
 
         return response()->json([
@@ -101,10 +144,11 @@ class MobileEventController extends Controller
     public function show(Event $event)
     {
         $event->load([
+            'merchant:id,company_name',
             'location',
             'prices',
             'ageGroups',
-            'slots.prices',
+            'slots.prices.ageGroup',
             'frequencies',
             'media',
             'dates',
@@ -124,9 +168,7 @@ class MobileEventController extends Controller
             $slot->available_seats = $slot->is_unlimited
                 ? null
                 : $slot->capacity - $slot->booked_quantity;
-
-            $slot->makeHidden('event'); // hide nested event to avoid duplication
-
+            $slot->makeHidden('event');
             return $slot;
         });
 
@@ -159,12 +201,26 @@ class MobileEventController extends Controller
             })->values();
         }
 
-        // Collect all slot prices
         $slotPrices = $event->slots->flatMap(fn($slot) => $slot->prices)->values();
+
+        $user = Auth::guard('sanctum')->user();
+        $liked = false;
+        
+        if ($user && $user->role === 'customer') {
+            $customer = Customer::where('user_id', $user->id)->first();
+            if ($customer) {
+                $liked = EventLike::where('event_id', $event->id)
+                    ->where('customer_id', $customer->id)
+                    ->exists();
+            }
+        }
+
+        $eventArray = $event->toArray();
+        $eventArray['liked'] = $liked;
 
         return response()->json([
             'success' => true,
-            'event' => $event,
+            'event' => $eventArray,
             'dates' => $dates,
             'slotPrices' => $slotPrices,
         ]);
@@ -197,18 +253,18 @@ class MobileEventController extends Controller
 
         $events = $customer->likedEvents()
             ->with([
-            'location',
-            'prices',
-            'ageGroups',
-            'frequencies',
-            'slots' => fn($q) => $q->whereDate('date', '>=', now())
-                                   ->orderBy('date'),
-            'media'
+                'location',
+                'prices',
+                'ageGroups',
+                'frequencies',
+                'slots' => fn($q) => $q->whereDate('date', '>=', now())
+                                        ->orderBy('date'),
+                'media'
             ])
             ->where('status', 'active')
             ->get();
 
-        $events->transform(function ($event) {
+        $events->transform(function ($event) use ($customer) {
             $event->slotPrices = $event->slots
                 ->flatMap(fn($slot) => $slot->prices)
                 ->values();
@@ -217,6 +273,8 @@ class MobileEventController extends Controller
                 $media->file_path = $media->url;
                 return $media;
             });
+
+            $event->liked = true; 
 
             return $event;
         });

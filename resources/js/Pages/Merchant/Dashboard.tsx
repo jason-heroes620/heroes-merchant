@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { router } from "@inertiajs/react";
 import BookingsSection from "../../components/dashboard/BookingsSection";
 import DashboardLayout from "../../components/dashboard/DashboardLayout";
@@ -15,103 +14,73 @@ interface DashboardProps {
     allBookings: BookingType[];
     todayBookings: BookingType[];
     weekBookings: BookingType[];
-    monthlySales: number;
-    lastMonthSales: number;
-    weeklyPercentageIncrease?: number;
-    monthlyPercentageIncrease?: number;
-    pendingPayouts: number;
-    availablePayouts: number;
-    totalBookingsThisMonth: number;
+    monthBookings: BookingType[];
+    todayRevenue: number;
+    weekRevenue: number;
+    monthRevenue: number;
+    todayPercentage: number;
+    weekPercentage: number;
+    monthPercentage: number;
+    thisMonthPayout: number;
+    payoutDate: string;
 }
 
 const MerchantDashboard: React.FC<DashboardProps> = ({
-    activeEvents,
-    pastEvents,
-    allBookings,
-    todayBookings,
-    weekBookings,
-    monthlySales,
-    weeklyPercentageIncrease,
-    monthlyPercentageIncrease,
-    pendingPayouts,
-    availablePayouts,
+    activeEvents = [],
+    pastEvents = [],
+    todayBookings = [],
+    weekBookings = [],
+    monthBookings = [],
+    todayRevenue = 0,
+    weekRevenue = 0,
+    monthRevenue = 0,
+    todayPercentage = 0,
+    weekPercentage = 0,
+    monthPercentage = 0,
+    thisMonthPayout = 0,
+    payoutDate = "",
 }) => {
-    // Calculate monthly bookings locally since backend doesn't send it
-    const monthBookings = useMemo(() => {
-        const now = new Date();
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const monthEnd = new Date(
-            now.getFullYear(),
-            now.getMonth() + 1,
-            0,
-            23,
-            59,
-            59
-        );
-
-        return allBookings.filter((b) => {
-            const d = new Date(b.booked_at || b.created_at);
-            return d >= monthStart && d <= monthEnd;
-        });
-    }, [allBookings]);
-
-    const weeklySales = useMemo(() => {
-        const now = new Date();
-        const weekStart = new Date(now);
-        weekStart.setDate(now.getDate() - now.getDay());
-        weekStart.setHours(0, 0, 0, 0);
-
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 6);
-        weekEnd.setHours(23, 59, 59, 999);
-
-        return weekBookings.reduce(
-            (sum, booking) => sum + (booking.total_amount || 0),
-            0
-        );
-    }, [weekBookings]);
-
     return (
         <AuthenticatedLayout>
-            <DashboardLayout title="Dashboard" userRole="merchant">
+            <DashboardLayout
+                title="Merchant Dashboard"
+                userRole="merchant"
+                subtitle="Welcome back! Here's your business overview"
+            >
                 {/* Revenue Section */}
                 <RevenueCard
-                    weeklySales={weeklySales}
-                    monthlySales={monthlySales}
-                    weeklyPercentage={weeklyPercentageIncrease ?? 0}
-                    monthlyPercentage={monthlyPercentageIncrease ?? 0}
+                    todayRevenue={todayRevenue ?? 0}
+                    weekRevenue={weekRevenue ?? 0}
+                    monthRevenue={monthRevenue ?? 0}
+                    todayPercentage={todayPercentage ?? 0}
+                    weekPercentage={weekPercentage ?? 0}
+                    monthPercentage={monthPercentage ?? 0}
                 />
 
                 {/* Stats Section */}
                 <StatsGrid
-                    activeEvents={activeEvents.length}
-                    todayBookings={todayBookings.length}
-                    attendeesToday={todayBookings.reduce(
-                        (s, b) => s + (b.quantity || 0),
-                        0
-                    )}
-                    availablePayouts={availablePayouts}
-                    pendingPayouts={pendingPayouts}
+                    activeEvents={activeEvents?.length ?? 0}
+                    monthBookings={monthBookings?.length ?? 0}
+                    thisMonthPayout={thisMonthPayout ?? 0}
+                    payoutDate={payoutDate ?? ""}
                     onEventsClick={() => router.visit("/merchant/events")}
                     onBookingsClick={() => router.visit("/merchant/bookings")}
-                    onPayoutClick={() => router.visit("/merchant/payouts")}
                 />
 
                 {/* Quick Actions */}
                 <QuickActions
-                    availablePayouts={availablePayouts}
-                    activeEventsCount={activeEvents.length}
-                    pastEventsCount={pastEvents.length}
+                    activeEventsCount={activeEvents?.length ?? 0}
+                    pastEventsCount={pastEvents?.length ?? 0}
                     onCreateEvent={() =>
                         router.visit("/merchant/events/create")
                     }
-                    onRequestPayout={() => router.visit("/merchant/payouts")}
                     onViewEvents={() => router.visit("/merchant/events")}
+                    onViewPayouts={() => router.visit("/merchant/payouts")}
                 />
 
                 {/* Upcoming Events */}
                 <UpcomingEventsGrid
-                    events={activeEvents}
+                    events={activeEvents ?? []}
                     userRole="merchant"
                     onEventClick={(id) =>
                         router.visit(`/merchant/events/${id}`)
@@ -120,9 +89,9 @@ const MerchantDashboard: React.FC<DashboardProps> = ({
 
                 {/* Bookings */}
                 <BookingsSection
-                    todayBookings={todayBookings}
-                    weekBookings={weekBookings}
-                    monthBookings={monthBookings}
+                    todayBookings={todayBookings ?? []}
+                    weekBookings={weekBookings ?? []}
+                    monthBookings={monthBookings ?? []}
                     userRole="merchant"
                     onBookingClick={(id) =>
                         router.visit(`/merchant/bookings/${id}`)

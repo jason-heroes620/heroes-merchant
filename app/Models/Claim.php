@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
-class Attendance extends Model
+class Claim extends Model
 {
     use HasFactory, HasUuids;
 
@@ -16,6 +16,7 @@ class Attendance extends Model
         'slot_id',
         'event_id',
         'customer_id',
+        'configuration_id',
         'status',
         'scanned_at',
     ];
@@ -49,5 +50,10 @@ class Attendance extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function configuration()
+    {
+        return $this->belongsTo(ClaimConfiguration::class, 'configuration_id');
     }
 }

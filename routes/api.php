@@ -11,7 +11,7 @@ use App\Http\Controllers\MerchantEventController;
 use App\Http\Controllers\MerchantBookingController;
 use App\Http\Controllers\EventLikeController;
 use App\Http\Controllers\BookingController;
-use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\ClaimController;
 use App\Http\Controllers\EghlCallbackController;
 use App\Http\Controllers\EghlPaymentController;
 use App\Http\Controllers\NotificationController;
@@ -75,11 +75,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::middleware('auth:sanctum')->prefix('merchant')->group(function () {
     Route::get('/events', [MerchantEventController::class, 'merchantSlots']);
-    Route::post('/scan-qr', [AttendanceController::class, 'scanPreview']);
-    Route::post('/attendance/claim', [AttendanceController::class, 'claimAttendance']);
-    Route::get('/attendances/slot/{slotId}', [AttendanceController::class, 'getSlotAttendances']);
+    Route::post('/scan-qr', [ClaimController::class, 'scanPreview']);
+    Route::post('/claim', [ClaimController::class, 'claim']);
+    Route::get('/claims/slot/{slotId}', [ClaimController::class, 'getSlotClaims']);
     Route::get('/bookings/event/{eventId}', [MerchantBookingController::class, 'apiBookingsByEvent']);
-    Route::post('/attendances/{bookingId}/manual-claim', [AttendanceController::class, 'manualClaim']);
+    Route::post('/claims/{bookingId}/manual-claim', [ClaimController::class, 'manualClaim']);
 });
 
 //Public Events

@@ -20,6 +20,8 @@ class BookingResource extends JsonResource
             'booking_code' => (string) $this->booking_code, 
             'status' => $this->status,
             'quantity' => $this->quantity,
+            'is_upcoming' => (bool) ($this->_is_upcoming ?? false),
+            'is_completed' => (bool) ($this->_is_completed ?? false),
             'booked_at' => $this->booked_at?->setTimezone('Asia/Kuala_Lumpur')->toIso8601String(),
             'cancelled_at' => $this->cancelled_at?->setTimezone('Asia/Kuala_Lumpur')->toIso8601String(),
 

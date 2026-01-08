@@ -5,11 +5,11 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\EventSlot;
 use App\Models\Booking;
-use App\Models\Attendance;
+use App\Models\Claim;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
-class AttendanceController extends Controller
+class ClaimController extends Controller
 {
 
      public function scanPreview(Request $request)
@@ -42,12 +42,12 @@ class AttendanceController extends Controller
         }
 
         $totalQuantity = $booking->items->sum('quantity');
-        $attendedQuantity = $booking->items->sum('quantity_attended');
+        $claimedQuantity = $booking->items->sum('quantity_claimed');
 
-        $attendanceStatus =
-            $attendedQuantity === 0
+        $claimStatus =
+            $claimedQuantity === 0
                 ? 'not_claimed'
-                : ($attendedQuantity < $totalQuantity
+                : ($claimedQuantity < $totalQuantity
                     ? 'partially_claimed'
                     : 'fully_claimed');
 
@@ -86,19 +86,19 @@ class AttendanceController extends Controller
                     'id' => $item->id,
                     'label' => $item->ageGroup?->label ?? 'General',
                     'quantity' => $item->quantity,
-                    'quantity_attended' => $item->quantity_attended ?? 0,
+                    'quantity_claimed' => $item->quantity_claimed ?? 0,
                 ]),
                 'media' => $media,
             ],
-            'attendance' => [
-                'status' => $attendanceStatus,
-                'attended_quantity' => $attendedQuantity,
+            'claim' => [
+                'status' => $claimStatus,
+                'claimed_quantity' => $claimedQuantity,
                 'total_quantity' => $totalQuantity,
             ],
         ]);
     }
 
-    public function claimAttendance(Request $request)
+    public function claimStatus(Request $request)
     {
         $user = $request->user();
         $merchant = $user->merchant;
@@ -111,7 +111,7 @@ class AttendanceController extends Controller
             'booking_id' => 'required|uuid',
             'items' => 'required|array|min:1',
             'items.*.id' => 'required|uuid|exists:booking_items,id',
-            'items.*.quantity_attended' => 'required|integer|min:0',
+            'items.*.quantity_claimed' => 'required|integer|min:0',
         ]);
 
         $booking = Booking::with(['slot.event', 'items'])
@@ -134,16 +134,16 @@ class AttendanceController extends Controller
                     continue;
                 }
 
-                $attendedQty = min(
-                    $itemData['quantity_attended'],
+                $claimedQty = min(
+                    $itemData['quantity_claimed'],
                     $bookingItem->quantity
                 );
 
                 $bookingItem->update([
-                    'quantity_attended' => $attendedQty,
+                    'quantity_claimed' => $claimedQty,
                 ]);
 
-                Attendance::updateOrCreate(
+                Claim::updateOrCreate(
                     [
                         'booking_id' => $booking->id,
                         'slot_id' => $booking->slot_id,
@@ -152,8 +152,8 @@ class AttendanceController extends Controller
                     [
                         'customer_id' => $booking->customer_id,
                         'event_id' => $booking->event_id,
-                        'status' => $attendedQty > 0 ? 'attended' : 'absent',
-                        'scanned_at' => $attendedQty > 0 ? now() : null,
+                        'status' => $claimedQty > 0 ? 'claimed' : 'expired',
+                        'scanned_at' => $claimedQty > 0 ? now() : null,
                     ]
                 );
             }
@@ -161,7 +161,7 @@ class AttendanceController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Attendance claimed successfully',
+            'message' => 'Successfully claimed',
         ]);
     }
 
@@ -186,7 +186,7 @@ class AttendanceController extends Controller
         }
 
         $data = $request->validate([
-            'status' => 'required|in:pending,attended,absent',
+            'status' => 'required|in:pending,claimed,expired',
             'booking_item_id' => 'required|exists:booking_items,id',
             'quantity' => 'nullable|integer|min:0',
         ]);
@@ -199,7 +199,7 @@ class AttendanceController extends Controller
 
         DB::transaction(function () use ($booking, $bookingItem, $data) {
 
-            $attendance = Attendance::updateOrCreate(
+            $claim = Claim::updateOrCreate(
                 [
                     'booking_id' => $booking->id,
                     'slot_id' => $booking->slot_id,
@@ -211,31 +211,31 @@ class AttendanceController extends Controller
                 ]
             );
 
-            if ($data['status'] === 'attended') {
+            if ($data['status'] === 'claimed') {
                 $qty = isset($data['quantity'])
                     ? min($data['quantity'], $bookingItem->quantity)
                     : $bookingItem->quantity;
 
-                $bookingItem->quantity_attended = $qty;
-                $attendance->scanned_at = now();
+                $bookingItem->quantity_claimed = $qty;
+                $claim->scanned_at = now();
             } else {
-                $bookingItem->quantity_attended = 0;
-                $attendance->scanned_at = null;
+                $bookingItem->quantity_claimed = 0;
+                $claim->scanned_at = null;
             }
 
-            $attendance->status = $data['status'];
+            $claim->status = $data['status'];
 
             $bookingItem->save();
-            $attendance->save();
+            $claim->save();
         });
 
         return response()->json([
             'success' => true,
-            'message' => 'Attendance updated successfully',
+            'message' => 'Claim submitted',
         ]);
     }
 
-    public function getSlotAttendances(Request $request, $slotId)
+    public function getSlotClaims(Request $request, $slotId)
     {
         $user = $request->user();
         $merchant = $user->merchant ?? null;
@@ -253,23 +253,23 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Slot not found'], 404);
         }
 
-        // Build attendance array from booking items
-        $attendance = $slot->bookings->flatMap(function($booking) use ($slot) {
+        // Build claim array from booking items
+        $claim = $slot->bookings->flatMap(function($booking) use ($slot) {
             return $booking->items->map(function($item) use ($booking, $slot) {
-                // Find or create attendance record for this booking item
-                $attendanceRecord = Attendance::where([
+                // Find or create claim record for this booking item
+                $claimRecord = Claim::where([
                     'booking_id' => $booking->id,
                     'slot_id' => $slot->id,
                     'booking_item_id' => $item->id,
                 ])->first();
 
                 return [
-                    'id' => $attendanceRecord?->id ?? null,
+                    'id' => $claimRecord?->id ?? null,
                     'booking_id' => $booking->id,
                     'booking_code' => $booking->booking_code,
                     'customer_name' => $booking->customer->user->full_name ?? 'Unknown',
-                    'status' => $attendanceRecord?->status ?? 'pending',
-                    'scanned_at' => $attendanceRecord?->scanned_at?->setTimezone('Asia/Kuala_Lumpur')->toDateTimeString(),
+                    'status' => $claimRecord?->status ?? 'pending',
+                    'scanned_at' => $claimRecord?->scanned_at?->setTimezone('Asia/Kuala_Lumpur')->toDateTimeString(),
                     'booking_item_id' => $item->id,
                     'age_group_label' => $item->ageGroup?->label ?? 'General',
                     'quantity' => $item->quantity,
@@ -284,7 +284,7 @@ class AttendanceController extends Controller
                 'event_title' => $slot->event->title,
                 'slot_start' => optional($slot->display_start)?->setTimezone('Asia/Kuala_Lumpur')->toDateTimeString(),
                 'slot_end' => optional($slot->display_end)?->setTimezone('Asia/Kuala_Lumpur')->toDateTimeString(),
-                'attendance' => $attendance,
+                'claim' => $claim,
             ],
         ]);
     }

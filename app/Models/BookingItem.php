@@ -15,7 +15,7 @@ class BookingItem extends Model
         'booking_id',
         'age_group_id',
         'quantity',
-        'quantity_attended',
+        'quantity_claimed',
         'free_credits',
         'paid_credits',
     ];

@@ -152,7 +152,7 @@ export default function Index() {
                                                             className="text-green-600"
                                                         />
                                                         <span className="text-sm font-medium text-gray-700">
-                                                            Bonus Credits
+                                                            Free Credits
                                                         </span>
                                                     </div>
                                                     <span className="text-xl font-bold text-green-600">

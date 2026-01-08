@@ -2,20 +2,20 @@ import { AlertCircle, FileText } from "lucide-react";
 
 export default function EventDetailsSection({ setData, data, errors }: any) {
     const placeholders = {
-        event: {
-            title: "e.g., Painting class for Kids",
+        workshop: {
+            title: "e.g., Painting Class for Kids",
             description:
-                "Describe what the event is about, who can join, and what participants will do or learn.",
+                "Describe what the workshop is about, who can join, and what participants will do or learn.",
         },
-        trial_class: {
+        trial: {
             title: "e.g., Little Explorers Trial Class",
             description:
                 "Explain what parents and children can expect during the trial class — activities, duration, and key takeaways.",
         },
-        location_based: {
-            title: "e.g., Educational Visit to Zoo Negara",
+        pass: {
+            title: "e.g., 1-Day Educational Trip to Zoo Negara",
             description:
-                "Provide details about the trip: destination, objectives, what students will explore, and any preparation needed.",
+                "Provide details about the tour: destination, duration (1-day or 2-day), objectives, what participants will explore, and any preparation needed.",
         },
     };
 

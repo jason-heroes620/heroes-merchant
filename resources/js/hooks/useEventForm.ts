@@ -5,9 +5,10 @@ import type {
     AgeGroup,
     Price,
     Frequency,
-    EventDate,
-    EventSlot,
     EventFormShape,
+    EventDateForm,
+    EventSlotForm,
+    ClaimConfigurationForm,
 } from "../types/events";
 
 interface UseEventFormProps {
@@ -46,15 +47,24 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
         is_recurring: false,
         frequencies: [],
         event_dates: [],
-        slots: [],
         status: "pending",
         featured: false,
+        claim_configuration: {
+            total_redemption_type: "limited",
+            total_redemption_limit: 1,
+            daily_redemption_type: "once",
+            daily_redemption_limit: 1,
+        },
     };
 
     // Merge with initial data if editing
     const initialFormData: EventFormShape = {
         ...defaultData,
         ...initialProps?.initialData,
+        merchant_id:
+            initialProps?.initialData?.merchant_id ??
+            initialProps?.merchant_id ??
+            null,
         location: {
             ...defaultData.location,
             ...(initialProps?.initialData?.location || {}),
@@ -67,16 +77,33 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
             : [],
         event_dates: initialProps?.initialData?.event_dates
             ? initialProps.initialData.event_dates.map((ed) => ({
-                  ...ed,
-                  slots: ed.slots || [],
+                  id: ed.id,
+                  start_date: ed.start_date,
+                  end_date: ed.end_date,
+                  slots:
+                      ed.slots?.map((s) => ({
+                          id: s.id,
+                          date: s.date,
+                          start_time: s.start_time,
+                          end_time: s.end_time,
+                          capacity: s.capacity,
+                          is_unlimited: s.is_unlimited,
+                      })) ?? [],
               }))
             : [],
         media: initialProps?.initialData?.media
             ? [...initialProps.initialData.media]
             : [],
+        claim_configuration: initialProps?.initialData?.claim_configuration
+            ? { ...initialProps.initialData.claim_configuration }
+            : {
+                  total_redemption_type: "limited",
+                  total_redemption_limit: 1,
+                  daily_redemption_type: "once",
+                  daily_redemption_limit: 1,
+              },
     };
 
-    // Inertia form
     const form = useForm<EventFormShape>(initialFormData);
     const { data, setData, errors, processing } = form;
 
@@ -101,7 +128,7 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
     const [frequencies, setFrequencies] = useState<Frequency[]>(
         initialFormData.frequencies || []
     );
-    const [eventDates, setEventDates] = useState<EventDate[]>(
+    const [eventDates, setEventDates] = useState<EventDateForm[]>(
         initialFormData.event_dates || []
     );
 
@@ -109,12 +136,42 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
         initialFormData.is_recurring ?? false
     );
 
+    // Add local state for claim configuration
+    const [claimConfiguration, setClaimConfiguration] =
+        useState<ClaimConfigurationForm>(
+            initialFormData.claim_configuration || {
+                total_redemption_type: "limited",
+                total_redemption_limit: 1,
+                daily_redemption_type: "once",
+                daily_redemption_limit: 1,
+            }
+        );
+
+    useEffect(() => {
+        console.log(
+            "🔍 Initial claim_configuration:",
+            initialFormData.claim_configuration
+        );
+        console.log("🔍 Current claimConfiguration state:", claimConfiguration);
+    }, []);
+
     useEffect(() => {
         setData("is_recurring", isRecurring);
         if (!isRecurring) {
             setFrequencies([]);
         }
     }, [isRecurring]);
+
+    // ==================== CLAIM CONFIGURATION HANDLERS ====================
+    const updateClaimConfiguration = (
+        field: keyof ClaimConfigurationForm,
+        value: any
+    ) => {
+        setClaimConfiguration((prev) => ({
+            ...prev,
+            [field]: value,
+        }));
+    };
 
     // ==================== MEDIA HANDLERS ====================
     const handleMediaInput = (files?: FileList | null) => {
@@ -179,7 +236,7 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
         };
         setFrequencies([...frequencies, newFreq]);
 
-        const newDate: EventDate = {
+        const newDate: EventDateForm = {
             start_date: "",
             end_date: "",
             slots: [],
@@ -203,7 +260,6 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
     const updateEventDate = (index: number, field: string, value: any) => {
         const updated = [...eventDates];
 
-        // Ensure slots array exists
         if (!updated[index]) {
             updated[index] = {
                 start_date: "",
@@ -215,7 +271,6 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
         updated[index] = {
             ...updated[index],
             [field]: value,
-            // Preserve slots if they exist
             slots: updated[index].slots || [],
         };
         setEventDates(updated);
@@ -233,7 +288,7 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
             };
         }
 
-        const newSlot: EventSlot = {
+        const newSlot: EventSlotForm = {
             date: eventDates[dateIndex]?.start_date || "",
             start_time: "",
             end_time: "",
@@ -267,7 +322,7 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
     const updateSlot = (
         dateIndex: number,
         slotIndex: number,
-        field: keyof EventSlot,
+        field: keyof EventSlotForm,
         value: any
     ) => {
         const updated = [...eventDates];
@@ -288,7 +343,7 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
         setEventDates(updated);
     };
 
-    const getSlots = (dateIndex: number): EventSlot[] => {
+    const getSlots = (dateIndex: number): EventSlotForm[] => {
         return eventDates[dateIndex]?.slots || [];
     };
 
@@ -296,7 +351,6 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
     const buildPrices = (): Price[] => {
         const pricingType = data.pricing_type || "fixed";
 
-        // For age_based or mixed, create one price per age group
         if (
             (pricingType === "age_based" || pricingType === "mixed") &&
             !data.is_suitable_for_all_ages &&
@@ -320,8 +374,14 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
             }));
         }
 
-        // For fixed or day_type, single price entry
-        const existingPrice = data.prices?.[0] || {};
+        const existingPrice: Price = (data.prices?.[0] as Price) || {
+            pricing_type: data.pricing_type || "fixed",
+            event_age_group_id: null,
+            fixed_price_in_rm: null,
+            weekday_price_in_rm: null,
+            weekend_price_in_rm: null,
+        };
+
         return [
             {
                 pricing_type: pricingType,
@@ -355,22 +415,46 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
         setData("event_dates", eventDates);
     }, [eventDates]);
 
+    useEffect(() => {
+        setData("claim_configuration", claimConfiguration);
+    }, [claimConfiguration]);
+
     // ==================== FORM SUBMISSION ====================
     const handleSubmit = (e?: React.FormEvent) => {
         e?.preventDefault();
 
-        // Determine is_recurring
         const isRecurring = frequencies.length > 0;
 
-        // Prepare submission data
         const submissionData: EventFormShape = {
-            ...data,
+            merchant_id: data.merchant_id ?? null,
+            type: data.type || "event",
+            title: data.title || "",
+            description: data.description || "",
+            category: data.category || "",
+            location: data.location || {
+                place_id: "",
+                location_name: "",
+                latitude: null,
+                longitude: null,
+                viewport: null,
+                raw_place: null,
+                how_to_get_there: "",
+            },
+            media: data.media || [],
+            removed_media: data.removed_media || [],
+            is_suitable_for_all_ages: data.is_suitable_for_all_ages || false,
+            pricing_type: data.pricing_type,
+            status: data.status || "pending",
+            featured: data.featured || false,
             is_recurring: isRecurring,
             age_groups: data.is_suitable_for_all_ages ? [] : ageGroups,
             frequencies: isRecurring ? frequencies : [],
             event_dates: eventDates,
             prices: buildPrices(),
+            claim_configuration: claimConfiguration,
         };
+
+        if (data.id) submissionData.id = data.id;
 
         const formData = new FormData();
 
@@ -392,6 +476,7 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
                     "frequencies",
                     "event_dates",
                     "location",
+                    "claim_configuration",
                 ].includes(key)
             ) {
                 formData.append(key, JSON.stringify(value));
@@ -424,7 +509,6 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
             },
         };
 
-        // Submit
         if (data.id) {
             form.put(route("merchant.events.update", data.id));
         } else {
@@ -459,5 +543,7 @@ export default function useEventForm(initialProps?: UseEventFormProps) {
         canEditPricing,
         isRecurring,
         setIsRecurring,
+        claimConfiguration,
+        updateClaimConfiguration,
     };
 }

@@ -110,11 +110,21 @@ export interface EventFormShape {
 
     is_recurring: boolean;
     frequencies: Frequency[];
-    event_dates: EventDate[];
-    slots: EventSlot[];
+
+    event_dates: EventDateForm[];
+
+    claim_configuration: ClaimConfigurationForm;
 
     status?: EventStatus;
     featured?: boolean;
+}
+
+export interface ClaimConfigurationForm {
+    total_redemption_type: "unlimited" | "limited";
+    total_redemption_limit: number | null;
+
+    daily_redemption_type: "once" | "multiple";
+    daily_redemption_limit: number | null;
 }
 
 export interface EventSubmissionData
@@ -135,13 +145,13 @@ export interface SyntheticSlot {
 }
 
 type SlotWithDisplay = {
-  display_start: string; 
-  display_end: string;
-  raw: {
-    is_unlimited?: boolean;
-    capacity?: number;
-    booked_quantity?: number;
-  };
+    display_start: string;
+    display_end: string;
+    raw: {
+        is_unlimited?: boolean;
+        capacity?: number;
+        booked_quantity?: number;
+    };
 };
 
 export interface EventType {
@@ -166,12 +176,11 @@ export interface EventType {
     click_count?: number;
     slotPrices?: EventSlotPrice[];
     dates?: EventDate[];
-    frequency?: Frequency[];
+    frequency?: Frequency;
     is_upcoming: boolean;
     is_past: boolean;
     all_slots?: SlotWithDisplay[];
 }
-
 
 export interface Event {
     id: string;
@@ -199,12 +208,14 @@ export interface Event {
 
 export interface Conversion {
     id: string;
+    rm: number;
     credits_per_rm: number;
-    free_credit_percentage: number;
+    paid_to_free_ratio: number;
     paid_credit_percentage: number;
+    free_credit_percentage: number;
     effective_from: string;
-    valid_until: string | null;
-    status: "active" | "inactive";
+    valid_until?: string | null;
+    status: "active" | "inactive" | "scheduled";
 }
 
 export interface Customer {
@@ -238,7 +249,7 @@ export interface Booking {
     items: BookingItem[];
     transactions?: Transaction[] | null;
     customer?: Customer | null;
-    attendance?: BookingAttendance;
+    claim?: BookingClaim;
 }
 
 export interface Transaction {
@@ -249,25 +260,25 @@ export interface Transaction {
     created_at: string;
 }
 
-export type BookingAttendance = {
-    summary: AttendanceSummary;
-    list: Attendance[];
+export type BookingClaim = {
+    summary: ClaimSummary;
+    list: Claim[];
 };
 
-export type AttendanceSummary = {
+export type ClaimSummary = {
     total: number;
-    attended: number;
+    claimed: number;
     pending: number;
     absent: number;
 };
 
-export type Attendance = {
+export type Claim = {
     id: string;
     booking_id: string;
     slot_id: string;
     event_id: string;
     customer_id: string;
-    status: "pending" | "attended" | "absent";
+    status: "pending" | "claimed" | "expired";
     scanned_at?: string | null;
     created_at: string;
     updated_at: string;
@@ -282,8 +293,24 @@ interface BookingType {
     event?: { title: string };
     quantity?: number;
     total_amount?: number;
-    attendance_status?: "pending" | "attended" | "absent";
+    claim_status?: "pending" | "claimed" | "expired";
     slot?: EventSlot;
     booked_at: string;
     created_at: string;
+}
+
+export interface EventSlotForm {
+    id?: string;
+    date: string;
+    start_time: string;
+    end_time: string;
+    capacity: number | null;
+    is_unlimited: boolean;
+}
+
+export interface EventDateForm {
+    id?: string;
+    start_date: string;
+    end_date: string;
+    slots: EventSlotForm[];
 }

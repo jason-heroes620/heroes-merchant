@@ -7,21 +7,21 @@ import {
 export default function EventTypeSection({ data, setData }: any) {
     const eventTypes = [
         {
-            value: "event",
-            label: "Event",
-            desc: "Regular on-campus event or program",
+            value: "workshop",
+            label: "Event / Workshop",
+            desc: "Regular on-campus program or event",
             icon: Calendar,
         },
         {
-            value: "trial_class",
+            value: "trial",
             label: "Trial Class",
             desc: "One-time trial or discovery class for new students",
             icon: Star,
         },
         {
-            value: "location_based",
-            label: "Field Trip",
-            desc: "Off-campus learning experience",
+            value: "pass",
+            label: "Ticket / Pass",
+            desc: "Special experience requiring a ticket or pass",
             icon: Map,
         },
     ];

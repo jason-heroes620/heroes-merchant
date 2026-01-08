@@ -11,18 +11,7 @@ import {
 import AuthenticatedLayout from "@/AuthenticatedLayout";
 import { toast } from "react-hot-toast";
 import type { PageProps } from "../../types";
-
-interface Conversion {
-    id: string;
-    rm: number;
-    credits_per_rm: number;
-    paid_to_free_ratio: number;
-    paid_credit_percentage: number;
-    free_credit_percentage: number;
-    effective_from: string;
-    valid_until?: string | null;
-    status: "active" | "inactive" | "scheduled";
-}
+import type { Conversion } from "@/types/events";
 
 interface ConversionCredits {
     paid_credits: number;
@@ -275,12 +264,12 @@ const ConversionCard: React.FC<ConversionCardProps> = ({
                     freeCredits={credits.free_credits}
                 />
 
-                <ConversionRule ratio={conversion.paid_to_free_ratio} />
-
                 <PercentageDisplay
                     paidPercentage={conversion.paid_credit_percentage}
                     freePercentage={conversion.free_credit_percentage}
                 />
+
+                <ConversionRule ratio={conversion.paid_to_free_ratio} />
 
                 <DateRange
                     effectiveFrom={conversion.effective_from}
@@ -396,7 +385,6 @@ const ConversionsIndex: React.FC<ConversionsIndexProps> = ({ conversions }) => {
     const pageProps = usePage<PagePropsWithFlash>().props;
     const flash = pageProps.flash;
 
-    // Debug: Log flash messages
     useEffect(() => {
         // console.log("Flash messages:", flash);
         // console.log("All props:", pageProps);

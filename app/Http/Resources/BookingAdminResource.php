@@ -98,15 +98,15 @@ class BookingAdminResource extends JsonResource
                 'profile_picture' => $customer->user?->profile_picture
             ] : null,
 
-            'attendance' => [
+            'claim' => [
                 'summary' => [
-                    'total' => $this->attendance?->count() ?? 0,
-                    'attended' => $this->attendance?->where('status', 'attended')->count() ?? 0,
-                    'pending' => $this->attendance?->where('status', 'pending')->count() ?? 0,
-                    'absent' => $this->attendance?->where('status', 'absent')->count() ?? 0,
+                    'total' => $this->claim?->count() ?? 0,
+                    'claimed' => $this->claim?->where('status', 'claimed')->count() ?? 0,
+                    'pending' => $this->claim?->where('status', 'pending')->count() ?? 0,
+                    'expired' => $this->claim?->where('status', 'expired')->count() ?? 0,
                 ],
-                'list' => $this->whenLoaded('attendance', fn () =>
-                    $this->attendance->map(fn ($a) => [
+                'list' => $this->whenLoaded('claim', fn () =>
+                    $this->claim->map(fn ($a) => [
                         'id' => (string) $a->id,
                         'customer_name' => $a->customer?->user?->full_name,
                         'status' => $a->status,

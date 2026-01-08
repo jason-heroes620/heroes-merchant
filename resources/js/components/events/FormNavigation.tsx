@@ -39,7 +39,7 @@ export default function FormNavigation({
                 <div className="mb-6">
                     <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                         <div
-                            className="bg-gradient-to-r from-orange-500 to-orange-600 h-full rounded-full transition-all duration-300 ease-out"
+                            className="bg-linear-to-r from-orange-500 to-orange-600 h-full rounded-full transition-all duration-300 ease-out"
                             style={{
                                 width: `${
                                     ((currentIndex + 1) / tabs.length) * 100
@@ -69,7 +69,7 @@ export default function FormNavigation({
                         <button
                             type="button"
                             onClick={handleNext}
-                            className="flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl font-bold hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+                            className="flex items-center gap-2 px-8 py-4 bg-linear-to-r from-orange-500 to-orange-600 text-white rounded-xl font-bold hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
                         >
                             Next
                             <ChevronRight size={20} />
@@ -83,8 +83,8 @@ export default function FormNavigation({
                                 processing
                                     ? "bg-gray-400 cursor-not-allowed"
                                     : isEditing
-                                    ? "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 hover:scale-105 active:scale-95"
-                                    : "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 hover:scale-105 active:scale-95"
+                                    ? "bg-linear-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 hover:scale-105 active:scale-95"
+                                    : "bg-linear-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 hover:scale-105 active:scale-95"
                             } text-white`}
                         >
                             {processing ? (

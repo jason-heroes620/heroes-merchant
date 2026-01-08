@@ -35,9 +35,9 @@ const EventBookingPage: React.FC = () => {
 
     const getEventTypeLabel = (type: string) => {
         const labels: Record<string, string> = {
-            event: "Event",
-            trial_class: "Trial Class",
-            location_based: "Field Trip",
+            workshop: "Event / Workshop",
+            trial: "Trial Class",
+            pass: "Ticket / Pass",
         };
         return labels[type] || type;
     };
@@ -100,7 +100,7 @@ const EventBookingPage: React.FC = () => {
             (b) => b.status === "cancelled" || b.status === "refunded"
         ).length,
         totalAttendees: bookings.reduce((sum, b) => {
-            return sum + (b.attendance?.summary?.attended ?? 0);
+            return sum + (b.claim?.summary?.claimed ?? 0);
         }, 0),
     };
 
@@ -575,12 +575,12 @@ const EventBookingPage: React.FC = () => {
                                                             )}
                                                         </div>
 
-                                                        {/* Attendance Summary */}
+                                                        {/* Claim Summary */}
                                                         <div className="col-span-3">
                                                             <div className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
-                                                                Attendance
+                                                                Claim
                                                             </div>
-                                                            {b.attendance ? (
+                                                            {b.claim ? (
                                                                 <div className="space-y-2">
                                                                     <div className="flex items-center gap-2">
                                                                         <CheckCircle
@@ -590,14 +590,14 @@ const EventBookingPage: React.FC = () => {
                                                                             className="text-green-600"
                                                                         />
                                                                         <span className="text-xs text-gray-600">
-                                                                            Attended:
+                                                                            Claimed:
                                                                         </span>
                                                                         <span className="font-bold text-green-600">
                                                                             {
                                                                                 b
-                                                                                    .attendance
+                                                                                    .claim
                                                                                     .summary
-                                                                                    .attended
+                                                                                    .claimed
                                                                             }
                                                                         </span>
                                                                     </div>
@@ -614,14 +614,13 @@ const EventBookingPage: React.FC = () => {
                                                                         <span className="font-bold text-yellow-600">
                                                                             {
                                                                                 b
-                                                                                    .attendance
+                                                                                    .claim
                                                                                     .summary
                                                                                     .pending
                                                                             }
                                                                         </span>
                                                                     </div>
-                                                                    {b
-                                                                        .attendance
+                                                                    {b.claim
                                                                         .summary
                                                                         .absent >
                                                                         0 && (
@@ -638,7 +637,7 @@ const EventBookingPage: React.FC = () => {
                                                                             <span className="font-bold text-red-600">
                                                                                 {
                                                                                     b
-                                                                                        .attendance
+                                                                                        .claim
                                                                                         .summary
                                                                                         .absent
                                                                                 }

@@ -84,9 +84,9 @@ class Booking extends Model
         return $this->hasMany(BookingItem::class, 'booking_id');
     }
 
-    public function attendance()
+    public function claim()
     {
-        return $this->hasMany(Attendance::class);
+        return $this->hasMany(Claim::class);
     }
 
     public function scopeForCustomer($query, $customerId)

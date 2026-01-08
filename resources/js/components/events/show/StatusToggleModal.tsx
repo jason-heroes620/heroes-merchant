@@ -1,14 +1,20 @@
 import { useState, useMemo } from "react";
 import { router } from "@inertiajs/react";
 import { toast } from "react-hot-toast";
-import { Clock, AlertCircle, Info, Calendar, Copy } from "lucide-react";
+import {
+    AlertCircle,
+    Info,
+    X,
+    CheckCircle2,
+    Calendar,
+    Clock,
+} from "lucide-react";
 import type {
     Event,
     Conversion,
     UserRole,
     EventSlot,
     EventSlotPrice,
-    AgeGroup,
 } from "../../../types/events";
 import StatusBadge from "./StatusBadge";
 
@@ -21,19 +27,125 @@ interface Props {
     onClose: () => void;
 }
 
+interface SelectProps {
+    value: string;
+    onValueChange: (value: EventStatus | string) => void;
+    children: React.ReactNode;
+    className?: string;
+}
+
+interface InputProps {
+    type?: string;
+    value: string | number;
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    placeholder?: string;
+    className?: string;
+}
+
+interface RadioOption {
+    value: string;
+    label: string;
+}
+
+interface RadioGroupProps {
+    value: string;
+    onValueChange: (value: string) => void;
+    options: RadioOption[];
+}
+
+const Select: React.FC<SelectProps> = ({
+    value,
+    onValueChange,
+    children,
+    className = "",
+}) => (
+    <select
+        value={value}
+        onChange={(e) => onValueChange(e.target.value as EventStatus)}
+        className={`w-full h-9 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${className}`}
+    >
+        {children}
+    </select>
+);
+
+const Input: React.FC<InputProps> = ({
+    type = "text",
+    value,
+    onChange,
+    placeholder = "",
+    className = "",
+}) => (
+    <input
+        type={type}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={`h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${className}`}
+    />
+);
+
+const RadioGroup: React.FC<RadioGroupProps> = ({
+    value,
+    onValueChange,
+    options,
+}) => (
+    <div className="space-y-2">
+        {options.map((option) => (
+            <label
+                key={option.value}
+                className="flex items-start gap-3 cursor-pointer group"
+            >
+                <input
+                    type="radio"
+                    value={option.value}
+                    checked={value === option.value}
+                    onChange={(e) => onValueChange(e.target.value)}
+                    className="mt-0.5 h-4 w-4 text-orange-600 border-gray-300 focus:ring-orange-500"
+                />
+                <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-900 group-hover:text-orange-600">
+                        {option.label}
+                    </div>
+                </div>
+            </label>
+        ))}
+    </div>
+);
+
 const StatusToggleModal: React.FC<Props> = ({
     event,
     userRole,
     conversion,
     onClose,
 }) => {
-    const [newStatus, setNewStatus] = useState(event.status);
+    const [newStatus, setNewStatus] = useState<EventStatus>(event.status);
     const [rejectedReason, setRejectedReason] = useState("");
+    const [activationMode, setActivationMode] = useState("keep_rm"); 
     const [bulkPaidCredits, setBulkPaidCredits] = useState<number | "">("");
     const [bulkFreeCredits, setBulkFreeCredits] = useState<number | "">("");
     const [applyToAll, setApplyToAll] = useState(false);
+    const [bulkApplyMode, setBulkApplyMode] = useState<
+        "all" | "age_group" | "day_type"
+    >("all");
+    const [selectedAgeGroup, setSelectedAgeGroup] = useState<string>("");
+    const [selectedDayType, setSelectedDayType] = useState<
+        "weekday" | "weekend"
+    >("weekday");
 
     const ageGroups = event.age_groups || [];
+
+    // Calculate credits based on conversion service logic
+    const calculateCredits = (priceInRM: number) => {
+        if (!conversion) return { paid: 0, free: 0 };
+
+        const paid = Math.ceil(priceInRM * conversion.credits_per_rm);
+        const free = Math.ceil(
+            (paid / conversion.paid_credit_percentage) *
+                conversion.free_credit_percentage
+        );
+
+        return { paid, free };
+    };
 
     const slotPrices: (EventSlotPrice & { event_slot_id: string })[] = useMemo(
         () =>
@@ -47,27 +159,21 @@ const StatusToggleModal: React.FC<Props> = ({
         [event.slots]
     );
 
-    // Calculate recommended credits with proper rounding
-    const calculateCredits = (priceInRM: number) => {
-        if (!conversion) return { paid: 0, free: 0 };
-
-        const paid = Math.ceil(priceInRM * conversion.credits_per_rm);
-        const free = Math.ceil(
-            (paid / conversion.paid_credit_percentage) *
-                conversion.free_credit_percentage
-        );
-
-        return { paid, free };
-    };
-
-    // Initialize credits with recommended values
+    // Initialize credits with recommended values or existing values
     const [credits, setCredits] = useState(
         slotPrices.map((sp) => {
             const recommended = calculateCredits(sp.price_in_rm ?? 0);
             return {
                 id: sp.id,
-                paid_credits: sp.paid_credits ?? recommended.paid,
-                free_credits: sp.free_credits ?? recommended.free,
+                paid_credits:
+                    activationMode === "custom_free_credits"
+                        ? null
+                        : sp.paid_credits ?? recommended.paid,
+                free_credits:
+                    sp.free_credits ??
+                    (activationMode === "custom_free_credits"
+                        ? 0
+                        : recommended.free),
             };
         })
     );
@@ -110,18 +216,38 @@ const StatusToggleModal: React.FC<Props> = ({
 
     const sortedDates = Object.keys(slotsByDate).sort();
 
-    const updateCreditsValue = (
-        priceRowId: string,
-        field: "paid_credits" | "free_credits",
-        value: number | ""
-    ) => {
+    const updatePaidCredits = (priceRowId: string, paidValue: number) => {
         setCredits((prev) =>
             prev.map((c) =>
-                c.id === priceRowId ? { ...c, [field]: value || 0 } : c
+                c.id === priceRowId
+                    ? {
+                          ...c,
+                          paid_credits:
+                              activationMode === "custom_free_credits"
+                                  ? null
+                                  : paidValue,
+                      }
+                    : c
             )
         );
     };
 
+    const updateFreeCredits = (priceRowId: string, freeValue: number) => {
+        setCredits((prev) =>
+            prev.map((c) =>
+                c.id === priceRowId ? { ...c, free_credits: freeValue } : c
+            )
+        );
+    };
+
+    // Check if date is weekend
+    const isWeekend = (dateString: string): boolean => {
+        const date = new Date(dateString);
+        const day = date.getDay();
+        return day === 0 || day === 6; // Sunday = 0, Saturday = 6
+    };
+
+    // Apply bulk credits based on mode
     const applyBulkCredits = () => {
         if (bulkPaidCredits === "" && bulkFreeCredits === "") {
             toast.error("Please enter values for paid and/or free credits");
@@ -129,41 +255,65 @@ const StatusToggleModal: React.FC<Props> = ({
         }
 
         const updated = [...credits];
-        let hasError = false;
 
         for (let i = 0; i < slotPrices.length; i++) {
-            const minPaidCredits = conversion
-                ? Math.ceil(
-                      (slotPrices[i].price_in_rm ?? 0) *
-                          conversion.credits_per_rm
-                  )
-                : 0;
+            const slotPrice = slotPrices[i];
+            let shouldApply = true;
 
-            if (bulkPaidCredits !== "" && bulkPaidCredits < minPaidCredits) {
-                toast.error(
-                    `Paid credits (${bulkPaidCredits}) is below minimum for slot ${
-                        i + 1
-                    } (RM ${
-                        slotPrices[i].price_in_rm
-                    } requires ${minPaidCredits} credits)`
+            if (bulkApplyMode === "age_group" && selectedAgeGroup) {
+                shouldApply = slotPrice.event_age_group_id === selectedAgeGroup;
+            } else if (bulkApplyMode === "day_type") {
+                const slot = event.slots?.find(
+                    (s) => s.id === slotPrice.event_slot_id
                 );
-                hasError = true;
-                break;
+                if (slot?.date) {
+                    const isSlotWeekend = isWeekend(slot.date);
+                    shouldApply =
+                        selectedDayType === "weekend"
+                            ? isSlotWeekend
+                            : !isSlotWeekend;
+                }
             }
 
-            if (bulkPaidCredits !== "") {
-                updated[i].paid_credits = bulkPaidCredits;
-            }
-            if (bulkFreeCredits !== "") {
-                updated[i].free_credits = bulkFreeCredits;
+            if (shouldApply) {
+                // For custom_free_credits mode, only update free credits
+                if (activationMode === "custom_free_credits") {
+                    if (bulkFreeCredits !== "") {
+                        updated[i].free_credits = Number(bulkFreeCredits);
+                    }
+                } else {
+                    // For convert_credits mode, update both
+                    if (bulkPaidCredits !== "") {
+                        updated[i].paid_credits = Number(bulkPaidCredits);
+                    }
+                    if (bulkFreeCredits !== "") {
+                        updated[i].free_credits = Number(bulkFreeCredits);
+                    }
+                }
             }
         }
 
-        if (!hasError) {
-            setCredits(updated);
-            toast.success("Credits applied to all slots!");
-        }
+        setCredits(updated);
+
+        const modeText =
+            bulkApplyMode === "all"
+                ? "all slots"
+                : bulkApplyMode === "age_group"
+                ? `${
+                      ageGroups.find((ag) => ag.id === selectedAgeGroup)
+                          ?.label || "selected"
+                  } age group`
+                : `${selectedDayType} slots`;
+
+        toast.success(`Credits applied to ${modeText}!`);
     };
+
+    // Calculate conversion display
+    const conversionDisplay = useMemo(() => {
+        if (!conversion) return null;
+        const { paid, free } = calculateCredits(1);
+        return { paid, free };
+    }, [conversion]);
 
     const handleConfirm = () => {
         let statusToUpdate = newStatus;
@@ -184,34 +334,35 @@ const StatusToggleModal: React.FC<Props> = ({
             return;
         }
 
-        // Validate paid credits are not below minimum
-        if (statusToUpdate === "active" && conversion) {
-            for (let i = 0; i < slotPrices.length; i++) {
-                const minPaidCredits = Math.ceil(
-                    (slotPrices[i].price_in_rm ?? 0) * conversion.credits_per_rm
-                );
-
-                if (credits[i].paid_credits < minPaidCredits) {
-                    toast.error(
-                        `Slot ${
-                            i + 1
-                        }: Paid credits must be at least ${minPaidCredits}`
-                    );
-                    return;
-                }
-            }
-        }
-
         const payload: Record<string, any> = {
             status: statusToUpdate,
+            activation_mode: activationMode, 
         };
 
         if (statusToUpdate === "rejected") {
             payload.rejected_reason = rejectedReason;
         }
 
-        if (statusToUpdate === "active") {
-            payload.slot_prices = credits;
+        if (statusToUpdate === "active" || event.status === "active") {
+            switch (activationMode) {
+                case "custom_free_credits":
+                    payload.slot_prices = credits.map((c) => ({
+                        id: c.id,
+                        paid_credits: null,
+                        free_credits: c.free_credits,
+                    }));
+                    break;
+                case "convert_credits":
+                    payload.slot_prices = credits;
+                    break;
+                case "keep_rm":
+                    payload.slot_prices = credits.map((c) => ({
+                        id: c.id,
+                        paid_credits: null,
+                        free_credits: null,
+                    }));
+                    break;
+            }
         }
 
         const routeName = isAdmin
@@ -231,377 +382,942 @@ const StatusToggleModal: React.FC<Props> = ({
         });
     };
 
-    const renderSlotCredits = (slot: EventSlot, ageGroups: AgeGroup[]) => {
-        // All prices belonging to this slot
-        const pricesForSlot = slotPrices.filter(
-            (p) => p.event_slot_id === slot.id
-        );
-
-        return (
-            <div
-                key={slot.id}
-                className="bg-white border border-gray-200 rounded-lg p-4 hover:border-orange-300 transition-colors"
-            >
-                <div className="flex items-center justify-between mb-4 pb-3 border-b">
-                    <div className="flex items-center gap-2">
-                        <Clock className="w-5 h-5 text-orange-600" />
-                        <span className="font-semibold text-gray-900">
-                            {slot.start_time} - {slot.end_time}
-                        </span>
-                    </div>
-                </div>
-
-                <div className="space-y-4">
-                    {pricesForSlot.map((priceRow) => {
-                        const ageGroup = ageGroups.find(
-                            (ag: AgeGroup) =>
-                                ag.id === priceRow.event_age_group_id
-                        );
-
-                        const priceInRM = Number(priceRow.price_in_rm) || 0;
-                        const recommended = calculateCredits(priceInRM);
-                        const current = credits.find(
-                            (c) => c.id === priceRow.id
-                        );
-
-                        const minPaidCredits = conversion
-                            ? Math.ceil(priceInRM * conversion.credits_per_rm)
-                            : 0;
-
-                        return (
-                            <div
-                                key={priceRow.id}
-                                className="p-3 bg-gray-50 rounded-lg border border-gray-200"
-                            >
-                                <div className="flex items-center justify-between mb-3">
-                                    <span className="text-sm font-semibold text-gray-900">
-                                        {ageGroup
-                                            ? ageGroup.label
-                                            : "General Pricing"}
-                                    </span>
-                                    <span className="text-sm font-bold text-orange-600 bg-orange-50 px-3 py-1 rounded-full">
-                                        RM {priceInRM.toFixed(2)}
-                                    </span>
-                                </div>
-
-                                <div className="mb-3">
-                                    <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                                        Paid Credits{" "}
-                                        <span className="text-red-500">*</span>
-                                    </label>
-                                    <div className="flex gap-2 items-start">
-                                        <input
-                                            type="number"
-                                            min={minPaidCredits}
-                                            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                            value={
-                                                current?.paid_credits ??
-                                                recommended.paid
-                                            }
-                                            onChange={(e) =>
-                                                updateCreditsValue(
-                                                    priceRow.id,
-                                                    "paid_credits",
-                                                    Number(e.target.value)
-                                                )
-                                            }
-                                        />
-                                        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs whitespace-nowrap text-center">
-                                            <div className="text-blue-600 font-medium">
-                                                Recommended
-                                            </div>
-                                            <div className="text-blue-800 font-bold">
-                                                {recommended.paid} PAID CREDITS
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        Minimum:{" "}
-                                        <span className="font-semibold text-red-600">
-                                            {minPaidCredits}
-                                        </span>{" "}
-                                        credits
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                                        Free Credits
-                                    </label>
-                                    <div className="flex gap-2 items-start">
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                            value={
-                                                current?.free_credits ??
-                                                recommended.free
-                                            }
-                                            onChange={(e) =>
-                                                updateCreditsValue(
-                                                    priceRow.id,
-                                                    "free_credits",
-                                                    Number(e.target.value)
-                                                )
-                                            }
-                                        />
-                                        <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs whitespace-nowrap text-center">
-                                            <div className="text-green-600 font-medium">
-                                                Recommended
-                                            </div>
-                                            <div className="text-green-800 font-bold">
-                                                {recommended.free} FREE CREDITS
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        );
-    };
-
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-50 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                {/* Header */}
-                <div className="bg-linear-to-r from-orange-500 to-red-500 px-6 py-5 text-white">
-                    <h3 className="text-2xl font-bold">Update Event Status</h3>
-                    <p className="text-orange-100 text-sm mt-1">
-                        Review and modify event status and credits
-                    </p>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                {/* Header with linear */}
+                <div className="bg-linear-to-r from-orange-500 to-red-500 px-5 py-4 flex items-center justify-between">
+                    <div>
+                        <h3 className="text-lg font-bold text-white">
+                            Update Event Status
+                        </h3>
+                        <p className="text-orange-100 text-xs mt-0.5">
+                            Configure status and pricing
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="text-white/90 hover:text-white hover:bg-white/20 rounded-full p-1.5 transition-colors"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-                    {/* Status Section */}
-                    <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
+                <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                    {/* Status Selection */}
+                    <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-xs font-medium text-gray-700 mb-1.5">
                                     Current Status
                                 </label>
                                 <StatusBadge status={event.status} />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-xs font-medium text-gray-700 mb-1.5">
                                     New Status{" "}
                                     <span className="text-red-500">*</span>
                                 </label>
-                                <select
+                                <Select
                                     value={newStatus}
-                                    onChange={(e) =>
-                                        setNewStatus(
-                                            e.target.value as EventStatus
-                                        )
+                                    onValueChange={(val) =>
+                                        setNewStatus(val as EventStatus)
                                     }
-                                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
                                 >
-                                    <option value={event.status}>
-                                        Select new status
-                                    </option>
+                                    <option value="">Select status</option>
                                     {getAllowedStatuses().map((status) => (
                                         <option key={status} value={status}>
                                             {status.charAt(0).toUpperCase() +
                                                 status.slice(1)}
                                         </option>
                                     ))}
-                                </select>
+                                </Select>
                             </div>
                         </div>
                     </div>
 
                     {/* Rejection Reason */}
                     {newStatus === "rejected" && (
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-5">
-                            <label className="block text-sm font-medium text-red-900 mb-2">
-                                <AlertCircle className="w-4 h-4 inline mr-1" />
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <label className="text-sm font-medium text-red-900 mb-2 flex items-center gap-1.5">
+                                <AlertCircle className="w-4 h-4" />
                                 Rejection Reason{" "}
-                                <span className="text-red-600">*</span>
+                                <span className="text-red-500">*</span>
                             </label>
                             <textarea
                                 value={rejectedReason}
                                 onChange={(e) =>
                                     setRejectedReason(e.target.value)
                                 }
-                                className="w-full border border-red-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+                                className="w-full border border-red-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
                                 rows={3}
-                                placeholder="Provide a detailed reason for rejecting this event..."
+                                placeholder="Provide detailed reason for rejection..."
                             />
                         </div>
                     )}
 
-                    {/* Credit Conversion Info */}
+                    {/* Activation Mode */}
                     {isAdmin &&
-                        newStatus === "active" &&
+                        (newStatus === "active" || event.status === "active") &&
                         conversion && (
-                            <div className="bg-linear-to-r from-orange-50 to-red-50 border border-orange-200 rounded-lg p-5">
-                                <div className="flex items-start gap-3">
-                                    <Info className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
-                                    <div className="flex-1">
-                                        <p className="text-sm font-semibold text-orange-900 mb-2">
-                                            Credit Conversion Settings
-                                        </p>
-                                        <div className="grid grid-cols-3 gap-4 text-sm">
-                                            <div className="bg-white rounded-lg p-3 border border-orange-200">
-                                                <div className="text-gray-600 text-xs">
-                                                    Rate
-                                                </div>
-                                                <div className="font-bold text-orange-700">
-                                                    1 RM ={" "}
-                                                    {conversion.credits_per_rm}{" "}
-                                                    credits
-                                                </div>
-                                            </div>
+                            <>
+                                <div className="bg-linear-to-r from-orange-50 to-red-50 border border-orange-200 rounded-lg p-4">
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <Info className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
+                                        <div className="flex-1">
+                                            <span className="text-sm font-semibold text-orange-900 block mb-3">
+                                                Pricing Configuration
+                                            </span>
+                                            <RadioGroup
+                                                value={activationMode}
+                                                onValueChange={
+                                                    setActivationMode
+                                                }
+                                                options={[
+                                                    {
+                                                        value: "keep_rm",
+                                                        label: "Keep RM Pricing",
+                                                    },
+                                                    {
+                                                        value: "custom_free_credits",
+                                                        label: "Keep RM Pricing + Free Rewards",
+                                                    },
+                                                    {
+                                                        value: "convert_credits",
+                                                        label: "Convert to Credits",
+                                                    },
+                                                ]}
+                                            />
                                         </div>
                                     </div>
+
+                                    {activationMode === "convert_credits" &&
+                                        conversionDisplay && (
+                                            <div className="mt-3 pt-3 border-t border-orange-200">
+                                                <div className="bg-white rounded-lg p-3 border border-orange-200">
+                                                    <div className="flex items-center justify-between text-xs">
+                                                        <span className="text-gray-600 font-medium">
+                                                            Conversion Rate:
+                                                        </span>
+                                                        <span className="font-bold text-orange-700">
+                                                            RM 1 ={" "}
+                                                            <span className="font-bold text-blue-700">
+                                                                {
+                                                                    conversionDisplay.paid
+                                                                }{" "}
+                                                                Paid Credits
+                                                            </span>{" "}
+                                                            +{" "}
+                                                            <span className="font-bold text-green-700">
+                                                                {
+                                                                    conversionDisplay.free
+                                                                }{" "}
+                                                                Free Credits
+                                                            </span>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                 </div>
-                            </div>
-                        )}
 
-                    {/* Slot Credits */}
-                    {isAdmin && newStatus === "active" && (
-                        <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
-                            <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <Calendar className="w-5 h-5 text-orange-600" />
-                                Configure Slot Credits
-                            </h4>
+                                {/* Credit Configuration - Show for both convert_credits and custom_free_credits */}
+                                {(activationMode === "convert_credits" ||
+                                    activationMode ===
+                                        "custom_free_credits") && (
+                                    <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+                                        <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                                            <Calendar className="w-4 h-4 text-orange-600" />
+                                            {activationMode ===
+                                            "custom_free_credits"
+                                                ? "Add Free Rewards"
+                                                : "Review Credit Conversion"}
+                                        </h4>
 
-                            {/* Bulk Apply Section */}
-                            <div className="bg-linear-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-5">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <input
-                                        type="checkbox"
-                                        id="applyToAll"
-                                        checked={applyToAll}
-                                        onChange={(e) =>
-                                            setApplyToAll(e.target.checked)
-                                        }
-                                        className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 focus:ring-2"
-                                    />
-                                    <label
-                                        htmlFor="applyToAll"
-                                        className="text-sm font-semibold text-gray-900 cursor-pointer"
-                                    >
-                                        Apply same credits to all slots
-                                    </label>
-                                </div>
-
-                                {applyToAll && (
-                                    <div className="space-y-3 mt-3">
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                                                    Paid Credits for All Slots
-                                                </label>
+                                        {/* Bulk Apply Section - Only show Free Credits field for custom mode */}
+                                        <div className="bg-linear-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-4">
+                                            <div className="flex items-center gap-2 mb-3">
                                                 <input
-                                                    type="number"
-                                                    min={0}
-                                                    placeholder="Enter amount"
-                                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                    value={bulkPaidCredits}
+                                                    type="checkbox"
+                                                    id="applyToAll"
+                                                    checked={applyToAll}
                                                     onChange={(e) =>
-                                                        setBulkPaidCredits(
-                                                            e.target.value ===
-                                                                ""
-                                                                ? ""
-                                                                : Number(
-                                                                      e.target
-                                                                          .value
-                                                                  )
+                                                        setApplyToAll(
+                                                            e.target.checked
                                                         )
                                                     }
+                                                    className="h-4 w-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 focus:ring-2"
                                                 />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                                                    Free Credits for All Slots
+                                                <label
+                                                    htmlFor="applyToAll"
+                                                    className="text-sm font-semibold text-gray-900 cursor-pointer"
+                                                >
+                                                    Apply same credits to
+                                                    multiple slots
                                                 </label>
-                                                <input
-                                                    type="number"
-                                                    min={0}
-                                                    placeholder="Enter amount"
-                                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                    value={bulkFreeCredits}
-                                                    onChange={(e) =>
-                                                        setBulkFreeCredits(
-                                                            e.target.value ===
-                                                                ""
-                                                                ? ""
-                                                                : Number(
-                                                                      e.target
-                                                                          .value
-                                                                  )
-                                                        )
-                                                    }
-                                                />
                                             </div>
+
+                                            {applyToAll && (
+                                                <div className="space-y-3 mt-3">
+                                                    {/* Apply Mode Selection */}
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-700 mb-2">
+                                                            Apply To
+                                                        </label>
+                                                        <div className="grid grid-cols-3 gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    setBulkApplyMode(
+                                                                        "all"
+                                                                    )
+                                                                }
+                                                                className={`px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                                                                    bulkApplyMode ===
+                                                                    "all"
+                                                                        ? "bg-blue-600 text-white"
+                                                                        : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                                                }`}
+                                                            >
+                                                                All Slots
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    setBulkApplyMode(
+                                                                        "age_group"
+                                                                    )
+                                                                }
+                                                                className={`px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                                                                    bulkApplyMode ===
+                                                                    "age_group"
+                                                                        ? "bg-blue-600 text-white"
+                                                                        : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                                                }`}
+                                                            >
+                                                                Age Group
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    setBulkApplyMode(
+                                                                        "day_type"
+                                                                    )
+                                                                }
+                                                                className={`px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                                                                    bulkApplyMode ===
+                                                                    "day_type"
+                                                                        ? "bg-blue-600 text-white"
+                                                                        : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                                                }`}
+                                                            >
+                                                                Day Type
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Age Group Selection */}
+                                                    {bulkApplyMode ===
+                                                        "age_group" && (
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                                                Select Age Group
+                                                            </label>
+                                                            <Select
+                                                                value={
+                                                                    selectedAgeGroup
+                                                                }
+                                                                onValueChange={
+                                                                    setSelectedAgeGroup
+                                                                }
+                                                            >
+                                                                <option value="">
+                                                                    Choose age
+                                                                    group
+                                                                </option>
+                                                                {ageGroups.map(
+                                                                    (ag) => (
+                                                                        <option
+                                                                            key={
+                                                                                ag.id
+                                                                            }
+                                                                            value={
+                                                                                ag.id
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                ag.label
+                                                                            }
+                                                                        </option>
+                                                                    )
+                                                                )}
+                                                            </Select>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Day Type Selection */}
+                                                    {bulkApplyMode ===
+                                                        "day_type" && (
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                                                Select Day Type
+                                                            </label>
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        setSelectedDayType(
+                                                                            "weekday"
+                                                                        )
+                                                                    }
+                                                                    className={`px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                                                                        selectedDayType ===
+                                                                        "weekday"
+                                                                            ? "bg-green-600 text-white"
+                                                                            : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                                                    }`}
+                                                                >
+                                                                    Weekdays
+                                                                    (Mon-Fri)
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        setSelectedDayType(
+                                                                            "weekend"
+                                                                        )
+                                                                    }
+                                                                    className={`px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                                                                        selectedDayType ===
+                                                                        "weekend"
+                                                                            ? "bg-purple-600 text-white"
+                                                                            : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                                                    }`}
+                                                                >
+                                                                    Weekends
+                                                                    (Sat-Sun)
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Credit Input Fields */}
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        {activationMode ===
+                                                            "convert_credits" && (
+                                                            <div>
+                                                                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                                                    Paid Credits
+                                                                </label>
+                                                                <Input
+                                                                    type="number"
+                                                                    placeholder="Enter amount"
+                                                                    value={
+                                                                        bulkPaidCredits
+                                                                    }
+                                                                    onChange={(
+                                                                        e
+                                                                    ) =>
+                                                                        setBulkPaidCredits(
+                                                                            e
+                                                                                .target
+                                                                                .value ===
+                                                                                ""
+                                                                                ? ""
+                                                                                : Number(
+                                                                                      e
+                                                                                          .target
+                                                                                          .value
+                                                                                  )
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        )}
+                                                        <div
+                                                            className={
+                                                                activationMode ===
+                                                                "custom_free_credits"
+                                                                    ? "col-span-2"
+                                                                    : ""
+                                                            }
+                                                        >
+                                                            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                                                {activationMode ===
+                                                                "custom_free_credits"
+                                                                    ? "Free Rewards"
+                                                                    : "Free Credits"}
+                                                            </label>
+                                                            <Input
+                                                                type="number"
+                                                                placeholder="Enter amount"
+                                                                value={
+                                                                    bulkFreeCredits
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setBulkFreeCredits(
+                                                                        e.target
+                                                                            .value ===
+                                                                            ""
+                                                                            ? ""
+                                                                            : Number(
+                                                                                  e
+                                                                                      .target
+                                                                                      .value
+                                                                              )
+                                                                    )
+                                                                }
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={
+                                                            applyBulkCredits
+                                                        }
+                                                        disabled={
+                                                            (bulkApplyMode ===
+                                                                "age_group" &&
+                                                                !selectedAgeGroup) ||
+                                                            (bulkPaidCredits ===
+                                                                "" &&
+                                                                bulkFreeCredits ===
+                                                                    "")
+                                                        }
+                                                        className="w-full px-4 py-2 bg-linear-to-r from-blue-500 to-purple-500 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    >
+                                                        <CheckCircle2 className="w-4 h-4" />
+                                                        Apply Credits
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
-                                        <button
-                                            onClick={applyBulkCredits}
-                                            className="w-full px-4 py-2 bg-linear-to-r from-blue-500 to-purple-500 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-600 transition-colors flex items-center justify-center gap-2"
-                                        >
-                                            <Copy className="w-4 h-4" />
-                                            Apply to All Slots
-                                        </button>
+
+                                        {/* Compact Table View */}
+                                        <div className="space-y-3">
+                                            {!event.is_recurring && (
+                                                <div className="space-y-2">
+                                                    {event.slots?.map(
+                                                        (slot) => {
+                                                            const pricesForSlot =
+                                                                slotPrices.filter(
+                                                                    (p) =>
+                                                                        p.event_slot_id ===
+                                                                        slot.id
+                                                                );
+
+                                                            return (
+                                                                <div
+                                                                    key={
+                                                                        slot.id
+                                                                    }
+                                                                    className="border border-gray-200 rounded-lg overflow-hidden hover:border-orange-300 transition-colors"
+                                                                >
+                                                                    <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 flex items-center gap-2">
+                                                                        <Clock className="w-4 h-4 text-orange-600" />
+                                                                        <span className="text-xs font-semibold text-gray-700">
+                                                                            {
+                                                                                slot.start_time
+                                                                            }{" "}
+                                                                            -{" "}
+                                                                            {
+                                                                                slot.end_time
+                                                                            }
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="p-3 space-y-2">
+                                                                        {pricesForSlot.map(
+                                                                            (
+                                                                                priceRow
+                                                                            ) => {
+                                                                                const ageGroup =
+                                                                                    ageGroups.find(
+                                                                                        (
+                                                                                            ag
+                                                                                        ) =>
+                                                                                            ag.id ===
+                                                                                            priceRow.event_age_group_id
+                                                                                    );
+                                                                                const priceInRM =
+                                                                                    Number(
+                                                                                        priceRow.price_in_rm
+                                                                                    ) ||
+                                                                                    0;
+                                                                                const recommended =
+                                                                                    calculateCredits(
+                                                                                        priceInRM
+                                                                                    );
+                                                                                const current =
+                                                                                    credits.find(
+                                                                                        (
+                                                                                            c
+                                                                                        ) =>
+                                                                                            c.id ===
+                                                                                            priceRow.id
+                                                                                    );
+
+                                                                                if (
+                                                                                    activationMode ===
+                                                                                    "custom_free_credits"
+                                                                                ) {
+                                                                                    return (
+                                                                                        <div
+                                                                                            key={
+                                                                                                priceRow.id
+                                                                                            }
+                                                                                            className="flex items-center gap-3 text-sm"
+                                                                                        >
+                                                                                            <div className="w-23 text-xs font-medium text-gray-600">
+                                                                                                {ageGroup
+                                                                                                    ? `${
+                                                                                                          ageGroup.label
+                                                                                                      }${
+                                                                                                          ageGroup.min_age !=
+                                                                                                              null ||
+                                                                                                          ageGroup.max_age !=
+                                                                                                              null
+                                                                                                              ? ` (${
+                                                                                                                    ageGroup.min_age ??
+                                                                                                                    "–"
+                                                                                                                }–${
+                                                                                                                    ageGroup.max_age ??
+                                                                                                                    "+"
+                                                                                                                })`
+                                                                                                              : ""
+                                                                                                      }`
+                                                                                                    : "General"}
+                                                                                            </div>
+                                                                                            <div className="w-20 font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded text-xs">
+                                                                                                RM{" "}
+                                                                                                {priceInRM.toFixed(
+                                                                                                    2
+                                                                                                )}
+                                                                                            </div>
+                                                                                            <div className="flex-1">
+                                                                                                <label className="block text-xs text-gray-600 mb-1 font-medium">
+                                                                                                    Free
+                                                                                                    Rewards
+                                                                                                </label>
+                                                                                                <Input
+                                                                                                    type="number"
+                                                                                                    value={
+                                                                                                        current?.free_credits ??
+                                                                                                        0
+                                                                                                    }
+                                                                                                    onChange={(
+                                                                                                        e
+                                                                                                    ) =>
+                                                                                                        updateFreeCredits(
+                                                                                                            priceRow.id,
+                                                                                                            Number(
+                                                                                                                e
+                                                                                                                    .target
+                                                                                                                    .value
+                                                                                                            )
+                                                                                                        )
+                                                                                                    }
+                                                                                                    placeholder="0"
+                                                                                                />
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    );
+                                                                                } else {
+                                                                                    return (
+                                                                                        <div
+                                                                                            key={
+                                                                                                priceRow.id
+                                                                                            }
+                                                                                            className="flex items-center gap-3 text-sm"
+                                                                                        >
+                                                                                            <div className="w-23 text-xs font-medium text-gray-600">
+                                                                                                {ageGroup
+                                                                                                    ? `${
+                                                                                                          ageGroup.label
+                                                                                                      }${
+                                                                                                          ageGroup.min_age !=
+                                                                                                              null ||
+                                                                                                          ageGroup.max_age !=
+                                                                                                              null
+                                                                                                              ? ` (${
+                                                                                                                    ageGroup.min_age ??
+                                                                                                                    "–"
+                                                                                                                }–${
+                                                                                                                    ageGroup.max_age ??
+                                                                                                                    "+"
+                                                                                                                })`
+                                                                                                              : ""
+                                                                                                      }`
+                                                                                                    : "General"}
+                                                                                            </div>
+                                                                                            <div className="w-20 font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded text-xs">
+                                                                                                RM{" "}
+                                                                                                {priceInRM.toFixed(
+                                                                                                    2
+                                                                                                )}
+                                                                                            </div>
+                                                                                            <div className="flex-1 grid grid-cols-2 gap-2">
+                                                                                                <div>
+                                                                                                    <label className="block text-xs text-gray-600 mb-1 font-medium">
+                                                                                                        Paid{" "}
+                                                                                                        <span className="text-blue-600 font-normal">
+                                                                                                            (Suggested:{" "}
+                                                                                                            {
+                                                                                                                recommended.paid
+                                                                                                            }
+
+                                                                                                            )
+                                                                                                        </span>
+                                                                                                    </label>
+                                                                                                    <Input
+                                                                                                        type="number"
+                                                                                                        value={
+                                                                                                            current?.paid_credits ??
+                                                                                                            recommended.paid
+                                                                                                        }
+                                                                                                        onChange={(
+                                                                                                            e
+                                                                                                        ) =>
+                                                                                                            updatePaidCredits(
+                                                                                                                priceRow.id,
+                                                                                                                Number(
+                                                                                                                    e
+                                                                                                                        .target
+                                                                                                                        .value
+                                                                                                                )
+                                                                                                            )
+                                                                                                        }
+                                                                                                        placeholder=""
+                                                                                                    />
+                                                                                                </div>
+                                                                                                <div>
+                                                                                                    <label className="block text-xs text-gray-600 mb-1 font-medium">
+                                                                                                        Free{" "}
+                                                                                                        <span className="text-green-600 font-normal">
+                                                                                                            (Suggested:{" "}
+                                                                                                            {
+                                                                                                                recommended.free
+                                                                                                            }
+
+                                                                                                            )
+                                                                                                        </span>
+                                                                                                    </label>
+                                                                                                    <Input
+                                                                                                        type="number"
+                                                                                                        value={
+                                                                                                            current?.free_credits ??
+                                                                                                            recommended.free
+                                                                                                        }
+                                                                                                        onChange={(
+                                                                                                            e
+                                                                                                        ) =>
+                                                                                                            updateFreeCredits(
+                                                                                                                priceRow.id,
+                                                                                                                Number(
+                                                                                                                    e
+                                                                                                                        .target
+                                                                                                                        .value
+                                                                                                                )
+                                                                                                            )
+                                                                                                        }
+                                                                                                        placeholder=""
+                                                                                                    />
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    );
+                                                                                }
+                                                                            }
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        }
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {event.is_recurring && (
+                                                <div className="space-y-3">
+                                                    {sortedDates.map((date) => (
+                                                        <div
+                                                            key={date}
+                                                            className="border-l-4 border-orange-500 pl-3"
+                                                        >
+                                                            <div className="flex items-center gap-2 mb-3">
+                                                                <Calendar className="w-4 h-4 text-orange-600" />
+                                                                <h5 className="text-sm font-bold text-gray-900">
+                                                                    {formatDate(
+                                                                        date
+                                                                    )}
+                                                                </h5>
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                {slotsByDate[
+                                                                    date
+                                                                ].map(
+                                                                    (slot) => {
+                                                                        const pricesForSlot =
+                                                                            slotPrices.filter(
+                                                                                (
+                                                                                    p
+                                                                                ) =>
+                                                                                    p.event_slot_id ===
+                                                                                    slot.id
+                                                                            );
+
+                                                                        return (
+                                                                            <div
+                                                                                key={
+                                                                                    slot.id
+                                                                                }
+                                                                                className="border border-gray-200 rounded-lg overflow-hidden hover:border-orange-300 transition-colors"
+                                                                            >
+                                                                                <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 flex items-center gap-2">
+                                                                                    <Clock className="w-4 h-4 text-orange-600" />
+                                                                                    <span className="text-xs font-semibold text-gray-700">
+                                                                                        {
+                                                                                            slot.start_time
+                                                                                        }{" "}
+                                                                                        -{" "}
+                                                                                        {
+                                                                                            slot.end_time
+                                                                                        }
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className="p-3 space-y-2">
+                                                                                    {pricesForSlot.map(
+                                                                                        (
+                                                                                            priceRow
+                                                                                        ) => {
+                                                                                            const ageGroup =
+                                                                                                ageGroups.find(
+                                                                                                    (
+                                                                                                        ag
+                                                                                                    ) =>
+                                                                                                        ag.id ===
+                                                                                                        priceRow.event_age_group_id
+                                                                                                );
+                                                                                            const priceInRM =
+                                                                                                Number(
+                                                                                                    priceRow.price_in_rm
+                                                                                                ) ||
+                                                                                                0;
+                                                                                            const recommended =
+                                                                                                calculateCredits(
+                                                                                                    priceInRM
+                                                                                                );
+                                                                                            const current =
+                                                                                                credits.find(
+                                                                                                    (
+                                                                                                        c
+                                                                                                    ) =>
+                                                                                                        c.id ===
+                                                                                                        priceRow.id
+                                                                                                );
+
+                                                                                            if (
+                                                                                                activationMode ===
+                                                                                                "custom_free_credits"
+                                                                                            ) {
+                                                                                                return (
+                                                                                                    <div
+                                                                                                        key={
+                                                                                                            priceRow.id
+                                                                                                        }
+                                                                                                        className="flex items-center gap-3 text-sm"
+                                                                                                    >
+                                                                                                        <div className="w-23 text-xs font-medium text-gray-600">
+                                                                                                            {ageGroup
+                                                                                                                ? `${
+                                                                                                                      ageGroup.label
+                                                                                                                  }${
+                                                                                                                      ageGroup.min_age !=
+                                                                                                                          null ||
+                                                                                                                      ageGroup.max_age !=
+                                                                                                                          null
+                                                                                                                          ? ` (${
+                                                                                                                                ageGroup.min_age ??
+                                                                                                                                "–"
+                                                                                                                            }–${
+                                                                                                                                ageGroup.max_age ??
+                                                                                                                                "+"
+                                                                                                                            })`
+                                                                                                                          : ""
+                                                                                                                  }`
+                                                                                                                : "General"}
+                                                                                                        </div>
+                                                                                                        <div className="w-20 font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded text-xs">
+                                                                                                            RM{" "}
+                                                                                                            {priceInRM.toFixed(
+                                                                                                                2
+                                                                                                            )}
+                                                                                                        </div>
+                                                                                                        <div className="flex-1">
+                                                                                                            <label className="block text-xs text-gray-600 mb-1 font-medium">
+                                                                                                                Free
+                                                                                                                Rewards
+                                                                                                            </label>
+                                                                                                            <Input
+                                                                                                                type="number"
+                                                                                                                value={
+                                                                                                                    current?.free_credits ??
+                                                                                                                    0
+                                                                                                                }
+                                                                                                                onChange={(
+                                                                                                                    e
+                                                                                                                ) =>
+                                                                                                                    updateFreeCredits(
+                                                                                                                        priceRow.id,
+                                                                                                                        Number(
+                                                                                                                            e
+                                                                                                                                .target
+                                                                                                                                .value
+                                                                                                                        )
+                                                                                                                    )
+                                                                                                                }
+                                                                                                                placeholder="0"
+                                                                                                            />
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                );
+                                                                                            } else {
+                                                                                                return (
+                                                                                                    <div
+                                                                                                        key={
+                                                                                                            priceRow.id
+                                                                                                        }
+                                                                                                        className="flex items-center gap-3 text-sm"
+                                                                                                    >
+                                                                                                        <div className="w-23 text-xs font-medium text-gray-600">
+                                                                                                            {ageGroup
+                                                                                                                ? `${
+                                                                                                                      ageGroup.label
+                                                                                                                  }${
+                                                                                                                      ageGroup.min_age !=
+                                                                                                                          null ||
+                                                                                                                      ageGroup.max_age !=
+                                                                                                                          null
+                                                                                                                          ? ` (${
+                                                                                                                                ageGroup.min_age ??
+                                                                                                                                "–"
+                                                                                                                            }–${
+                                                                                                                                ageGroup.max_age ??
+                                                                                                                                "+"
+                                                                                                                            })`
+                                                                                                                          : ""
+                                                                                                                  }`
+                                                                                                                : "General"}
+                                                                                                        </div>
+                                                                                                        <div className="w-20 font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded text-xs">
+                                                                                                            RM{" "}
+                                                                                                            {priceInRM.toFixed(
+                                                                                                                2
+                                                                                                            )}
+                                                                                                        </div>
+                                                                                                        <div className="flex-1 grid grid-cols-2 gap-2">
+                                                                                                            <div>
+                                                                                                                <label className="block text-xs text-gray-600 mb-1 font-medium">
+                                                                                                                    Paid{" "}
+                                                                                                                    <span className="text-blue-600 font-normal">
+                                                                                                                        (Suggested:{" "}
+                                                                                                                        {
+                                                                                                                            recommended.paid
+                                                                                                                        }
+
+                                                                                                                        )
+                                                                                                                    </span>
+                                                                                                                </label>
+                                                                                                                <Input
+                                                                                                                    type="number"
+                                                                                                                    value={
+                                                                                                                        current?.paid_credits ??
+                                                                                                                        recommended.paid
+                                                                                                                    }
+                                                                                                                    onChange={(
+                                                                                                                        e
+                                                                                                                    ) =>
+                                                                                                                        updatePaidCredits(
+                                                                                                                            priceRow.id,
+                                                                                                                            Number(
+                                                                                                                                e
+                                                                                                                                    .target
+                                                                                                                                    .value
+                                                                                                                            )
+                                                                                                                        )
+                                                                                                                    }
+                                                                                                                    placeholder=""
+                                                                                                                />
+                                                                                                            </div>
+                                                                                                            <div>
+                                                                                                                <label className="block text-xs text-gray-600 mb-1 font-medium">
+                                                                                                                    Free{" "}
+                                                                                                                    <span className="text-green-600 font-normal">
+                                                                                                                        (Suggested:{" "}
+                                                                                                                        {
+                                                                                                                            recommended.free
+                                                                                                                        }
+
+                                                                                                                        )
+                                                                                                                    </span>
+                                                                                                                </label>
+                                                                                                                <Input
+                                                                                                                    type="number"
+                                                                                                                    value={
+                                                                                                                        current?.free_credits ??
+                                                                                                                        recommended.free
+                                                                                                                    }
+                                                                                                                    onChange={(
+                                                                                                                        e
+                                                                                                                    ) =>
+                                                                                                                        updateFreeCredits(
+                                                                                                                            priceRow.id,
+                                                                                                                            Number(
+                                                                                                                                e
+                                                                                                                                    .target
+                                                                                                                                    .value
+                                                                                                                            )
+                                                                                                                        )
+                                                                                                                    }
+                                                                                                                    placeholder=""
+                                                                                                                />
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                );
+                                                                                            }
+                                                                                        }
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    }
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
-                            </div>
-
-                            {/* One-time Event */}
-                            {!event.is_recurring && (
-                                <div className="space-y-3">
-                                    {event.slots?.map((slot) =>
-                                        renderSlotCredits(slot, ageGroups)
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Recurring Event */}
-                            {event.is_recurring && (
-                                <div className="space-y-4">
-                                    {sortedDates.map((date) => (
-                                        <div
-                                            key={date}
-                                            className="border-l-4 border-orange-500 pl-4"
-                                        >
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <Calendar className="w-4 h-4 text-orange-600" />
-                                                <h5 className="font-semibold text-gray-900">
-                                                    {formatDate(date)}
-                                                </h5>
-                                            </div>
-                                            <div className="space-y-3">
-                                                {slotsByDate[date].map((slot) =>
-                                                    renderSlotCredits(
-                                                        slot,
-                                                        ageGroups
-                                                    )
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
+                            </>
+                        )}
                 </div>
 
                 {/* Footer */}
-                <div className="bg-white border-t border-gray-200 px-6 py-4 flex gap-3">
+                <div className="border-t border-gray-200 px-5 py-4 flex gap-3 bg-gray-50">
                     <button
                         onClick={onClose}
-                        className="flex-1 px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition-colors"
+                        className="flex-1 h-9 px-4 border-2 border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-white transition-colors"
                     >
                         Cancel
                     </button>
                     <button
                         onClick={handleConfirm}
-                        disabled={newStatus === event.status}
-                        className="flex-1 px-6 py-3 bg-linear-to-r from-orange-500 to-red-500 text-white rounded-lg font-semibold hover:from-orange-600 hover:to-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg disabled:shadow-none"
+                        className="flex-1 h-9 px-4 bg-linear-to-r from-orange-500 to-red-500 text-white rounded-lg text-sm font-bold hover:from-orange-600 hover:to-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg disabled:shadow-none flex items-center justify-center gap-1.5"
                     >
+                        <CheckCircle2 className="w-4 h-4" />
                         Confirm Changes
                     </button>
                 </div>
