@@ -19,7 +19,7 @@ const UpcomingEventsGrid: React.FC<Props> = ({
         const now = new Date();
 
         if (!event.is_recurring) {
-            const date = event.dates?.[0];
+            const date = event.dates;
             const slot = event.slots?.[0];
             if (!date || !slot) return "";
             return `${new Date(date.start_date).toLocaleDateString("en-US", {

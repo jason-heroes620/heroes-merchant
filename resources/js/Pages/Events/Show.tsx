@@ -81,6 +81,7 @@ const EventDisplayPage: React.FC = () => {
                         ageGroups={eventData.ageGroups}
                         prices={eventData.prices}
                         claimConfiguration={eventData.claim_configuration}
+                        userRole={userRole}
                     />
 
                     <EventModesSection

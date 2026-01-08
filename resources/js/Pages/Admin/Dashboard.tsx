@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Inertia } from "@inertiajs/inertia";
+import { router } from "@inertiajs/react";
 import {
     Users,
     Calendar,
@@ -675,10 +675,12 @@ const AdminDashboard = ({
                                         <select
                                             value={selectedMonth}
                                             onChange={(e) =>
-                                                Inertia.get(
+                                                router.get(
                                                     route("admin.dashboard"),
+                                                    { month: e.target.value },
                                                     {
-                                                        month: e.target.value,
+                                                        preserveState: true,
+                                                        replace: true,
                                                     }
                                                 )
                                             }

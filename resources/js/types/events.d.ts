@@ -176,7 +176,7 @@ export interface EventType {
     like_count?: number;
     click_count?: number;
     slotPrices?: EventSlotPrice[];
-    dates?: EventDate[];
+    dates?: EventDate;
     frequency?: Frequency;
     is_upcoming: boolean;
     is_past: boolean;
