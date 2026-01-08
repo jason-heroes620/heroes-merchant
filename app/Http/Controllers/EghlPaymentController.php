@@ -37,7 +37,6 @@ class EghlPaymentController extends Controller
         $html = view('eghl.eghlpayment', [
             'paymentUrl' => config('services.eghl.payment_url'),
             'serviceId' => $serviceId,
-            'orderId' => $orderId,
             'orderId' => $paymentId,
             'description' => '',
             'hash' => $hash,
@@ -62,7 +61,8 @@ class EghlPaymentController extends Controller
         $paymentId = $request->payment_id;
         $amount = $request->amount;
         $paymentDesc = $request->payment_desc;
-        $productId = $request->package_id;
+        //Update to cart_id
+        $productId = $request->package_id; 
 
         $redirectScheme = env('APP_SCHEME') . '://payment/result';
 
@@ -78,9 +78,11 @@ class EghlPaymentController extends Controller
             'order_status' => 'pending_payment',
         ]);
 
+        //Update to CartProducts
         OrderProducts::create([
             'order_id' => $order->order_id,
             'product_id' => $productId,
+            //update to cart_name
             'product_name' => $paymentDesc,
             'qty' => 1,
             'uom' => 'unit',

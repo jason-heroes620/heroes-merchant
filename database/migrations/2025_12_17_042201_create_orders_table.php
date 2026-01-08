@@ -21,7 +21,7 @@ return new class extends Migration
             $table->unsignedInteger('quantity', 3);
             $table->decimal('price', 10, 2);
             $table->string('order_status', 50);
-            $table->$table->timestamps();
+            $table->timestamps();
         });
     }
 

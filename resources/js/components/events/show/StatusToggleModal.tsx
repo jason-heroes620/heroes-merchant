@@ -392,6 +392,7 @@ const StatusToggleModal: React.FC<Props> = ({
 
         const payload: Record<string, any> = {
             status: statusToUpdate,
+            activationMode,
             slot_prices,
         };
 

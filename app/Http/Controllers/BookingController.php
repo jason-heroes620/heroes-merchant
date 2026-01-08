@@ -146,8 +146,48 @@ class BookingController extends Controller
             }
         }
 
+        $requiresPayment = false;
+        $totalRM = 0;
+        $totalFreeToAdd = 0;
+        $hasCustomFreeCredits = false;
+        $activationMode = null;
+
+        foreach ($quantitiesByAgeGroup as $ageGroupId => $quantity) {
+            if ($quantity < 1) continue;
+            
+            $ageGroupIdForQuery = $ageGroupId === 'general' ? null : $ageGroupId;
+            $slotPrice = $slot->prices()
+                ->when($ageGroupIdForQuery, fn($q) => $q->where('event_age_group_id', $ageGroupIdForQuery))
+                ->first();
+            
+            if ($slotPrice) {
+                $activationMode = $slotPrice->activation_mode;
+                
+                if ($slotPrice->activation_mode === 'keep_rm' || $slotPrice->activation_mode === 'custom_free_credits') {
+                    $requiresPayment = true;
+                    $totalRM += ($slotPrice->price_in_rm ?? 0) * $quantity;
+                    
+                    if ($slotPrice->activation_mode === 'custom_free_credits') {
+                        $hasCustomFreeCredits = true;
+                        $totalFreeToAdd += ($slotPrice->free_credits ?? 0) * $quantity;
+                    }
+                }
+            }
+        }
+
+        // If payment required, return payment info 
+        if ($requiresPayment) {
+            return response()->json([
+                'requires_payment' => true,
+                'total_rm' => $totalRM,
+                'free_credits_to_add' => $totalFreeToAdd,
+                'has_custom_free_credits' => $hasCustomFreeCredits,
+                'activation_mode' => $activationMode,
+            ], 200);
+        }
+
         try {
-            $conversion = Conversion::first(); // or whatever logic applies
+            $conversion = Conversion::first(); 
             if (!$conversion) {
                 return response()->json(['message' => 'Conversion settings not found.'], 500);
             }
@@ -157,7 +197,8 @@ class BookingController extends Controller
                 $slot,
                 $quantitiesByAgeGroup,
                 $conversion,
-                $allowFallback
+                $allowFallback,
+                false // isPaid = false for convert_credits
             );
 
             $bookingModel = $bookingResponse['booking'];
