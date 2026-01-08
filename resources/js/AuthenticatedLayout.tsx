@@ -1,17 +1,24 @@
 import { useState, useEffect } from "react";
 import { router, usePage, Link } from "@inertiajs/react";
 import Cookies from "js-cookie";
-import { LogOut, User as UserIcon, ChevronDown } from "lucide-react";
+import { LogOut, User as UserIcon } from "lucide-react";
 import { AppSidebar } from "../components/AppSidebar";
 import {
     SidebarInset,
     SidebarProvider,
     SidebarTrigger,
 } from "@/components/ui/sidebar";
-import Dropdown from "@/components/ui/dropdown";
 import Loading from "@/components/ui/loading";
 import { Toaster } from "@/components/ui/sonner";
 import ResponsiveNavLink from "@/components/ui/ResponsiveNavLink";
+import {
+    NavigationMenu,
+    NavigationMenuContent,
+    NavigationMenuItem,
+    NavigationMenuLink,
+    NavigationMenuList,
+    NavigationMenuTrigger,
+} from "@/components/ui/navigation-menu";
 
 const AuthenticatedLayout = ({ children }: { children: React.ReactNode }) => {
     const page = usePage();
@@ -52,7 +59,7 @@ const AuthenticatedLayout = ({ children }: { children: React.ReactNode }) => {
                             {user && (
                                 <div className="hidden sm:flex sm:items-center sm:gap-3">
                                     {/* User Dropdown */}
-                                    <Dropdown>
+                                    {/* <Dropdown>
                                         <Dropdown.Trigger>
                                             <button className="group flex items-center gap-3 rounded-xl border border-orange-200/60 bg-white px-4 py-2.5 shadow-sm transition-all duration-300 hover:shadow-md hover:border-orange-300 hover:bg-linear-to-r hover:from-orange-50 hover:to-red-50">
                                                 <div className="relative">
@@ -101,7 +108,70 @@ const AuthenticatedLayout = ({ children }: { children: React.ReactNode }) => {
                                                 </span>
                                             </button>
                                         </Dropdown.Content>
-                                    </Dropdown>
+                                    </Dropdown> */}
+                                    <NavigationMenu>
+                                        <NavigationMenuList>
+                                            <NavigationMenuItem className="hidden md:block">
+                                                <NavigationMenuTrigger>
+                                                    <div className="relative">
+                                                        <div className="w-9 h-9 rounded-full bg-linear-to-br from-orange-400 via-orange-500 to-red-500 flex items-center justify-center text-white font-bold shadow-md text-sm ring-2 ring-white">
+                                                            {user.full_name
+                                                                .charAt(0)
+                                                                .toUpperCase()}
+                                                        </div>
+                                                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
+                                                    </div>
+                                                    <div className="pl-4">
+                                                        <div className="text-left">
+                                                            <div className="text-sm font-semibold text-gray-800 group-hover:text-orange-700 transition-colors">
+                                                                {user.full_name}
+                                                            </div>
+                                                            <div className="text-xs text-orange-600 capitalize">
+                                                                {user.role}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </NavigationMenuTrigger>
+                                                <NavigationMenuContent>
+                                                    <ul className="grid w-[200px] gap-4">
+                                                        <li>
+                                                            <NavigationMenuLink
+                                                                asChild
+                                                            >
+                                                                <Link
+                                                                    href="/profile"
+                                                                    className="flex-row items-center gap-2"
+                                                                >
+                                                                    <UserIcon className="w-4 h-4" />
+                                                                    <span className="font-medium">
+                                                                        Profile
+                                                                    </span>
+                                                                </Link>
+                                                            </NavigationMenuLink>
+                                                            <NavigationMenuLink
+                                                                asChild
+                                                            >
+                                                                <Link
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        router.post(
+                                                                            "/logout"
+                                                                        )
+                                                                    }
+                                                                    className="flex-row items-center gap-2"
+                                                                >
+                                                                    <LogOut className="w-4 h-4" />
+                                                                    <span className="font-medium">
+                                                                        Log Out
+                                                                    </span>
+                                                                </Link>
+                                                            </NavigationMenuLink>
+                                                        </li>
+                                                    </ul>
+                                                </NavigationMenuContent>
+                                            </NavigationMenuItem>
+                                        </NavigationMenuList>
+                                    </NavigationMenu>
                                 </div>
                             )}
 

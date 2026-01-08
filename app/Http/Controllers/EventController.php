@@ -204,10 +204,7 @@ class EventController extends Controller
         ];
 
         return Inertia::render('Events/Show', [
-            'eventData' => $eventData,
-            'auth' => [
-                'user' => $user,
-            ],
+            'eventData' => $eventData
         ]);
     }
 
@@ -1208,7 +1205,6 @@ class EventController extends Controller
                     ? 'Event has been featured successfully.'
                     : 'Event has been unfeatured successfully.'
             );
-
         } catch (\Throwable $e) {
             Log::error('Failed to update featured status', [
                 'event_id' => $event->id,

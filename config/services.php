@@ -42,6 +42,8 @@ return [
         'password' => env('EGHL_PASSWORD'),
         'payment_url' => env('EGHL_PAYMENT_URL'),
         'callback' => env('EGHL_CALLBACK_URL'),
-        'return' => env('EGHL_RETURN_URL')
+        'return' => env('EGHL_RETURN_URL'),
+        'artFairCallback' => env('ARTFAIR_CALLBACK_URL'),
+        'artFairReturn' => env('ARTFAIR_RETURN_URL'),
     ]
 ];

@@ -116,7 +116,7 @@ Route::middleware(['auth'])->group(function () {
 
         // Merchant Payouts
         Route::get('/payouts', [MerchantPayoutController::class, 'index'])->name('payouts.index');
-        Route::get('/payouts/export-pdf', [MerchantPayoutController::class, 'exportSlotPayoutPdf'])->name('payouts.export.pdf');          
+        Route::get('/payouts/export-pdf', [MerchantPayoutController::class, 'exportSlotPayoutPdf'])->name('payouts.export.pdf');
         Route::get('/payouts/{payout}', [MerchantPayoutController::class, 'show'])->name('payouts.show');
         Route::post('/payouts/mark-paid', [MerchantPayoutController::class, 'markAsPaid'])->name('payouts.mark-paid');
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
@@ -138,14 +138,14 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/bookings/event/{eventId}', [MerchantBookingController::class, 'bookingsByEvent'])->name('bookings.by-event');
         Route::patch('/bookings/update-status', [MerchantBookingController::class, 'updateStatus'])->name('bookings.updateStatus');
 
-        Route::get('/payouts/export-pdf', [MerchantPayoutController::class, 'exportSlotPayoutPdf'])->name('payouts.export.pdf');          
+        Route::get('/payouts/export-pdf', [MerchantPayoutController::class, 'exportSlotPayoutPdf'])->name('payouts.export.pdf');
         Route::get('/payouts', [MerchantPayoutController::class, 'index'])->name('payouts.index');
         Route::get('/payouts/show', [MerchantPayoutController::class, 'show'])->name('payouts.show');
-        
+
         Route::get('/dashboard', [MerchantDashboardController::class, 'index'])->name('dashboard');
     });
 
     /* Notifications (shared for all authenticated users) */
-    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
-    Route::post('/notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.markAsRead');
+    // Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    // Route::post('/notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.markAsRead');
 });

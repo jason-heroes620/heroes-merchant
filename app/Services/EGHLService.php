@@ -106,21 +106,24 @@ class EghlService
             ]);
 
             $order = Orders::where('payment_id', $data['PaymentID'])->first();
-            $package = PurchasePackage::where('id', $order->package_id)->first();
-            $customer_id = Customer::where('user_id', $order->user_id)->first()->id;
-            $user = User::where('id', $order->user_id)->first();
-            $this->updateWallet(
-                $user,
-                [
-                    'type' => 'purchase',
-                    'delta_free' => $package->free_credits,
-                    'delta_paid' => $package->paid_credits,
-                    'amount_in_rm' => $package->price_in_rm,
-                    'description' => 'Purchase of ' . $package->name,
-                    'purchase_package_id' => $package->id,
-                ],
-                $customer_id
-            );
+            $product = $order->products->first();
+            if ($product->isPackage) {
+                $package = PurchasePackage::where('id', $order->package_id)->first();
+                $customer_id = Customer::where('user_id', $order->user_id)->first()->id;
+                $user = User::where('id', $order->user_id)->first();
+                $this->updateWallet(
+                    $user,
+                    [
+                        'type' => 'purchase',
+                        'delta_free' => $package->free_credits,
+                        'delta_paid' => $package->paid_credits,
+                        'amount_in_rm' => $package->price_in_rm,
+                        'description' => 'Purchase of ' . $package->name,
+                        'purchase_package_id' => $package->id,
+                    ],
+                    $customer_id
+                );
+            }
         }
         return true;
         // ... logic to re-calculate hash and compare with the returned HashValue ...

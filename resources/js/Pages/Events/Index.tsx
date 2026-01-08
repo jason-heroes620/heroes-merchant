@@ -204,7 +204,7 @@ export default function EventsIndexPage() {
     return (
         <AuthenticatedLayout>
             <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 py-8 px-4">
-                <div className="max-w-[1600px] mx-auto">
+                <div className="max-w-7xl mx-auto">
                     {/* Header */}
                     <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
                         <div className="bg-linear-to-r from-orange-500 via-orange-600 to-red-500 px-8 py-8">

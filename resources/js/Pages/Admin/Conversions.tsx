@@ -386,8 +386,8 @@ const ConversionsIndex: React.FC<ConversionsIndexProps> = ({ conversions }) => {
     const flash = pageProps.flash;
 
     useEffect(() => {
-        console.log("Flash messages:", flash);
-        console.log("All props:", pageProps);
+        // console.log("Flash messages:", flash);
+        // console.log("All props:", pageProps);
     }, [flash, pageProps]);
 
     useEffect(() => {
@@ -445,7 +445,6 @@ const ConversionsIndex: React.FC<ConversionsIndexProps> = ({ conversions }) => {
     const visibleConversions = conversions.filter(
         (conv) => conv.status !== "inactive"
     );
-
     return (
         <AuthenticatedLayout>
             <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 py-8 px-4">

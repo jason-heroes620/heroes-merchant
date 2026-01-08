@@ -13,15 +13,15 @@ return new class extends Migration
     {
         Schema::create('orders', function (Blueprint $table) {
             $table->char('order_id', 36)->primary(); // UUID as primary key
-            $table->string('order_number', 10);       // VARCHAR(10)
+            $table->string('order_number', 20);       // VARCHAR(10)
             $table->string('payment_id', 50);       // VARCHAR(10)
             $table->char('user_id', 36);
             $table->string('package_id', 36);        // Assuming UUID
             $table->string('product', 200);
-            $table->unsignedInteger('quantity', 3);      // NO autoIncrement!
+            $table->unsignedInteger('quantity', 3);
             $table->decimal('price', 10, 2);
             $table->string('order_status', 50);
-            $table->$table->timestamps();                     // created_at, updated_at
+            $table->$table->timestamps();
         });
     }
 

@@ -15,7 +15,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->string('payment_id', 50);
             $table->string('transaction_id', 100);
-            $table->string('order_number', 10);
+            $table->string('order_number', 20);
             $table->string('payment_method', 50);
             $table->string('transaction_status', 2);
             $table->decimal('amount', 10, 2);
