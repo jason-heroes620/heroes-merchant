@@ -13,7 +13,7 @@ return new class extends Migration {
             // Merchant reference
             $table->foreignUuid('merchant_id')->constrained('merchants')->onDelete('cascade');
 
-            $table->string('type'); // event, trial_class, location_based
+            $table->string('type'); // workshop, trial, pass
             $table->string('title');
             $table->text('description')->nullable();
             $table->string('category')->nullable();

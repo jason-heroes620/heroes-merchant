@@ -54,7 +54,7 @@ class MerchantDashboardController extends Controller
             $isActive = false;
 
             if (!$event->is_recurring) {
-                $date = $event->dates->first();
+                $date = $event->dates; 
                 if ($date && Carbon::parse($date->end_date)->gte($today)) {
                     $isActive = true;
                 }

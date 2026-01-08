@@ -15,6 +15,7 @@ return new class extends Migration
             $table->foreignUuid('event_slot_id')->constrained('event_slots')->onDelete('cascade');
             $table->foreignUuid('event_age_group_id')->nullable()->constrained('event_age_groups')->onDelete('cascade');
 
+            $table->enum('activation_mode', ['keep_rm', 'custom_free_credits', 'convert_credits'])->nullable();
             $table->decimal('price_in_rm', 10, 2)->nullable();
 
             $table->unsignedInteger('free_credits')->nullable();

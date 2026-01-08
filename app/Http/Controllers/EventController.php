@@ -164,7 +164,7 @@ class EventController extends Controller
             }
         }
 
-        $event->load(['location', 'ageGroups', 'slots.prices', 'frequencies', 'dates', 'media']);
+        $event->load(['merchant', 'location', 'ageGroups', 'slots.prices', 'frequencies', 'dates', 'media']);
 
         $event->slots->transform(function ($slot) {
             $slot->available_seats = $slot->is_unlimited
@@ -178,25 +178,12 @@ class EventController extends Controller
             return $media;
         });
 
-        $dates = collect();
-
-        if ($event->is_recurring) {
-            // Use slot dates for recurring events
-            $dates = $event->slots->map(function ($slot) {
-                return [
-                    'start_date' => $slot->date,
-                    'end_date'   => $slot->date,
-                ];
-            })->unique();
-        } else {
-            // Use event_dates for one-time events
-            $dates = $event->dates->map(function ($date) {
-                return [
-                    'start_date' => $date->start_date,
-                    'end_date'   => $date->end_date,
-                ];
-            });
-        }
+        $dates = collect([
+            [
+                'start_date' => $event->dates?->start_date ?? $event->dates?->date,
+                'end_date'   => $event->dates?->end_date ?? $event->dates?->date,
+            ]
+        ]);
 
         $frequency = $event->frequencies->first() ?? null;
 
@@ -208,12 +195,12 @@ class EventController extends Controller
             'ageGroups' => $event->ageGroups,
             'prices' => $event->prices,
             'frequency' => $frequency,
-            'dates' => $dates,
+            'dates' => $dates->first() ?? null,
             'slots' => $event->slots,
             'slotPrices' => $event->slots->flatMap(fn($slot) => $slot->prices)->values(),
-            'bookings' => $event->bookings,
             'conversion' => $activeConversion,
             'location' => $event->location,
+            'claim_configuration' => $event->claimConfiguration, 
         ];
 
         return Inertia::render('Events/Show', [
@@ -1078,6 +1065,7 @@ class EventController extends Controller
             'slot_prices.*.id' => 'nullable|string|exists:event_slot_prices,id',
             'slot_prices.*.paid_credits' => 'nullable|integer|min:0',
             'slot_prices.*.free_credits' => 'nullable|integer|min:0',
+            'slot_prices.*.activation_mode' => 'nullable|in:keep_rm,custom_free_credits,convert_credits'
         ]);
 
         Log::info('Validated request', ['validated' => $validated]);
@@ -1115,34 +1103,36 @@ class EventController extends Controller
                     throw new \Exception('No active conversion found.');
                 }
 
-                $activationMode = $request->input('activation_mode', 'convert_credits');
-
                 foreach ($validated['slot_prices'] as $sp) {
                     $slot = EventSlotPrice::find($sp['id']);
                     $price = $slot->price_in_rm ? (float) $slot->price_in_rm : 0.00;
+                    $mode = $sp['activation_mode'] ?? 'convert_credits';
 
-                    if ($activationMode === 'convert_credits') {
+                    if ($mode === 'convert_credits') {
                         $conversion = app(ConversionService::class)->getActiveConversion();
                         $recommended = app(ConversionService::class)->calculateCredits($price, $conversion);
 
-                        if ($sp['paid_credits'] < $recommended['paid_credits']) {
+                        if (($sp['paid_credits'] ?? 0) < $recommended['paid_credits']) {
                             throw new \Exception("Paid credits for slot #{$sp['id']} cannot be lower than minimum ({$recommended['paid_credits']}) to prevent loss.");
                         }
 
-                        EventSlotPrice::where('id', $sp['id'])->update([
+                        $slot->update([
                             'paid_credits' => $sp['paid_credits'],
                             'free_credits' => $sp['free_credits'] ?? $recommended['free_credits'],
                             'conversion_id' => $conversion->id,
+                            'activation_mode' => $mode,
                         ]);
-                    } elseif ($activationMode === 'custom_free_credits') {
-                        EventSlotPrice::where('id', $sp['id'])->update([
+                    } elseif ($mode === 'custom_free_credits') {
+                        $slot->update([
                             'paid_credits' => null,
-                            'free_credits' => $sp['free_credits'], 
+                            'free_credits' => $sp['free_credits'],
+                            'activation_mode' => $mode,
                         ]);
-                    } elseif ($activationMode === 'keep_rm') {
-                        EventSlotPrice::where('id', $sp['id'])->update([
+                    } elseif ($mode === 'keep_rm') {
+                        $slot->update([
                             'paid_credits' => null,
                             'free_credits' => null,
+                            'activation_mode' => $mode,
                         ]);
                     }
                 }

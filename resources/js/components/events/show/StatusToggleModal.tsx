@@ -27,6 +27,13 @@ interface Props {
     onClose: () => void;
 }
 
+interface CreditRow {
+    id: string;
+    activation_mode: "keep_rm" | "custom_free_credits" | "convert_credits";
+    paid_credits: number | null;
+    free_credits: number | null;
+}
+
 interface SelectProps {
     value: string;
     onValueChange: (value: EventStatus | string) => void;
@@ -120,7 +127,7 @@ const StatusToggleModal: React.FC<Props> = ({
 }) => {
     const [newStatus, setNewStatus] = useState<EventStatus>(event.status);
     const [rejectedReason, setRejectedReason] = useState("");
-    const [activationMode, setActivationMode] = useState("keep_rm"); 
+    const [activationMode, setActivationMode] = useState("keep_rm");
     const [bulkPaidCredits, setBulkPaidCredits] = useState<number | "">("");
     const [bulkFreeCredits, setBulkFreeCredits] = useState<number | "">("");
     const [applyToAll, setApplyToAll] = useState(false);
@@ -159,21 +166,24 @@ const StatusToggleModal: React.FC<Props> = ({
         [event.slots]
     );
 
-    // Initialize credits with recommended values or existing values
-    const [credits, setCredits] = useState(
+    const [credits, setCredits] = useState<CreditRow[]>(
         slotPrices.map((sp) => {
             const recommended = calculateCredits(sp.price_in_rm ?? 0);
+            const mode = sp.activation_mode ?? "keep_rm";
             return {
                 id: sp.id,
+                activation_mode: mode,
                 paid_credits:
-                    activationMode === "custom_free_credits"
+                    mode === "custom_free_credits" || mode === "keep_rm"
                         ? null
                         : sp.paid_credits ?? recommended.paid,
                 free_credits:
-                    sp.free_credits ??
-                    (activationMode === "custom_free_credits"
-                        ? 0
-                        : recommended.free),
+                    mode === "keep_rm"
+                        ? null
+                        : sp.free_credits ??
+                          (mode === "custom_free_credits"
+                              ? 0
+                              : recommended.free),
             };
         })
     );
@@ -223,7 +233,7 @@ const StatusToggleModal: React.FC<Props> = ({
                     ? {
                           ...c,
                           paid_credits:
-                              activationMode === "custom_free_credits"
+                              c.activation_mode === "custom_free_credits"
                                   ? null
                                   : paidValue,
                       }
@@ -244,7 +254,7 @@ const StatusToggleModal: React.FC<Props> = ({
     const isWeekend = (dateString: string): boolean => {
         const date = new Date(dateString);
         const day = date.getDay();
-        return day === 0 || day === 6; // Sunday = 0, Saturday = 6
+        return day === 0 || day === 6;
     };
 
     // Apply bulk credits based on mode
@@ -254,46 +264,63 @@ const StatusToggleModal: React.FC<Props> = ({
             return;
         }
 
-        const updated = [...credits];
+        setCredits((prev) =>
+            prev.map((c) => {
+                const slotPrice = slotPrices.find((sp) => sp.id === c.id);
+                if (!slotPrice) return c;
 
-        for (let i = 0; i < slotPrices.length; i++) {
-            const slotPrice = slotPrices[i];
-            let shouldApply = true;
+                let shouldApply = true;
 
-            if (bulkApplyMode === "age_group" && selectedAgeGroup) {
-                shouldApply = slotPrice.event_age_group_id === selectedAgeGroup;
-            } else if (bulkApplyMode === "day_type") {
-                const slot = event.slots?.find(
-                    (s) => s.id === slotPrice.event_slot_id
-                );
-                if (slot?.date) {
-                    const isSlotWeekend = isWeekend(slot.date);
+                if (bulkApplyMode === "age_group" && selectedAgeGroup) {
                     shouldApply =
-                        selectedDayType === "weekend"
-                            ? isSlotWeekend
-                            : !isSlotWeekend;
-                }
-            }
-
-            if (shouldApply) {
-                // For custom_free_credits mode, only update free credits
-                if (activationMode === "custom_free_credits") {
-                    if (bulkFreeCredits !== "") {
-                        updated[i].free_credits = Number(bulkFreeCredits);
-                    }
-                } else {
-                    // For convert_credits mode, update both
-                    if (bulkPaidCredits !== "") {
-                        updated[i].paid_credits = Number(bulkPaidCredits);
-                    }
-                    if (bulkFreeCredits !== "") {
-                        updated[i].free_credits = Number(bulkFreeCredits);
+                        slotPrice.event_age_group_id === selectedAgeGroup;
+                } else if (bulkApplyMode === "day_type") {
+                    const slot = event.slots?.find(
+                        (s) => s.id === slotPrice.event_slot_id
+                    );
+                    if (slot?.date) {
+                        const isSlotWeekend = isWeekend(slot.date);
+                        shouldApply =
+                            selectedDayType === "weekend"
+                                ? isSlotWeekend
+                                : !isSlotWeekend;
                     }
                 }
-            }
-        }
 
-        setCredits(updated);
+                if (!shouldApply) return c;
+
+                const updated: CreditRow = {
+                    ...c,
+                    activation_mode: activationMode as
+                        | "keep_rm"
+                        | "custom_free_credits"
+                        | "convert_credits",
+                };
+
+                switch (activationMode) {
+                    case "custom_free_credits":
+                        updated.paid_credits = null;
+                        if (bulkFreeCredits !== "") {
+                            updated.free_credits = Number(bulkFreeCredits);
+                        }
+                        break;
+                    case "convert_credits":
+                        if (bulkPaidCredits !== "") {
+                            updated.paid_credits = Number(bulkPaidCredits);
+                        }
+                        if (bulkFreeCredits !== "") {
+                            updated.free_credits = Number(bulkFreeCredits);
+                        }
+                        break;
+                    case "keep_rm":
+                        updated.paid_credits = null;
+                        updated.free_credits = null;
+                        break;
+                }
+
+                return updated;
+            })
+        );
 
         const modeText =
             bulkApplyMode === "all"
@@ -316,7 +343,7 @@ const StatusToggleModal: React.FC<Props> = ({
     }, [conversion]);
 
     const handleConfirm = () => {
-        let statusToUpdate = newStatus;
+        let statusToUpdate: EventStatus = newStatus;
 
         if (isMerchant) {
             if (event.status === "draft") statusToUpdate = "pending";
@@ -334,35 +361,42 @@ const StatusToggleModal: React.FC<Props> = ({
             return;
         }
 
+        const parseCredit = (value: number | null | undefined) =>
+            value == null ? null : Number(value);
+
+        const slot_prices = credits.map((c) => {
+            switch (activationMode) {
+                case "custom_free_credits":
+                    return {
+                        id: c.id,
+                        paid_credits: null,
+                        free_credits: parseCredit(c.free_credits),
+                        activation_mode: activationMode,
+                    };
+                case "convert_credits":
+                    return {
+                        id: c.id,
+                        paid_credits: parseCredit(c.paid_credits),
+                        free_credits: parseCredit(c.free_credits),
+                        activation_mode: activationMode,
+                    };
+                case "keep_rm":
+                    return {
+                        id: c.id,
+                        paid_credits: null,
+                        free_credits: null,
+                        activation_mode: activationMode,
+                    };
+            }
+        });
+
         const payload: Record<string, any> = {
             status: statusToUpdate,
-            activation_mode: activationMode, 
+            slot_prices,
         };
 
         if (statusToUpdate === "rejected") {
             payload.rejected_reason = rejectedReason;
-        }
-
-        if (statusToUpdate === "active" || event.status === "active") {
-            switch (activationMode) {
-                case "custom_free_credits":
-                    payload.slot_prices = credits.map((c) => ({
-                        id: c.id,
-                        paid_credits: null,
-                        free_credits: c.free_credits,
-                    }));
-                    break;
-                case "convert_credits":
-                    payload.slot_prices = credits;
-                    break;
-                case "keep_rm":
-                    payload.slot_prices = credits.map((c) => ({
-                        id: c.id,
-                        paid_credits: null,
-                        free_credits: null,
-                    }));
-                    break;
-            }
         }
 
         const routeName = isAdmin
@@ -895,7 +929,7 @@ const StatusToggleModal: React.FC<Props> = ({
                                                                                                 )}
                                                                                             </div>
                                                                                             <div className="flex-1">
-                                                                                                <label className="block text-xs text-gray-600 mb-1 font-medium">
+                                                                                                <label className="block text-xs text-blue-600 mb-1 font-bold">
                                                                                                     Free
                                                                                                     Rewards
                                                                                                 </label>
@@ -958,9 +992,10 @@ const StatusToggleModal: React.FC<Props> = ({
                                                                                             </div>
                                                                                             <div className="flex-1 grid grid-cols-2 gap-2">
                                                                                                 <div>
-                                                                                                    <label className="block text-xs text-gray-600 mb-1 font-medium">
-                                                                                                        Paid{" "}
-                                                                                                        <span className="text-blue-600 font-normal">
+                                                                                                    <label className="block text-xs text-blue-600 mb-1 font-bold">
+                                                                                                        Paid
+                                                                                                        Credits{" "}
+                                                                                                        <span className="text-gray-600 font-normal text-xs">
                                                                                                             (Suggested:{" "}
                                                                                                             {
                                                                                                                 recommended.paid
@@ -991,9 +1026,10 @@ const StatusToggleModal: React.FC<Props> = ({
                                                                                                     />
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <label className="block text-xs text-gray-600 mb-1 font-medium">
-                                                                                                        Free{" "}
-                                                                                                        <span className="text-green-600 font-normal">
+                                                                                                    <label className="block text-xs text-green-600 mb-1 font-bold">
+                                                                                                        Free
+                                                                                                        Credits{" "}
+                                                                                                        <span className="text-gray-600 font-normal text-xs">
                                                                                                             (Suggested:{" "}
                                                                                                             {
                                                                                                                 recommended.free
@@ -1154,7 +1190,7 @@ const StatusToggleModal: React.FC<Props> = ({
                                                                                                             )}
                                                                                                         </div>
                                                                                                         <div className="flex-1">
-                                                                                                            <label className="block text-xs text-gray-600 mb-1 font-medium">
+                                                                                                            <label className="block text-xs text-blue-600 mb-1 font-bold">
                                                                                                                 Free
                                                                                                                 Rewards
                                                                                                             </label>
@@ -1217,9 +1253,10 @@ const StatusToggleModal: React.FC<Props> = ({
                                                                                                         </div>
                                                                                                         <div className="flex-1 grid grid-cols-2 gap-2">
                                                                                                             <div>
-                                                                                                                <label className="block text-xs text-gray-600 mb-1 font-medium">
-                                                                                                                    Paid{" "}
-                                                                                                                    <span className="text-blue-600 font-normal">
+                                                                                                                <label className="block text-xs text-blue-600 mb-1 font-bold">
+                                                                                                                    Paid
+                                                                                                                    Credits{" "}
+                                                                                                                    <span className="text-gray-600 font-normal text-xs">
                                                                                                                         (Suggested:{" "}
                                                                                                                         {
                                                                                                                             recommended.paid
@@ -1250,9 +1287,10 @@ const StatusToggleModal: React.FC<Props> = ({
                                                                                                                 />
                                                                                                             </div>
                                                                                                             <div>
-                                                                                                                <label className="block text-xs text-gray-600 mb-1 font-medium">
-                                                                                                                    Free{" "}
-                                                                                                                    <span className="text-green-600 font-normal">
+                                                                                                                <label className="block text-xs text-green-600 mb-1 font-bold">
+                                                                                                                    Free
+                                                                                                                    Credits{" "}
+                                                                                                                    <span className="text-gray-600 font-normal text-xs">
                                                                                                                         (Suggested:{" "}
                                                                                                                         {
                                                                                                                             recommended.free
