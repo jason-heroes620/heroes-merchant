@@ -120,7 +120,7 @@ const StatusToggleModal: React.FC<Props> = ({
 }) => {
     const [newStatus, setNewStatus] = useState<EventStatus>(event.status);
     const [rejectedReason, setRejectedReason] = useState("");
-    const [activationMode, setActivationMode] = useState("keep_rm"); 
+    const [activationMode, setActivationMode] = useState("keep_rm");
     const [bulkPaidCredits, setBulkPaidCredits] = useState<number | "">("");
     const [bulkFreeCredits, setBulkFreeCredits] = useState<number | "">("");
     const [applyToAll, setApplyToAll] = useState(false);
@@ -173,7 +173,8 @@ const StatusToggleModal: React.FC<Props> = ({
                     sp.free_credits ??
                     (activationMode === "custom_free_credits"
                         ? 0
-                        : recommended.free),
+                        : // : recommended.free),
+                          0),
             };
         })
     );
@@ -336,7 +337,7 @@ const StatusToggleModal: React.FC<Props> = ({
 
         const payload: Record<string, any> = {
             status: statusToUpdate,
-            activation_mode: activationMode, 
+            activation_mode: activationMode,
         };
 
         if (statusToUpdate === "rejected") {

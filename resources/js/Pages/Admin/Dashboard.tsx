@@ -1,5 +1,4 @@
 import { useState, useMemo } from "react";
-import { Inertia } from "@inertiajs/inertia";
 import {
     Users,
     Calendar,
@@ -33,6 +32,7 @@ import {
 import AuthenticatedLayout from "@/AuthenticatedLayout";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import type { Conversion } from "@/types/events";
+import { router } from "@inertiajs/react";
 
 interface Package {
     id: number;
@@ -675,7 +675,7 @@ const AdminDashboard = ({
                                         <select
                                             value={selectedMonth}
                                             onChange={(e) =>
-                                                Inertia.get(
+                                                router.get(
                                                     route("admin.dashboard"),
                                                     {
                                                         month: e.target.value,
