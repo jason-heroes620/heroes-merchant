@@ -12,14 +12,13 @@ import type {
     EventLocation,
     Booking,
     Conversion,
+    ClaimConfigurationForm,
 } from "../../types/events";
 import { usePage } from "@inertiajs/react";
 import type { PageProps } from "../../types/index";
 import EventHeader from "../../components/events/show/EventHeader";
-import EventModesSection from "../../components/events/show/EventModesSection";
+import EventModesSection from "../../components/events/show/EventSchedule";
 import BasicInfoSection from "../../components/events/show/BasicInfoSection";
-import PricingSection from "../../components/events/show/PricingSection";
-import BookingInfoSection from "../../components/events/show/BookingInfoSection";
 import AuthenticatedLayout from "@/AuthenticatedLayout";
 
 interface EventDisplayData {
@@ -27,13 +26,14 @@ interface EventDisplayData {
     media: EventMedia[];
     ageGroups: AgeGroup[];
     prices: Price[];
-    frequency: Frequency | null;
-    dates: EventDate[];
+    frequency: Frequency;
+    dates: EventDate;
     slots: EventSlot[];
     slotPrices: EventSlotPrice[];
     bookings: Booking[];
-    conversion: Conversion | null;
+    conversion: Conversion;
     location: EventLocation;
+    claim_configuration: ClaimConfigurationForm;
 }
 
 const EventDisplayPage: React.FC = () => {
@@ -53,32 +53,9 @@ const EventDisplayPage: React.FC = () => {
                 rejected_reason: rejectedReason || null,
             };
 
-            let updatedSlotPrices = prev.slotPrices;
-
-            if (
-                userRole === "admin" &&
-                newStatus === "active" &&
-                prev.event.status === "pending" &&
-                prev.conversion
-            ) {
-                updatedSlotPrices = prev.slotPrices.map((sp) => {
-                    if (sp.price_in_rm) {
-                        const totalCredits =
-                            sp.price_in_rm * prev.conversion!.credits_per_rm;
-                        return {
-                            ...sp,
-                            free_credits: Math.floor(totalCredits * 0.2),
-                            paid_credits: Math.floor(totalCredits * 0.8),
-                        };
-                    }
-                    return sp;
-                });
-            }
-
             return {
                 ...prev,
                 event: updatedEvent,
-                slotPrices: updatedSlotPrices,
             };
         });
 
@@ -98,32 +75,21 @@ const EventDisplayPage: React.FC = () => {
 
                     <BasicInfoSection
                         event={eventData.event}
+                        frequency={eventData.frequency}
                         media={eventData.media}
-                        ageGroups={eventData.ageGroups}
                         location={eventData.location}
-                    />
-
-                    <PricingSection
-                        prices={eventData.prices}
                         ageGroups={eventData.ageGroups}
+                        prices={eventData.prices}
+                        claimConfiguration={eventData.claim_configuration}
                         userRole={userRole}
-                        conversion={eventData.conversion}
                     />
 
                     <EventModesSection
                         event={eventData.event}
                         slots={eventData.slots}
                         ageGroups={eventData.ageGroups}
-                        bookings={eventData.bookings}
                         frequency={eventData.frequency}
                         dates={eventData.dates}
-                        userRole={userRole}
-                    />
-
-                    <BookingInfoSection
-                        event={eventData.event}
-                        slots={eventData.slots}
-                        bookings={eventData.bookings}
                         userRole={userRole}
                     />
                 </div>

@@ -58,6 +58,7 @@ export interface EventSlotPrice {
     price_in_rm: number | null;
     free_credits: number | null;
     paid_credits: number | null;
+    activation_mode?: "convert_credits" | "custom_free_credits" | "keep_rm";
 }
 
 export interface EventDate {
@@ -175,7 +176,7 @@ export interface EventType {
     like_count?: number;
     click_count?: number;
     slotPrices?: EventSlotPrice[];
-    dates?: EventDate[];
+    dates?: EventDate;
     frequency?: Frequency;
     is_upcoming: boolean;
     is_past: boolean;
@@ -185,6 +186,7 @@ export interface EventType {
 export interface Event {
     id: string;
     merchant_id: string;
+    merchant?: Merchant;
     type: "event" | "trial_class" | "location_based";
     title: string;
     description: string | null;
@@ -199,7 +201,7 @@ export interface Event {
     status: "draft" | "pending" | "active" | "inactive" | "rejected";
     rejected_reason: string | null;
     age_groups: AgeGroup[];
-    event_dates?: EventDate[];
+    event_dates?: EventDate;
     slotPrices?: EventSlotPrice[];
     slots?: EventSlot[];
     created_at: string;

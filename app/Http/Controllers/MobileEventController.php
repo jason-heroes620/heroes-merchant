@@ -83,7 +83,7 @@ class MobileEventController extends Controller
             ->select(
                 'event_slots.event_id',
                 'event_slot_prices.*',
-                DB::raw('ROW_NUMBER() OVER (PARTITION BY event_slots.event_id, event_slot_prices.event_age_group_id ORDER BY event_slot_prices.free_credits, event_slot_prices.paid_credits) as rn')
+                DB::raw('ROW_NUMBER() OVER (PARTITION BY event_slots.event_id, event_slot_prices.event_age_group_id ORDER BY event_slot_prices.free_credits, event_slot_prices.paid_credits, event_slot_prices.price_in_rm) as rn')
             )
             ->get()
             ->where('rn', 1)
@@ -156,12 +156,15 @@ class MobileEventController extends Controller
 
         $now = now()->setTimezone('Asia/Kuala_Lumpur');
 
-        // Filter slots that have not ended yet
-        $filteredSlots = $event->slots->filter(function ($slot) use ($now) {
-            return $slot->display_end && $slot->display_end->gte($now);
-        })->values();
+        $filteredSlots = $event->slots;
 
-        $event->setRelation('slots', $filteredSlots);
+        if ($event->is_recurring) {
+            $filteredSlots = $filteredSlots->filter(function ($slot) use ($now) {
+                return $slot->display_end && $slot->display_end->gte($now);
+            });
+        }
+
+        $event->setRelation('slots', $filteredSlots->values());
 
         // Transform slots
         $event->slots->transform(function ($slot) {
@@ -178,7 +181,6 @@ class MobileEventController extends Controller
             return $media;
         });
 
-        // Build dates array
         if ($event->is_recurring) {
             $dates = $event->slots->map(function ($slot) {
                 return [
@@ -187,18 +189,20 @@ class MobileEventController extends Controller
                 ];
             })->unique('start_date')->values();
         } else {
-            $dates = $event->dates->filter(function ($date) use ($event, $now) {
-                return $event->slots->contains(function ($slot) use ($date, $now) {
-                    return $slot->event_date_id === $date->id
-                        && $slot->display_end
-                        && $slot->display_end->gte($now);
+            $dates = collect();
+
+            if ($event->dates) {
+                $slotExists = $event->slots->contains(function ($slot) use ($event) {
+                    return $slot->event_date_id === $event->dates->id;
                 });
-            })->map(function ($date) {
-                return [
-                    'start_date' => $date->start_date,
-                    'end_date'   => $date->end_date,
-                ];
-            })->values();
+
+                if ($slotExists) {
+                    $dates->push([
+                        'start_date' => $event->dates->start_date,
+                        'end_date'   => $event->dates->end_date,
+                    ]);
+                }
+            }
         }
 
         $slotPrices = $event->slots->flatMap(fn($slot) => $slot->prices)->values();
@@ -221,7 +225,6 @@ class MobileEventController extends Controller
         return response()->json([
             'success' => true,
             'event' => $eventArray,
-            'dates' => $dates,
             'slotPrices' => $slotPrices,
         ]);
     }

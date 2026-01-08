@@ -46,7 +46,7 @@ class Event extends Model
 
     public function frequencies() { return $this->hasMany(EventFrequency::class); }
 
-    public function dates() { return $this->hasMany(EventDate::class); }
+    public function dates() { return $this->hasOne(EventDate::class); }
 
     public function slots()
     {

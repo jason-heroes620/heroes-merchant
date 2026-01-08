@@ -18,6 +18,7 @@ class EventSlotPrice extends Model
         'price_in_rm',
         'free_credits',
         'paid_credits',
+        'activation_mode'
     ];
 
     protected $casts = [

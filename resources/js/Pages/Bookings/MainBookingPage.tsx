@@ -85,9 +85,9 @@ const MainBookingPage = () => {
 
     const getEventTypeLabel = (type: string) => {
         const labels: Record<string, string> = {
-            event: "Event",
-            trial_class: "Trial Class",
-            location_based: "Field Trip",
+            workshop: "Event / Workshop",
+            trial: "Trial Class",
+            pass: "Ticket / Pass",
         };
         return labels[type] || type;
     };

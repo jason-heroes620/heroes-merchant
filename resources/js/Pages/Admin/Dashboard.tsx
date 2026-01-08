@@ -677,8 +677,10 @@ const AdminDashboard = ({
                                             onChange={(e) =>
                                                 router.get(
                                                     route("admin.dashboard"),
+                                                    { month: e.target.value },
                                                     {
-                                                        month: e.target.value,
+                                                        preserveState: true,
+                                                        replace: true,
                                                     }
                                                 )
                                             }
