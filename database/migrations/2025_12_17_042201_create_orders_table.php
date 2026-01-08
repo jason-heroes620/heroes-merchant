@@ -18,7 +18,7 @@ return new class extends Migration
             $table->char('user_id', 36);
             $table->string('package_id', 36);        // Assuming UUID
             $table->string('product', 200);
-            $table->unsignedInteger('quantity', 3);
+            $table->unsignedInteger('quantity', 3, $autoIncrement = false);
             $table->decimal('price', 10, 2);
             $table->string('order_status', 50);
             $table->timestamps();

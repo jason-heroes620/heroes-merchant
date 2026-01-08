@@ -178,12 +178,11 @@ const StatusToggleModal: React.FC<Props> = ({
                         ? null
                         : sp.paid_credits ?? recommended.paid,
                 free_credits:
-                    mode === "keep_rm"
-                        ? null
-                        : sp.free_credits ??
-                          (mode === "custom_free_credits"
-                              ? 0
-                              : recommended.free),
+                    sp.free_credits ??
+                    (activationMode === "custom_free_credits"
+                        ? 0
+                        : // : recommended.free),
+                          0),
             };
         })
     );
@@ -392,7 +391,7 @@ const StatusToggleModal: React.FC<Props> = ({
 
         const payload: Record<string, any> = {
             status: statusToUpdate,
-            activationMode,
+            activation_mode: activationMode,
             slot_prices,
         };
 
