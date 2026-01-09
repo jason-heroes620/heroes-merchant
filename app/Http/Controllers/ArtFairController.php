@@ -13,6 +13,7 @@ use App\Models\EventSlot;
 use App\Models\EventSlotPrice;
 use App\Models\OrderProducts;
 use App\Models\Orders;
+use App\Models\Payments;
 use App\Models\Setting;
 use App\Models\User;
 use App\Models\WalletCreditGrant;
@@ -160,6 +161,21 @@ class ArtFairController extends Controller
         $order->save();
 
         if ($status == '0') {
+
+            Payments::create([
+                'payment_id' => $request->input('PaymentID'),
+                'transaction_id' => $request->input('TxnID'),
+                'order_number' => $request->input('OrderNumber'),
+                'payment_method' => $request->input('PymtMethod'),
+                'transaction_status' => $request->input('TxnStatus'),
+                'amount' => $request->input('Amount'),
+                'transaction_message' => $request->input('TxnMessage'),
+                'bank_ref_no' => $request->input('BankRefNo'),
+                'issuing_bank' => $request->input('IssuingBank'),
+                'card_type' => $request->input('CardType'),
+                'card_number' => $request->input('CardNoMask')
+            ]);
+
             $user = User::select('id', 'full_name', 'email', 'contact_number')
                 ->where('id', $order->user_id)->first();
             $orderProduct = OrderProducts::select('order_product_id', 'product_id', 'product_name', 'qty', 'uom', 'price', 'total')
