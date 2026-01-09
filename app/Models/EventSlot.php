@@ -69,21 +69,21 @@ class EventSlot extends Model
 
     public function getDisplayStartAttribute(): ?Carbon
     {
-        // Get date part
-        $slotDate = $this->date instanceof Carbon 
-            ? $this->date->format('Y-m-d') 
+        $slotDate = $this->date instanceof Carbon
+            ? $this->date->toDateString()
             : (is_string($this->date) ? substr($this->date, 0, 10) : null);
 
         if (!$slotDate) {
-            $eventStartDate = optional($this->event->dates->first())->start_date;
-            $slotDate = $eventStartDate instanceof Carbon 
-                ? $eventStartDate->format('Y-m-d') 
+            $eventStartDate = optional($this->event->dates)->start_date;
+
+            $slotDate = $eventStartDate instanceof Carbon
+                ? $eventStartDate->toDateString()
                 : (is_string($eventStartDate) ? substr($eventStartDate, 0, 10) : null);
         }
 
         $slotTime = $this->start_time instanceof Carbon
-            ? $this->start_time->format('H:i:s')
-            : (is_string($this->start_time) ? substr($this->start_time, 0, 8) : null);
+            ? $this->start_time->format('H:i')
+            : (is_string($this->start_time) ? substr($this->start_time, 0, 5) : null);
 
         if (!$slotDate || !$slotTime) {
             Log::warning('Slot display_start is missing date or time', [
@@ -95,9 +95,13 @@ class EventSlot extends Model
         }
 
         try {
-            return Carbon::createFromFormat('Y-m-d H:i:s', "{$slotDate} {$slotTime}", 'Asia/Kuala_Lumpur');
+            return Carbon::createFromFormat(
+                'Y-m-d H:i',
+                "{$slotDate} {$slotTime}",
+                'Asia/Kuala_Lumpur'
+            );
         } catch (\Exception $e) {
-            Log::error('Failed to parse display_end', [
+            Log::error('Failed to parse display_start', [
                 'slot_id' => $this->id,
                 'slot_date' => $slotDate,
                 'slot_time' => $slotTime,
@@ -109,15 +113,15 @@ class EventSlot extends Model
 
    public function getDisplayEndAttribute(): ?Carbon
     {
-        // Get date part
-        $slotDate = $this->date instanceof Carbon 
-            ? $this->date->format('Y-m-d') 
+        $slotDate = $this->date instanceof Carbon
+            ? $this->date->toDateString()
             : (is_string($this->date) ? substr($this->date, 0, 10) : null);
 
         if (!$slotDate) {
-            $eventEndDate = optional($this->event->dates->first())->end_date;
-            $slotDate = $eventEndDate instanceof Carbon 
-                ? $eventEndDate->format('Y-m-d') 
+            $eventEndDate = optional($this->event->dates)->end_date;
+
+            $slotDate = $eventEndDate instanceof Carbon
+                ? $eventEndDate->toDateString()
                 : (is_string($eventEndDate) ? substr($eventEndDate, 0, 10) : null);
         }
 
@@ -135,7 +139,11 @@ class EventSlot extends Model
         }
 
         try {
-            return Carbon::createFromFormat('Y-m-d H:i:s', "{$slotDate} {$slotTime}", 'Asia/Kuala_Lumpur');
+            return Carbon::createFromFormat(
+                'Y-m-d H:i:s',
+                "{$slotDate} {$slotTime}",
+                'Asia/Kuala_Lumpur'
+            );
         } catch (\Exception $e) {
             Log::error('Failed to parse display_end', [
                 'slot_id' => $this->id,
@@ -146,6 +154,7 @@ class EventSlot extends Model
             return null;
         }
     }
+
 
     public function payout()
     {
