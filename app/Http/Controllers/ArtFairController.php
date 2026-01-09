@@ -159,48 +159,50 @@ class ArtFairController extends Controller
         }
         $order->save();
 
-        $user = User::select('id', 'full_name', 'email', 'contact_number')
-            ->where('id', $order->user_id)->first();
-        $orderProduct = OrderProducts::select('order_product_id', 'product_id', 'product_name', 'qty', 'uom', 'price', 'total')
-            ->where('order_id', $order->order_id)->get();
+        if ($status == '0') {
+            $user = User::select('id', 'full_name', 'email', 'contact_number')
+                ->where('id', $order->user_id)->first();
+            $orderProduct = OrderProducts::select('order_product_id', 'product_id', 'product_name', 'qty', 'uom', 'price', 'total')
+                ->where('order_id', $order->order_id)->get();
 
-        $customer = Customer::select('id')->where('user_id', $user->id)->first();
-        $customerWallet = CustomerWallet::select('id', 'customer_id', 'cached_free_credits', 'cached_paid_credits')
-            ->where('customer_id', $customer->id)->first();
-        $eventSlots = EventSlot::where('event_id', $orderProduct[0]->product_id)->first();
-        $eventSlotPrice = EventSlotPrice::where('event_slot_id', $eventSlots->id)->first();
+            $customer = Customer::select('id')->where('user_id', $user->id)->first();
+            $customerWallet = CustomerWallet::select('id', 'customer_id', 'cached_free_credits', 'cached_paid_credits')
+                ->where('customer_id', $customer->id)->first();
+            $eventSlots = EventSlot::where('event_id', $orderProduct[0]->product_id)->first();
+            $eventSlotPrice = EventSlotPrice::where('event_slot_id', $eventSlots->id)->first();
 
-        $data = [
-            'type' => 'purchase',
-            'delta_free' => $eventSlotPrice->free_credits,
-            'delta_paid' => $eventSlotPrice->paid_credits,
-            'amount_in_rm' => $eventSlotPrice->price,
-            'description' => $orderProduct[0]->product_name,
-            'transaction_id' => $request->input('TransactionID'),
-            'purchase_package_id' => null,
-        ];
-        $transaction = null;
-        $this->transactions($customerWallet, $data, $transaction);
+            $data = [
+                'type' => 'purchase',
+                'delta_free' => $eventSlotPrice->free_credits,
+                'delta_paid' => $eventSlotPrice->paid_credits,
+                'amount_in_rm' => $eventSlotPrice->price,
+                'description' => $orderProduct[0]->product_name,
+                'transaction_id' => $request->input('TransactionID'),
+                'purchase_package_id' => null,
+            ];
+            $transaction = null;
+            $this->transactions($customerWallet, $data, $transaction);
 
-        $booking = $this->insertBooking($customer, $eventSlots, $customerWallet, 1);
-        $payload = json_encode([
-            'code' => $booking,
-            'ts'   => round(microtime(true) * 1000), // JS Date.now()
-        ]);
+            $booking = $this->insertBooking($customer, $eventSlots, $customerWallet, 1);
+            $payload = json_encode([
+                'code' => $booking,
+                'ts'   => round(microtime(true) * 1000), // JS Date.now()
+            ]);
 
-        // Encrypt using Laravel APP_KEY
-        $encrypted = $this->encryptData($payload);
-        $qrCodeSvg = QrCode::format('svg')
-            ->size(200)
-            ->errorCorrection('H')
-            ->generate($encrypted);
+            // Encrypt using Laravel APP_KEY
+            $encrypted = $this->encryptData($payload);
+            $qrCodeSvg = QrCode::format('svg')
+                ->size(200)
+                ->errorCorrection('H')
+                ->generate($encrypted);
 
-        try {
-            Mail::bcc(['jason.w@heroes.my'])
-                ->to($user->email)
-                ->later(now()->addMinutes(0), new OrderSummaryMail($user, $order, $orderProduct, $qrCodeSvg));
-        } catch (\Exception $e) {
-            Log::error('Order Summary email send failed: ' . $e->getMessage() . $orderNumber);
+            try {
+                Mail::bcc(['jason.w@heroes.my'])
+                    ->to($user->email)
+                    ->later(now()->addMinutes(0), new OrderSummaryMail($user, $order, $orderProduct, $qrCodeSvg));
+            } catch (\Exception $e) {
+                Log::error('Order Summary email send failed: ' . $e->getMessage() . $orderNumber);
+            }
         }
 
         // Redirect the user's browser back to the mobile app
