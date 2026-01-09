@@ -120,6 +120,16 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/payouts/{payout}', [MerchantPayoutController::class, 'show'])->name('payouts.show');
         Route::post('/payouts/mark-paid', [MerchantPayoutController::class, 'markAsPaid'])->name('payouts.mark-paid');
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
+
+        Route::get('/storage-link', function () {
+            Illuminate\Support\Facades\Artisan::call('storage:link');
+            return 'Application optimized';
+        });
+
+        Route::get('/optimize-clear', function () {
+            Illuminate\Support\Facades\Artisan::call('optimize:clear');
+            return 'Application optimized';
+        });
     });
 
     /* Merchant Routes */
@@ -151,25 +161,25 @@ Route::middleware(['auth'])->group(function () {
 });
 
 
-Route::get('/order-summary/{orderNumber?}', function (\Illuminate\Http\Request $request) {
-    \Illuminate\Support\Facades\Log::info('Order Summary Request', ['orderNumber' => $request->orderNumber]);
-    $orderNumber = $request->orderNumber;
-    $order = \App\Models\Orders::where('order_number', $orderNumber)->firstOrFail();
-    $user = \App\Models\User::select('id', 'full_name', 'email', 'contact_number')
-        ->where('id', $order->user_id)->first();
-    $orderProducts = \App\Models\OrderProducts::select('order_product_id', 'product_id', 'product_name', 'qty', 'uom', 'price', 'total')
-        ->where('order_id', $order->order_id)->get();
-    $payload = [
-        'booking_code' => \Illuminate\Support\Str::random(8),
-    ];
-    $json = json_encode($payload);
+// Route::get('/order-summary/{orderNumber?}', function (\Illuminate\Http\Request $request) {
+//     \Illuminate\Support\Facades\Log::info('Order Summary Request', ['orderNumber' => $request->orderNumber]);
+//     $orderNumber = $request->orderNumber;
+//     $order = \App\Models\Orders::where('order_number', $orderNumber)->firstOrFail();
+//     $user = \App\Models\User::select('id', 'full_name', 'email', 'contact_number')
+//         ->where('id', $order->user_id)->first();
+//     $orderProducts = \App\Models\OrderProducts::select('order_product_id', 'product_id', 'product_name', 'qty', 'uom', 'price', 'total')
+//         ->where('order_id', $order->order_id)->get();
+//     $payload = [
+//         'booking_code' => \Illuminate\Support\Str::random(8),
+//     ];
+//     $json = json_encode($payload);
 
-    // Encrypt using Laravel APP_KEY
-    $encrypted = \Illuminate\Support\Facades\Crypt::encryptString($json);
-    $qrCodeSvg = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')
-        ->size(200)
-        ->errorCorrection('H')
-        ->generate($encrypted);
+//     // Encrypt using Laravel APP_KEY
+//     $encrypted = \Illuminate\Support\Facades\Crypt::encryptString($json);
+//     $qrCodeSvg = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')
+//         ->size(200)
+//         ->errorCorrection('H')
+//         ->generate($encrypted);
 
-    return new App\Mail\OrderSummaryMail($user, $order, $orderProducts, $qrCodeSvg);
-});
+//     return new App\Mail\OrderSummaryMail($user, $order, $orderProducts, $qrCodeSvg);
+// });
