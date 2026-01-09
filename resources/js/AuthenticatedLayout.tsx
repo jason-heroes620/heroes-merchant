@@ -58,57 +58,6 @@ const AuthenticatedLayout = ({ children }: { children: React.ReactNode }) => {
                             {/* Right Section */}
                             {user && (
                                 <div className="hidden sm:flex sm:items-center sm:gap-3">
-                                    {/* User Dropdown */}
-                                    {/* <Dropdown>
-                                        <Dropdown.Trigger>
-                                            <button className="group flex items-center gap-3 rounded-xl border border-orange-200/60 bg-white px-4 py-2.5 shadow-sm transition-all duration-300 hover:shadow-md hover:border-orange-300 hover:bg-linear-to-r hover:from-orange-50 hover:to-red-50">
-                                                <div className="relative">
-                                                    <div className="w-9 h-9 rounded-full bg-linear-to-br from-orange-400 via-orange-500 to-red-500 flex items-center justify-center text-white font-bold shadow-md text-sm ring-2 ring-white">
-                                                        {user.full_name
-                                                            .charAt(0)
-                                                            .toUpperCase()}
-                                                    </div>
-                                                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
-                                                </div>
-                                                <div className="text-left">
-                                                    <div className="text-sm font-semibold text-gray-800 group-hover:text-orange-700 transition-colors">
-                                                        {user.full_name}
-                                                    </div>
-                                                    <div className="text-xs text-orange-600 capitalize">
-                                                        {user.role}
-                                                    </div>
-                                                </div>
-                                                <ChevronDown className="w-4 h-4 text-orange-500 transition-transform duration-200 group-hover:translate-y-0.5" />
-                                            </button>
-                                        </Dropdown.Trigger>
-
-                                        <Dropdown.Content>
-                                            <Link
-                                                href="/profile"
-                                                className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-linear-to-r hover:from-orange-50 hover:to-red-50 hover:text-orange-700 transition-all duration-200 rounded-md mx-1"
-                                            >
-                                                <UserIcon className="w-4 h-4" />
-                                                <span className="font-medium">
-                                                    Profile
-                                                </span>
-                                            </Link>
-
-                                            <div className="my-1 h-px bg-linear-to-r from-transparent via-orange-200 to-transparent"></div>
-
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    router.post("/logout")
-                                                }
-                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-linear-to-r hover:from-red-50 hover:to-orange-50 hover:text-red-600 transition-all duration-200 rounded-md mx-1"
-                                            >
-                                                <LogOut className="w-4 h-4" />
-                                                <span className="font-medium">
-                                                    Log Out
-                                                </span>
-                                            </button>
-                                        </Dropdown.Content>
-                                    </Dropdown> */}
                                     <NavigationMenu>
                                         <NavigationMenuList>
                                             <NavigationMenuItem className="hidden md:block">

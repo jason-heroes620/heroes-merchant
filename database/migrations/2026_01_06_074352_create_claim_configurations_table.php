@@ -25,10 +25,6 @@ return new class extends Migration
 
             $table->timestamps();
         });
-
-        Schema::table('claims', function (Blueprint $table) {
-            $table->foreignUuid('configuration_id')->nullable()->constrained('claim_configurations')->onDelete('set null')->after('customer_id');
-        });
     }
 
     /**

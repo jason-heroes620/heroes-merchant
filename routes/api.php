@@ -18,6 +18,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrdersController;
 use App\Http\Controllers\PurchasePackageController;
 use App\Http\Controllers\SettingsController;
+use Illuminate\Http\Request;
 
 // Public API routes
 Route::post('/register', [AuthController::class, 'register']);

@@ -11,6 +11,7 @@ use Inertia\Inertia;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ProfileController extends Controller
 {
@@ -58,7 +59,7 @@ class ProfileController extends Controller
     {
         $user = Auth::user();
 
-        \Log::info('Incoming profile update data:', $request->all());
+        Log::info('Incoming profile update data:', $request->all());
 
         $validated = $request->validate([
             'full_name' => 'nullable|string|max:255',
