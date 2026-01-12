@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\OrderProducts;
 use App\Models\Orders;
+use App\Models\Cart;
+use App\Models\CartItem;
 use App\Services\EghlService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -58,63 +60,124 @@ class EghlPaymentController extends Controller
 
     public function initiate(Request $request, EghlService $eghlService)
     {
+        $customer = $request->user()->customer ?? null;
+        if (!$customer) {
+            return response()->json(['message' => 'Customer record not found.'], 404);
+        }
+
+        $cart = Cart::where('customer_id', $customer->id)
+            ->where('status', 'active')
+            ->with('items')
+            ->firstOrFail();
+
+        $amount = $cart->total_rm;
+
+        $paymentDesc = $cart->items
+            ->map(function (CartItem $item) {
+                if ($item->purchase_package_id) {
+                    return $item->package_name;
+                } elseif ($item->event_slot_id) {
+                    return str_replace("\n", " | ", $this->buildEventDisplayName($item));
+                }
+                return null;
+            })
+            ->filter()
+            ->implode(', ');
+
         $paymentId = $request->payment_id;
-        $amount = $request->amount;
-        $paymentDesc = $request->payment_desc;
-        //Update to cart_id
-        $productId = $request->package_id; 
+        $order_number = 'ORD' . date('ymd') . $this->generateCode(6);
 
-        $redirectScheme = env('APP_SCHEME') . '://payment/result';
-
-        $desired_length = 6;
-        $order_number = 'ORD' . date('ymd') . $this->generateCode($desired_length);
-
-        Log::info('payment id' . $request);
         $order = Orders::create([
             'order_number' => $order_number,
             'payment_id' => $paymentId,
-            'user_id' => Auth::id(),
+            'user_id' => $request->user()->id,
             'total' => $amount,
             'order_status' => 'pending_payment',
         ]);
 
-        //Update to CartProducts
-        OrderProducts::create([
-            'order_id' => $order->order_id,
-            'product_id' => $productId,
-            //update to cart_name
-            'product_name' => $paymentDesc,
-            'qty' => 1,
-            'uom' => 'unit',
-            'price' => $amount,
-            'total' => $amount,
-        ]);
+        foreach ($cart->items as $item) {
+            $this->createOrderProductFromCartItem($order, $item);
+        }
 
-        // The Deep Link URL for the Expo App
         $redirectScheme = env('APP_SCHEME') . "://payment/result?order_number={$order_number}";
 
-        // Define all required eGHL parameters
         $eghlParams = [
             'PaymentID' => $paymentId,
-            'Amount' => number_format($amount, 2, '.', ''), // Must be in correct format
-            'CustEmail' => Auth::user()->email,
-            'CustName' => Auth::user()->name,
-            'CustPhone' => Auth::user()->phone,
+            'Amount' => number_format($amount, 2, '.', ''),
+            'CustEmail' => $request->user()->email,
+            'CustName' => $request->user()->name,
+            'CustPhone' => $request->user()->phone,
             'PymtMethod' => 'ANY',
             'OrderNumber' => $order_number,
             'PaymentDesc' => $paymentDesc,
-            'MerchantReturnURL' => $redirectScheme, // Deep link to return to mobile app
-            // 'MerchantCallbackURL' => route('eghl.callback')
+            'MerchantReturnURL' => $redirectScheme,
             'MerchantCallbackURL' => env("EGHL_CALLBACK_URL")
         ];
 
-        // Generate the full eGHL URL with the HashValue (Checksum)
         $eghlUrl = $eghlService->generateEghlRequest($eghlParams);
-
-        // Optional: Save transaction ID or URL for logging
         $order->update(['eghl_url' => $eghlUrl, 'status' => 'pending_payment']);
 
-        return response()->json(['eghl_url' => $eghlUrl]);
+        return response()->json(['eghl_url' => $eghlUrl, 'order_number' => $order_number]);
+    }
+
+    protected function createOrderProductFromCartItem(Orders $order, CartItem $item): void
+    {
+        if ($item->purchase_package_id) {
+            $productId = $item->purchase_package_id;
+            $flags = ['is_package' => true, 'is_event' => false, 'is_product' => false];
+            $name = $item->package_name;
+        } elseif ($item->event_slot_id) {
+            $productId = $item->event_slot_id;
+            $flags = ['is_package' => false, 'is_event' => true, 'is_product' => false];
+            $name = $this->buildEventDisplayName($item);
+        } else {
+            return;
+        }
+
+        OrderProducts::create([
+            'order_id' => $order->order_id,
+            'product_id' => $productId,
+            ...$flags,
+            'product_name' => $name,
+            'qty' => 1,
+            'uom' => 'unit',
+            'price' => $item->price_in_rm,
+            'total' => $item->price_in_rm,
+            'reward' => $item->free_credits ?? 0,
+        ]);
+    }
+
+    protected function buildEventDisplayName(CartItem $item): string
+    {
+        $lines = [];
+
+        // Event title
+        if ($item->event_title) {
+            $lines[] = $item->event_title;
+        }
+
+        // Slot date + time
+        $slotParts = [];
+
+        if ($item->slot_date) {
+            $slotParts[] = $item->slot_date;
+        }
+
+        if ($item->slot_start_time && $item->slot_end_time) {
+            $slotParts[] =
+                $item->slot_start_time->format('H:i') .
+                '–' .
+                $item->slot_end_time->format('H:i');
+        }
+
+        if ($slotParts) {
+            $lines[] = '• ' . implode(' · ', $slotParts);
+        }
+
+        // Age group label
+        $lines[] = '  ◦ ' . ($item->age_group_label ?: 'All ages');
+
+        return implode("\n", $lines);
     }
 
     public function paymentStatus(Request $request)

@@ -48,7 +48,6 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
     ageGroups = [],
     prices = [],
     claimConfiguration,
-    userRole,
 }) => {
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -544,7 +543,7 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
                     )}
 
                     {/* Claim Configuration */}
-                    {userRole === "admin" && claimConfiguration && (
+                    {claimConfiguration && (
                         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                             <div className="px-5 py-4 bg-gray-50/50 border-b border-gray-200">
                                 <div className="flex items-center gap-3">

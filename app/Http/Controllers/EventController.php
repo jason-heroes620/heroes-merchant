@@ -1109,7 +1109,7 @@ class EventController extends Controller
                         $conversion = app(ConversionService::class)->getActiveConversion();
                         $recommended = app(ConversionService::class)->calculateCredits($price, $conversion);
 
-                        if (($sp['paid_credits'] ?? 0) < $recommended['paid_credits']) {
+                        if (($sp['paid_credits'] ?? 0) <= $recommended['paid_credits']) {
                             throw new \Exception("Paid credits for slot #{$sp['id']} cannot be lower than minimum ({$recommended['paid_credits']}) to prevent loss.");
                         }
 

@@ -8,15 +8,35 @@ use App\Models\CustomerWallet;
 use App\Models\CustomerCreditTransaction;
 use App\Models\WalletCreditGrant;
 use App\Models\Setting;
-use App\Models\Conversion;
+use App\Services\ConversionService;
 use Illuminate\Support\Facades\Notification;
 use App\Notifications\WalletTransactionNotification;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 
-class WalletService
+class InsufficientCreditsException extends \Exception
 {
+    public int $shortfallFree;
+    public float $paidToFreeRatio;
+
+    public function __construct(string $message, int $shortfallFree, float $paidToFreeRatio)
+    {
+        parent::__construct($message);
+        $this->shortfallFree = $shortfallFree;
+        $this->paidToFreeRatio = $paidToFreeRatio;
+    }
+}
+
+class WalletService
+    {
+    protected ConversionService $conversionService;
+
+    public function __construct(ConversionService $conversionService)
+    {
+        $this->conversionService = $conversionService;
+    }
+
      public function registrationBonus(Customer $customer)
     {
         $wallet = $customer->wallet ?? CustomerWallet::create([
@@ -119,132 +139,134 @@ class WalletService
             )
         );
     }
-
-    public function hasEnoughCredits(CustomerWallet $wallet, int $paidNeeded, Conversion $conversion, int $quantity = 1): bool
+    public function hasEnoughCredits(CustomerWallet $wallet, int $freePerTicket, int $quantity = 1): bool
     {
-        $paidToFreeRatio = $conversion->paid_to_free_ratio > 0 ? $conversion->paid_to_free_ratio : 1;
-
-        $freeNeeded = (int) ceil($paidNeeded / $paidToFreeRatio);
-
-        $totalPaid = $paidNeeded * $quantity;
-        $totalFree = $freeNeeded * $quantity;
-
-        return ($wallet->cached_paid_credits >= $totalPaid)
-            && ($wallet->cached_free_credits >= $totalFree);
+        $additionalInfo = $this->calculateAdditionalPaid($wallet, $freePerTicket, $quantity);
+        return $additionalInfo['canCoverWithPaid'];
     }
 
     public function canBookWithCredits(
         CustomerWallet $wallet,
-        int $paidNeeded,
-        Conversion $conversion,
+        int $freePerTicket,
         int $quantity = 1,
         bool $allowFallback = false
     ): bool {
-        $paidToFreeRatio = max(1, $conversion->paid_to_free_ratio);
+        $additionalInfo = $this->calculateAdditionalPaid($wallet, $freePerTicket, $quantity);
 
-        $totalPaidNeeded = $paidNeeded * $quantity;
-        $totalFreeNeeded = (int) ceil($paidNeeded / $paidToFreeRatio) * $quantity;
-
-        // 1️⃣ Paid credits must ALWAYS be sufficient
-        if ($wallet->cached_paid_credits < $totalPaidNeeded) {
-            throw new \Exception("Insufficient paid credits. Booking failed.");
-        }
-
-        // 2️⃣ Enough free credits → OK
-        if ($wallet->cached_free_credits >= $totalFreeNeeded) {
+        if ($wallet->cached_free_credits >= $freePerTicket * $quantity) {
             return true;
         }
 
-        // 3️⃣ Free shortfall
-        $shortfall = $totalFreeNeeded - $wallet->cached_free_credits;
-
-        // 4️⃣ Allow fallback using paid credits
-        if ($allowFallback && $wallet->cached_paid_credits >= $totalPaidNeeded + $shortfall) {
+        if ($allowFallback && $additionalInfo['canCoverWithPaid']) {
             return true;
         }
 
-        throw new \Exception(
-            "Insufficient free credits. You can use paid credits to cover the remaining {$shortfall} credits."
+        throw new InsufficientCreditsException(
+            "Insufficient credits. You can use paid credits to cover the remaining free credits.",
+            $additionalInfo['shortfallFree'],
+            $additionalInfo['paidToFreeRatio']
         );
     }
 
-    public function calculateAdditionalPaid(CustomerWallet $wallet, int $paidNeeded, Conversion $conversion, int $quantity = 1): array
+    public function calculateAdditionalPaid(CustomerWallet $wallet, int $freePerTicket, int $quantity = 1): array
     {
-        $paidToFreeRatio = $conversion->paid_to_free_ratio > 0 ? $conversion->paid_to_free_ratio : 1;
+        $conversion = $this->conversionService->getActiveConversion();
+        if (!$conversion) {
+            throw new \Exception('No active conversion available.');
+        }
 
-        $totalPaidNeeded = $paidNeeded * $quantity;
-        $totalFreeNeeded = (int) ceil($paidNeeded / $paidToFreeRatio) * $quantity;
+        $paidToFreeRatio = max(1, $conversion->paid_to_free_ratio);
 
+        $totalFreeNeeded = $freePerTicket * $quantity;
         $shortfallFree = max(0, $totalFreeNeeded - $wallet->cached_free_credits);
-        $canCoverWithPaid = $wallet->cached_paid_credits >= $totalPaidNeeded + $shortfallFree;
+
+        $totalPaidNeeded = $shortfallFree * $paidToFreeRatio;
 
         return [
             'shortfallFree' => $shortfallFree,
             'paidToFreeRatio' => $paidToFreeRatio,
-            'canCoverWithPaid' => $canCoverWithPaid,
+            'totalPaidNeeded' => $totalPaidNeeded,
+            'canCoverWithPaid' => $wallet->cached_paid_credits >= $totalPaidNeeded
         ];
     }
 
-    public function deductCredits(CustomerWallet $wallet, int $paidNeeded, Conversion $conversion, string $desc = '', ?string $bookingId = null, int $quantity = 1, bool $allowFallback = false)
-    {
-        $paidToFreeRatio = $conversion->paid_to_free_ratio > 0 ? $conversion->paid_to_free_ratio : 1;
-        $freeNeeded = (int) ceil($paidNeeded / $paidToFreeRatio);
+    public function deductCredits(
+        CustomerWallet $wallet,
+        int $freePerTicket,
+        int $paidPerTicket = 0,
+        string $desc = '',
+        ?string $bookingId = null,
+        int $quantity = 1,
+        bool $allowFallback = false
+    ): array {
+        // Step 1: total free required
+        $totalFreeNeeded = $freePerTicket * $quantity;
+        $deductFree = min($totalFreeNeeded, $wallet->cached_free_credits);
+        $shortfallFree = $totalFreeNeeded - $deductFree;
 
-        $totalPaid = $paidNeeded * $quantity;
-        $totalFree = $freeNeeded * $quantity;
+        // Step 2: calculate total paid
+        $totalPaidFromTicket = $paidPerTicket * $quantity;
 
+        $conversion = $this->conversionService->getActiveConversion();
+        if (!$conversion) {
+            throw new \Exception('No active conversion available.');
+        }
+        $paidToFreeRatio = max(1, $conversion->paid_to_free_ratio);
+
+        $totalPaid = $totalPaidFromTicket + ($shortfallFree * $paidToFreeRatio);
+
+        // Step 3: handle insufficient paid credits
+        if ($totalPaid > $wallet->cached_paid_credits) {
+            if ($allowFallback) {
+                $totalPaid = $wallet->cached_paid_credits;
+            } else {
+                throw new InsufficientCreditsException(
+                    "Not enough paid credits to cover free credit shortfall.",
+                    $shortfallFree,
+                    $paidToFreeRatio
+                );
+            }
+        }
+
+        // Step 4: store before balances
         $beforePaid = $wallet->cached_paid_credits;
         $beforeFree = $wallet->cached_free_credits;
 
-        // Deduct free first
-        $deductFree = min($totalFree, $wallet->cached_free_credits);
-        $remainingFree = $totalFree - $deductFree;
+        // Step 5: decrement wallet
+        if ($deductFree > 0) $wallet->decrement('cached_free_credits', $deductFree);
+        if ($totalPaid > 0) $wallet->decrement('cached_paid_credits', $totalPaid);
 
-        // Deduct remaining free from paid if allowed
-        $deductPaid = $totalPaid;
-        if ($remainingFree > 0) {
-            if (!$allowFallback) {
-                throw new \Exception("Insufficient free credits. You can use paid credits to cover missing free credits.");
-            }
-            $deductPaid += $remainingFree;
-        }
+        // Step 6: record transaction
+        CustomerCreditTransaction::create([
+            'wallet_id' => $wallet->id,
+            'type' => 'booking',
+            'before_paid_credits' => $beforePaid,
+            'before_free_credits' => $beforeFree,
+            'delta_paid' => -$totalPaid,
+            'delta_free' => -$deductFree,
+            'description' => $desc,
+            'booking_id' => $bookingId,
+            'transaction_id' => Str::uuid()->toString(),
+        ]);
 
-        if ($deductPaid > $wallet->cached_paid_credits) {
-            throw new \Exception("Insufficient paid credits to cover free credit.");
-        }
+        Log::info("Credits deducted for wallet {$wallet->id}", [
+            'deductFree' => $deductFree,
+            'deductPaid' => $totalPaid,
+            'paidPerTicket' => $paidPerTicket,
+            'freePerTicket' => $freePerTicket,
+            'quantity' => $quantity,
+            'shortfallFree' => $shortfallFree,
+            'paidToFreeRatio' => $paidToFreeRatio,
+            'beforePaid' => $beforePaid,
+            'beforeFree' => $beforeFree,
+            'bookingId' => $bookingId,
+            'allowFallback' => $allowFallback
+        ]);
 
-        try {
-            if ($deductFree > 0) $wallet->decrement('cached_free_credits', $deductFree);
-            if ($deductPaid > 0) $wallet->decrement('cached_paid_credits', $deductPaid);
-
-            CustomerCreditTransaction::create([
-                'wallet_id' => $wallet->id,
-                'type' => 'booking',
-                'before_paid_credits' => $beforePaid,
-                'before_free_credits' => $beforeFree,
-                'delta_paid' => -$deductPaid,
-                'delta_free' => -$deductFree,
-                'description' => $desc,
-                'booking_id' => $bookingId,
-                'transaction_id' => Str::uuid()->toString(),
-            ]);
-
-            Log::info("Credits deducted for wallet {$wallet->id}", [
-                'paid' => $deductPaid,
-                'free' => $deductFree,
-                'beforePaid' => $beforePaid,
-                'beforeFree' => $beforeFree,
-                'bookingId' => $bookingId,
-            ]);
-        } catch (\Exception $e) {
-            Log::error("Failed to deduct credits for wallet {$wallet->id}", [
-                'error' => $e->getMessage(),
-                'paid' => $deductPaid,
-                'free' => $deductFree,
-                'bookingId' => $bookingId,
-            ]);
-            throw $e;
-        }
+        return [
+            'deducted_free' => $deductFree,
+            'deducted_paid' => $totalPaid,
+        ];
     }
 
     public function refundCredits($transaction, string $walletId)

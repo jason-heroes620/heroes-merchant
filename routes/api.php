@@ -11,6 +11,7 @@ use App\Http\Controllers\MerchantEventController;
 use App\Http\Controllers\MerchantBookingController;
 use App\Http\Controllers\EventLikeController;
 use App\Http\Controllers\BookingController;
+use App\Http\Controllers\CartController;
 use App\Http\Controllers\ClaimController;
 use App\Http\Controllers\EghlCallbackController;
 use App\Http\Controllers\EghlPaymentController;
@@ -66,6 +67,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/bookings', [BookingController::class, 'book']);
     Route::get('/bookings/{booking}', [BookingController::class, 'show']);
     Route::patch('/bookings/{booking}/cancel', [BookingController::class, 'cancel']);
+
+    // Cart
+    Route::get('/cart', [CartController::class, 'index']);               
+    Route::post('/cart/add', [CartController::class, 'add']);           
+    Route::delete('/cart/items', [CartController::class, 'remove']); 
+    Route::delete('/cart/clear', [CartController::class, 'clear']);
 
     Route::post('/notifications/token', [NotificationController::class, 'saveToken']);
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
