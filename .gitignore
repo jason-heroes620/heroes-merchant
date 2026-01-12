@@ -25,3 +25,5 @@ Thumbs.db
 
 .env*
 public/qrcodes/*
+public/*.zip
+vendor.zip
