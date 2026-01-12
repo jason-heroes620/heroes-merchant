@@ -5,11 +5,12 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Services\BookingService;
 use App\Services\WalletService;
+use App\Services\ConversionService;
 use App\Http\Resources\BookingResource;
+use App\Services\InsufficientCreditsException;
 use App\Models\Booking;
 use App\Models\Claim;
 use App\Models\EventSlot;
-use App\Models\Conversion;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
@@ -18,11 +19,14 @@ class BookingController extends Controller
 {
     protected BookingService $bookingService;
     protected WalletService $walletService;
+    protected ConversionService $conversionService;
 
-    public function __construct(BookingService $bookingService, WalletService $walletService)
+
+    public function __construct(BookingService $bookingService, WalletService $walletService, ConversionService $conversionService)
     {
         $this->bookingService = $bookingService;
         $this->walletService = $walletService;
+        $this->conversionService = $conversionService;
     }
 
     /**
@@ -146,93 +150,95 @@ class BookingController extends Controller
             }
         }
 
-        $requiresPayment = false;
-        $totalRM = 0;
-        $totalFreeToAdd = 0;
-        $hasCustomFreeCredits = false;
-        $activationMode = null;
-
+        // Collect all activation modes
+        $activationModes = [];
         foreach ($quantitiesByAgeGroup as $ageGroupId => $quantity) {
-            if ($quantity < 1) continue;
-            
             $ageGroupIdForQuery = $ageGroupId === 'general' ? null : $ageGroupId;
             $slotPrice = $slot->prices()
                 ->when($ageGroupIdForQuery, fn($q) => $q->where('event_age_group_id', $ageGroupIdForQuery))
-                ->first();
+                ->firstOrFail();
+            $activationModes[] = $slotPrice->activation_mode;
+        }
+
+        $activationModes = array_unique($activationModes);
+
+        // Check if convert_credits is included
+        if (in_array('convert_credits', $activationModes)) {
+            if (count($activationModes) > 1) {
+                return response()->json([
+                    'message' => 'convert_credits cannot be mixed with RM-based booking.'
+                ], 422);
+            }
+
+            // Get the active conversion
+            $conversion = $this->conversionService->getActiveConversion();
             
-            if ($slotPrice) {
-                $activationMode = $slotPrice->activation_mode;
-                
-                if ($slotPrice->activation_mode === 'keep_rm' || $slotPrice->activation_mode === 'custom_free_credits') {
-                    $requiresPayment = true;
-                    $totalRM += ($slotPrice->price_in_rm ?? 0) * $quantity;
-                    
-                    if ($slotPrice->activation_mode === 'custom_free_credits') {
-                        $hasCustomFreeCredits = true;
-                        $totalFreeToAdd += ($slotPrice->free_credits ?? 0) * $quantity;
-                    }
-                }
-            }
-        }
-
-        // If payment required, return payment info 
-        if ($requiresPayment) {
-            return response()->json([
-                'requires_payment' => true,
-                'total_rm' => $totalRM,
-                'free_credits_to_add' => $totalFreeToAdd,
-                'has_custom_free_credits' => $hasCustomFreeCredits,
-                'activation_mode' => $activationMode,
-            ], 200);
-        }
-
-        try {
-            $conversion = Conversion::first(); 
             if (!$conversion) {
-                return response()->json(['message' => 'Conversion settings not found.'], 500);
+                return response()->json([
+                    'message' => 'No active conversion available. Please contact support.'
+                ], 422);
             }
 
-            $bookingResponse = $this->bookingService->bookSlot(
-                $customer,
-                $slot,
-                $quantitiesByAgeGroup,
-                $conversion,
-                $allowFallback,
-                false // isPaid = false for convert_credits
-            );
-
-            $bookingModel = $bookingResponse['booking'];
-
-            foreach ($bookingModel->items as $item) {
-                Claim::create([
-                    'id' => Str::uuid(),
-                    'booking_id' => $bookingModel->id,
-                    'booking_item_id' => $item->id,
-                    'slot_id' => $slot->id,
-                    'event_id' => $slot->event_id,
-                    'customer_id' => $customer->id,
-                    'status' => 'pending',
-                ]);
-            }
-
-            return response()->json($bookingResponse, 201);
-        } catch (\Exception $e) {
-            if (str_contains($e->getMessage(), 'Insufficient free credits')) {
-                $additionalPaidInfo = $this->walletService->calculateAdditionalPaid(
-                    $customer->wallet,
-                    $slot->prices()->first()->paid_credits,
-                    $conversion,
-                    array_sum($quantitiesByAgeGroup)
+            try {
+                $bookingResponse = $this->bookingService->bookSlot(
+                    $customer,
+                    $slot,
+                    $quantitiesByAgeGroup,
+                    $allowFallback
                 );
 
+                $bookingModel = $bookingResponse['booking'];
+
+                foreach ($bookingModel->items as $item) {
+                    Claim::create([
+                        'id' => Str::uuid(),
+                        'booking_id' => $bookingModel->id,
+                        'booking_item_id' => $item->id,
+                        'slot_id' => $slot->id,
+                        'event_id' => $slot->event_id,
+                        'customer_id' => $customer->id,
+                        'status' => 'pending',
+                    ]);
+                }
+
+                return response()->json($bookingResponse, 201);
+
+            } catch (InsufficientCreditsException $e) {
+                // Only triggered if free credits are insufficient
                 return response()->json([
                     'message' => $e->getMessage(),
-                    'paid_to_free_ratio' => $additionalPaidInfo['paidToFreeRatio'],
-                    'additional_paid_needed' => $additionalPaidInfo['shortfallFree'],
-                ], 422); 
+                    'additional_paid_needed' => (int) ceil($e->shortfallFree * $e->paidToFreeRatio),
+                    'paid_to_free_ratio' => $e->paidToFreeRatio,
+                ], 422);
+            } catch (\Exception $e) {
+                return response()->json(['message' => $e->getMessage()], 422);
             }
-            return response()->json(['message' => $e->getMessage()], 400);
         }
+
+        // RM-based booking (keep_rm + custom_free_credits)
+        $bookingResponse = $this->bookingService->bookSlot(
+            $customer,
+            $slot,
+            $quantitiesByAgeGroup,
+            $allowFallback
+        );
+
+        $bookingModel = $bookingResponse['booking'];
+
+        // Create claims for all items
+        foreach ($bookingModel->items as $item) {
+            Claim::create([
+                'id' => Str::uuid(),
+                'booking_id' => $bookingModel->id,
+                'booking_item_id' => $item->id,
+                'slot_id' => $slot->id,
+                'event_id' => $slot->event_id,
+                'customer_id' => $customer->id,
+                'status' => 'pending',
+            ]);
+        }
+
+        return response()->json($bookingResponse, 201);
     }
 
     /**
@@ -243,13 +249,6 @@ class BookingController extends Controller
         $user = $request->user();
         $customer = $user->customer ?? null;
 
-        Log::info("Cancel request received", [
-            'booking_id' => $booking->id,
-            'user_id' => $user->id ?? null,
-            'customer_id' => $customer->id ?? null,
-            'request_data' => $request->all(),
-        ]);
-
         if (!$customer) {
             Log::warning("Customer record not found for user {$user->id}");
             return response()->json(['message' => 'Customer record not found.'], 404);
@@ -258,25 +257,17 @@ class BookingController extends Controller
         try {
             $result = $this->bookingService->cancelBooking($booking);
 
-            // If not refunded, calculate forfeited credits
-            if (!$result['refunded']) {
-                $freeCredits = $booking->items->sum('free_credits');
-                $paidCredits = $booking->items->sum('paid_credits');
-
-                $result['message'] = "Free credits ({$freeCredits}) and total credits ({$paidCredits}) will be forfeited. Are you sure you want to cancel?";
-            }
-
-            Log::info("Cancel result prepared", ['result' => $result]);
-
             Claim::where('booking_id', $booking->id)->delete();
 
             return response()->json($result, 200);
+
         } catch (\Exception $e) {
             Log::error("Cancel booking failed", [
                 'booking_id' => $booking->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
             return response()->json(['error' => $e->getMessage()], 400);
         }
     }

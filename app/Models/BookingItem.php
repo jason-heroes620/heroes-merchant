@@ -16,8 +16,10 @@ class BookingItem extends Model
         'age_group_id',
         'quantity',
         'quantity_claimed',
+        'price_in_rm',
         'free_credits',
         'paid_credits',
+        'activation_mode'
     ];
 
     public function booking()

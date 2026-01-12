@@ -33,9 +33,6 @@ return new class extends Migration {
             $table->enum('status', ['draft', 'pending', 'active', 'inactive', 'rejected'])->default('pending');
             $table->text('rejected_reason')->nullable();
 
-            $table->integer('cancellation_policy_hours')->default(24); 
-            $table->boolean('allow_refund')->default(true);
-
             $table->timestamps();
             $table->index(['merchant_id', 'status']);
         });

@@ -23,9 +23,9 @@ class BookingAdminResource extends JsonResource
         if ($event instanceof Model) {
             if ($event->is_recurring && $slot instanceof Model && $slot->date) {
                 $eventDate = $slot->date->setTimezone('Asia/Kuala_Lumpur')->format('d M Y');
-            } elseif ($event->dates?->first()) {
-                $start = $event->dates->first()->start_date;
-                $end = $event->dates->first()->end_date;
+            } elseif ($event->dates) {
+                $start = $event->dates->start_date;
+                $end = $event->dates->end_date;
 
                 if ($start && $end) {
                     $eventDate = $start->equalTo($end)

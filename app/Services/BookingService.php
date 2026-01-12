@@ -8,14 +8,13 @@ use App\Models\BookingItem;
 use App\Models\EventSlot;
 use App\Models\Reminder;
 use App\Models\Setting;
-use App\Models\Conversion;
 use App\Jobs\SendPushNotification;
 use App\Jobs\SendReminder;
 use App\Services\WalletService;
+use App\Services\ConversionService;
 use App\Services\SlotAvailabilityService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use App\Notifications\WalletTransactionNotification;
 use App\Notifications\MerchantBookingNotification;
@@ -23,17 +22,24 @@ use App\Notifications\MerchantBookingNotification;
 class BookingService
 {
     protected WalletService $walletService;
+    protected ConversionService $conversionService;
     protected SlotAvailabilityService $slotAvailability;
 
-    public function __construct(WalletService $walletService, SlotAvailabilityService $slotAvailability)
+    public function __construct(WalletService $walletService, ConversionService $conversionService, SlotAvailabilityService $slotAvailability)
     {
         $this->walletService = $walletService;
+        $this->conversionService = $conversionService;
         $this->slotAvailability = $slotAvailability;
     }
 
-    public function bookSlot($customer, EventSlot $slot, array $quantitiesByAgeGroup, Conversion $conversion, bool $allowFallback = false)
-    {
-        return DB::transaction(function () use ($customer, $slot, $quantitiesByAgeGroup, $conversion, $allowFallback) {
+    public function bookSlot(
+        $customer,
+        EventSlot $slot,
+        array $quantitiesByAgeGroup,
+        bool $allowFallback = false
+    ) {
+        return DB::transaction(function () use ($customer, $slot, $quantitiesByAgeGroup, $allowFallback) {
+
             $totalQuantity = array_sum($quantitiesByAgeGroup);
             if ($totalQuantity < 1) {
                 throw new \Exception('Please select at least one ticket.');
@@ -42,61 +48,107 @@ class BookingService
             // Lock slot
             $slot = EventSlot::where('id', $slot->id)->lockForUpdate()->firstOrFail();
 
-            if (! $this->slotAvailability->isAvailable($slot, $totalQuantity)) {
+            if (!$this->slotAvailability->isAvailable($slot, $totalQuantity)) {
                 throw new \Exception('Not enough seats available for this slot.');
             }
 
             $wallet = $customer->wallet ?? throw new \Exception('Wallet not found.');
 
-            // Step 1: Validate credits first
+            $schedule = $this->buildSlotSchedule($slot);
+
+            $slotDateDisplay = $schedule['date_display'];
+            $slotTimeDisplay = $schedule['time_display'];
+
+            $desc = sprintf(
+                "Booking for '%s' (%s, %s)",
+                $slot->event->title,
+                $slotDateDisplay,
+                $slotTimeDisplay
+            );
+
+            $desc = sprintf(
+                "Booking for '%s' (%s, %s)",
+                $slot->event->title,
+                $slotDateDisplay,
+                $slotTimeDisplay
+            );
+
             $bookingItemsData = [];
-            $totalPaid = 0;
-            $totalFree = 0;
+            $totalPaidCredits = 0;
+            $totalFreeCredits = 0;
 
             foreach ($quantitiesByAgeGroup as $ageGroupId => $quantity) {
                 if ($quantity < 1) continue;
 
                 $ageGroupIdForQuery = $ageGroupId === 'general' ? null : $ageGroupId;
+
                 $slotPrice = $slot->prices()
                     ->when($ageGroupIdForQuery, fn($q) => $q->where('event_age_group_id', $ageGroupIdForQuery))
-                    ->first();
+                    ->firstOrFail();
 
-                $requiredPaid = $slotPrice->paid_credits ?? 0;
+                $activationMode = $slotPrice->activation_mode;
 
-                // Step 1: Calculate additional paid needed
-                $additionalPaidInfo = $this->walletService->calculateAdditionalPaid(
-                    $wallet,
-                    $requiredPaid,
-                    $conversion,
-                    $quantity
-                );
+                // --- CREDIT BOOKING ---
+                if ($activationMode === 'convert_credits') {
+                    $freePerTicket = $slotPrice->free_credits ?? 0;
+                    $paidPerTicket = $slotPrice->paid_credits ?? 0;
 
-                $requiredFree = (int) ceil($requiredPaid / $additionalPaidInfo['paidToFreeRatio']);
+                    // Validate wallet can cover booking
+                    $this->walletService->canBookWithCredits(
+                        $wallet,
+                        $freePerTicket,
+                        $quantity,
+                        $allowFallback
+                    );
 
-                Log::info('Credit calculation', [
-                    'paid_needed_per_ticket' => $requiredPaid,
-                    'quantity' => $quantity,
-                    'wallet_paid' => $wallet->cached_paid_credits,
-                    'wallet_free' => $wallet->cached_free_credits,
-                    'paid_to_free_ratio' => $additionalPaidInfo['paidToFreeRatio'],
-                    'shortfall_free' => $additionalPaidInfo['shortfallFree'],
-                ]);
+                    // Deduct credits and get actual spent
+                    $deductionResult = $this->walletService->deductCredits(
+                        $wallet,
+                        $freePerTicket,
+                        $paidPerTicket,
+                        $desc,
+                        null, // bookingId added later
+                        $quantity,
+                        $allowFallback
+                    );
 
-                $this->walletService->canBookWithCredits($wallet, $requiredPaid, $conversion, $quantity, $allowFallback);
+                    $actualFreeSpent = $deductionResult['deducted_free'];
+                    $actualPaidSpent = $deductionResult['deducted_paid'];
 
-                $bookingItemsData[] = [
-                    'age_group_id' => $ageGroupIdForQuery,
-                    'quantity' => $quantity,
-                    'paid_credits' => $requiredPaid,
-                    'free_credits' => $requiredFree,
-                    'additional_paid' => $additionalPaidInfo['shortfallFree'], // pass to frontend
-                ];
+                    // Add booking item
+                    $bookingItemsData[] = [
+                        'age_group_id' => $ageGroupIdForQuery,
+                        'quantity' => $quantity,
+                        'free_credits' => $actualFreeSpent,
+                        'paid_credits' => $actualPaidSpent,
+                        'activation_mode' => $activationMode,
+                        'additional_paid' => max(0, $actualPaidSpent - $paidPerTicket * $quantity),
+                    ];
 
-                $totalPaid += $requiredPaid * $quantity;
-                $totalFree += $requiredFree * $quantity;
+                    $totalFreeCredits += $actualFreeSpent;
+                    $totalPaidCredits += $actualPaidSpent;
+                }
+                // --- RM-BASED BOOKING ---
+                else {
+                    $bookingItemsData[] = [
+                        'age_group_id' => $ageGroupIdForQuery,
+                        'quantity' => $quantity,
+                        'paid_credits' => 0,
+                        'free_credits' => $activationMode === 'custom_free_credits'
+                            ? $slotPrice->free_credits ?? 0
+                            : 0,
+                        'activation_mode' => $activationMode,
+                        'price_in_rm' => $slotPrice->price_in_rm ?? 0,
+                        'additional_paid' => 0,
+                    ];
+
+                    if ($activationMode === 'custom_free_credits') {
+                        $wallet->increment('cached_free_credits', $slotPrice->free_credits * $quantity);
+                    }
+                }
             }
 
-            // Step 2: Create main booking
+            // --- Create main booking ---
             $booking = Booking::create([
                 'customer_id' => $customer->id,
                 'event_id' => $slot->event_id,
@@ -107,36 +159,14 @@ class BookingService
                 'quantity' => $totalQuantity,
             ]);
 
-            // Step 3: Create booking items per age group
+            // --- Save booking items ---
             foreach ($bookingItemsData as $item) {
-                BookingItem::create(array_merge($item, [
-                    'booking_id' => $booking->id
-                ]));
+                BookingItem::create(array_merge($item, ['booking_id' => $booking->id]));
             }
 
-            $slotDate = $slot->date
-                ? $slot->date->format('Y-m-d')
-                : optional($slot->event->dates->first())->start_date?->format('Y-m-d');
-
-            $slotTime = $slot->start_time instanceof Carbon
-                ? $slot->start_time->format('H:i:s')
-                : $slot->start_time;
-
-            $desc = "Booking Code {$booking->booking_code}:\nBooking Confirmed for '{$slot->event->title}' on {$slotDate} at {$slotTime}";
-
-            // Step 4: Deduct credits
-            $this->walletService->deductCredits(
-                $wallet,
-                $totalPaid,
-                $conversion, 
-                 $desc,
-                $booking->id,
-                1,
-                $allowFallback
-            );
-
-            // Step 5: Notifications (same as before)
+            // --- Notifications ---
             $transaction = $booking->transactions()->where('type', 'booking')->first();
+
             if ($transaction) {
                 Notification::send(
                     User::where('role', 'admin')->get(),
@@ -145,13 +175,14 @@ class BookingService
                         $customer->user->full_name,
                         $customer->id,
                         $slot->event->title,
-                        $slot->date?->format('Y-m-d'),
-                        $slot->start_time instanceof Carbon ? $slot->start_time->format('H:i:s') : $slot->start_time
+                        $slotDateDisplay,
+                        $slotTimeDisplay
                     )
                 );
             }
 
             $merchantUser = $slot->event->merchant->user ?? null;
+
             if ($merchantUser) {
                 Notification::send(
                     $merchantUser,
@@ -159,8 +190,8 @@ class BookingService
                         $customer->user->full_name,
                         $booking->booking_code,
                         $slot->event->title,
-                        $slotDate,
-                        $slotTime,
+                        $slotDateDisplay,
+                        $slotTimeDisplay,
                         'confirmed'
                     )
                 );
@@ -169,20 +200,18 @@ class BookingService
                     (string) $merchantUser->id,
                     (string) $merchantUser->id,
                     "New Booking: {$booking->booking_code}",
-                    "{$customer->user->full_name} booked '{$slot->event->title}' on {$slotDate} at {$slotTime}.",
+                    "{$customer->user->full_name} booked '{$slot->event->title}' ({$slotDateDisplay}, {$slotTimeDisplay}).",
                     ['booking_id' => $booking->id]
                 );
             }
 
             $this->sendConfirmationAndReminder($customer, $slot, $booking);
 
-            // Step 6: Return booking with calculated credits for frontend
             return [
                 'booking' => $booking->load('items'),
-                'total_paid_credits' => $totalPaid,
-                'total_free_credits' => $totalFree,
+                'total_paid_credits' => $totalPaidCredits,
+                'total_free_credits' => $totalFreeCredits,
                 'items' => $bookingItemsData,
-                'paid_to_free_ratio' => $conversion->paid_to_free_ratio, 
                 'additional_paid_needed' => array_sum(array_column($bookingItemsData, 'additional_paid')),
             ];
         });
@@ -191,187 +220,216 @@ class BookingService
     /**
      * 4️⃣ Send push notification and schedule reminder
      */
-    private function sendConfirmationAndReminder($customer, $slot, $booking)
+    private function sendConfirmationAndReminder($customer, EventSlot $slot, Booking $booking): void
     {
-        $event = $slot->event;
+        $schedule = $this->buildSlotSchedule($slot);
 
-        $slotDate = $slot->date 
-        ? $slot->date->format('Y-m-d') 
-        : (optional($event->dates->first())->start_date 
-            ? optional($event->dates->first())->start_date->format('Y-m-d') 
-            : null
-        );
+        $dateDisplay   = $schedule['date_display'];
+        $timeDisplay   = $schedule['time_display'];
+        $startDateTime = $schedule['start_datetime'];
 
-        $slotTime = $slot->start_time instanceof Carbon
-            ? $slot->start_time->format('H:i:s')
-            : $slot->start_time;
+        $eventTitle = $slot->event->title;
 
-        $eventTitle = $event->title;
-
+        // --- Customer confirmation ---
         SendPushNotification::dispatch(
             (string) $customer->id,
-            "", // merchantId
-            "Booking Confirmed: {$booking->booking_code}", 
-            "Your booking for '{$eventTitle}' on {$slotDate} at {$slotTime} is confirmed.",
-            [
-                'booking_id' => $booking->booking_id, 
-            ]
+            "",
+            "Booking Confirmed: {$booking->booking_code}",
+            "Your booking for '{$eventTitle}' ({$dateDisplay}, {$timeDisplay}) is confirmed.",
+            ['booking_id' => $booking->id]
         );
 
-        if (!$slotDate || !$slotTime) {
-            Log::warning('No slot date or start time found', [
-                'slot_id' => $slot->id,
-                'event_id' => $event->id,
-                'slot_date' => $slotDate,
-                'start_time' => $slotTime,
+        // --- Merchant notification ---
+        $merchantUser = $slot->event->merchant->user ?? null;
+        if ($merchantUser) {
+            SendPushNotification::dispatch(
+                (string) $merchantUser->id,
+                (string) $merchantUser->id,
+                "New Booking: {$booking->booking_code}",
+                "{$customer->user->full_name} booked '{$eventTitle}' ({$dateDisplay}, {$timeDisplay}).",
+                ['booking_id' => $booking->id]
+            );
+        }
+
+        // --- Reminder (24 hours before start) ---
+        if ($startDateTime) {
+            $reminderAt = $startDateTime->copy()->subHours(24);
+
+            if ($reminderAt->isPast()) {
+                $reminderAt = now('Asia/Kuala_Lumpur')->addMinute();
+            }
+
+            $reminder = Reminder::create([
+                'booking_id'   => $booking->id,
+                'scheduled_at' => $reminderAt,
             ]);
-            return;
+
+            SendReminder::dispatch($reminder->id)->delay($reminderAt);
         }
-
-        $slotStart = Carbon::createFromFormat('Y-m-d H:i:s', "{$slotDate} {$slotTime}", 'Asia/Kuala_Lumpur');
-        Log::info("Slot start datetime:", ['slotStart' => $slotStart->toDateTimeString()]);
-
-        // 24 hrs before event
-        $reminderAt = $slotStart->copy()->subHours(24);
-
-        if ($reminderAt->isPast()) {
-            $reminderAt = now('Asia/Kuala_Lumpur')->addMinute();
-        }
-
-        $reminder = Reminder::create([
-            'booking_id' => $booking->id,
-            'scheduled_at' => $reminderAt,
-        ]);
-
-        SendReminder::dispatch($reminder->id)
-            ->delay($reminderAt);
     }
 
     public function cancelBooking(Booking $booking, bool $force = false)
     {
         return DB::transaction(function () use ($booking, $force) {
 
-            // Already cancelled?
             if ($booking->status === 'cancelled') {
-                Log::info("Booking {$booking->id} already cancelled.");
                 return [
-                    'booking_id' => (string)$booking->id,
-                    'refunded' => false,
-                    'message' => 'Booking is already cancelled.'
+                    'booking_id' => (string) $booking->id,
+                    'refunded'   => false,
+                    'message'    => 'Booking is already cancelled.',
                 ];
             }
 
-            // Only block cancellation if status is not confirmed and not forced
             if ($booking->status !== 'confirmed' && !$force) {
                 throw new \Exception('This booking cannot be cancelled.');
             }
 
-            $slot = $booking->slot;
-            $event = $slot->event;
+            $slot   = $booking->slot;
+            $event  = $slot->event;
+            $wallet = $booking->customer->wallet;
 
-            // Determine slot start datetime
-            $slotDate = $slot->date
-                ? $slot->date->format('Y-m-d')
-                : optional($event->dates->first())->start_date?->format('Y-m-d');
+            $schedule = $this->buildSlotSchedule($slot);
 
-            $slotTime = $slot->start_time instanceof Carbon
-                ? $slot->start_time->format('H:i:s')
-                : $slot->start_time;
+            $dateDisplay   = $schedule['date_display'];
+            $timeDisplay   = $schedule['time_display'];
+            $startDateTime = $schedule['start_datetime'];
 
-            if (!$slotDate || !$slotTime) {
+            if (!$startDateTime && !$force) {
                 throw new \Exception('Unable to determine event start time. Cancellation blocked.');
             }
 
-            $slotStart = Carbon::createFromFormat('Y-m-d H:i:s', "{$slotDate} {$slotTime}", 'Asia/Kuala_Lumpur');
-
             $cancellationHours = (int) Setting::get('cancellation_policy_hours', 24);
 
-            $eligibleForRefund =
-                now('Asia/Kuala_Lumpur')->lt(
-                    $slotStart->copy()->subHours($cancellationHours)
-                ) || $force;
+            $eligibleForRefund = $force ||
+                now('Asia/Kuala_Lumpur')->lt($startDateTime->copy()->subHours($cancellationHours));
 
+            // --- Refund logic ---
             $transaction = $booking->transactions()->where('type', 'booking')->first();
 
-            if (!$transaction && !$force) {
-                throw new \Exception('No credit transaction found for this booking.');
+            foreach ($booking->items as $item) {
+                switch ($item->activation_mode) {
+                    case 'convert_credits':
+                        if ($eligibleForRefund && $transaction) {
+                            $this->walletService->refundCredits($transaction, $wallet->id);
+                        }
+                        break;
+
+                    case 'custom_free_credits':
+                        if ($eligibleForRefund) {
+                            $wallet->increment('cached_free_credits', $item->free_credits * $item->quantity);
+                        }
+                        break;
+
+                    case 'keep_rm':
+                        break;
+                }
             }
 
-            if ($transaction && $eligibleForRefund) {
-                $this->walletService->refundCredits($transaction, $booking->wallet_id);
-            }
-
-            $totalSeats = $booking->items->sum('quantity');
-
-            $booking->status = 'cancelled';
-            $booking->cancelled_at = now();
-            $booking->save();
-
-            Log::info("Booking {$booking->id} cancelled", [
-                'refunded' => $eligibleForRefund,
-                'seats_restored' => $totalSeats,
-                'force' => $force
+            $booking->update([
+                'status'        => 'cancelled',
+                'cancelled_at'  => now(),
             ]);
 
-            // Send notification if transaction exists
-            if ($transaction) {
-                $typeLabel = $eligibleForRefund ? 'Booking Refund' : 'Booking Cancellation (Credits Forfeited)';
-                $creditsText = $eligibleForRefund
-                    ? "{$transaction->delta_free} free credits and {$transaction->delta_paid} paid credits refunded"
-                    : "{$transaction->delta_free} free credits and {$transaction->delta_paid} paid credits forfeited";
+            // --- Notifications ---
 
+            // Admins
+            if ($transaction) {
                 Notification::send(
                     User::where('role', 'admin')->get(),
                     new WalletTransactionNotification(
                         $transaction,
                         $booking->customer->user->full_name,
                         $booking->customer->id,
-                        $slot->event->title,
-                        $slotDate,
-                        $slotTime,
+                        $event->title,
+                        $dateDisplay,
+                        $timeDisplay,
                         $booking->booking_code,
                         $eligibleForRefund
                     )
                 );
             }
 
-            $merchantUser = $booking->slot->event->merchant->user ?? null;
+            // Customer
+            SendPushNotification::dispatch(
+                (string) $booking->customer->id,
+                "",
+                "Booking Cancelled: {$booking->booking_code}",
+                "Your booking for '{$event->title}' ({$dateDisplay}, {$timeDisplay}) has been cancelled" .
+                    ($eligibleForRefund ? ' and credits refunded.' : '.'),
+                ['booking_id' => $booking->id]
+            );
 
+            // Merchant
+            $merchantUser = $event->merchant->user ?? null;
             if ($merchantUser) {
                 $status = $eligibleForRefund ? 'refunded' : 'cancelled';
-
-                Notification::send(
-                    $merchantUser,
-                    new MerchantBookingNotification(
-                        $booking->customer->user->full_name,
-                        $booking->booking_code,
-                        $booking->slot->event->title,
-                        $slotDate,
-                        $slotTime,
-                        $status
-                    )
-                );
 
                 SendPushNotification::dispatch(
                     (string) $merchantUser->id,
                     (string) $merchantUser->id,
                     "Booking {$status}: {$booking->booking_code}",
-                    "{$booking->customer->user->full_name}'s booking '{$booking->booking_code}' for '{$booking->slot->event->title}' on {$slotDate} at {$slotTime} has been {$status}.",
-                    [
-                        'booking_id' => $booking->id,
-                    ]
+                    "{$booking->customer->user->full_name}'s booking '{$booking->booking_code}' for '{$event->title}' ({$dateDisplay}, {$timeDisplay}) has been {$status}.",
+                    ['booking_id' => $booking->id]
                 );
             }
 
             return [
-                'booking_id' => (string)$booking->id,
-                'refunded' => $eligibleForRefund,
-                'message' => $transaction
-                    ? ($eligibleForRefund 
-                        ? 'Booking successfully cancelled and credits refunded.'
-                        : 'Booking successfully cancelled. Credits forfeited (within 24 hours).')
-                    : 'Booking cancelled without transaction.'
+                'booking_id' => (string) $booking->id,
+                'refunded'   => $eligibleForRefund,
+                'message'    => $eligibleForRefund
+                    ? 'Booking cancelled and credits refunded.'
+                    : 'Booking cancelled. Credits forfeited.',
             ];
         });
+    }
+
+    private function buildSlotSchedule(EventSlot $slot): array
+    {
+        $event = $slot->event;
+
+        $startDate = $slot->date
+            ? Carbon::parse($slot->date)
+            : ($event->dates?->start_date ? Carbon::parse($event->dates->start_date) : null);
+
+        $endDate = $event->dates?->end_date
+            ? Carbon::parse($event->dates->end_date)
+            : null;
+
+        // Date display
+        if ($startDate && $endDate && $startDate->eq($endDate)) {
+            $dateDisplay = $startDate->format('Y-m-d');
+        } elseif ($startDate && $endDate) {
+            $dateDisplay = "{$startDate->format('Y-m-d')} - {$endDate->format('Y-m-d')}";
+        } elseif ($startDate) {
+            $dateDisplay = $startDate->format('Y-m-d');
+        } else {
+            $dateDisplay = 'Date TBC';
+        }
+
+        $startTime = $slot->start_time instanceof Carbon
+            ? $slot->start_time->format('H:i')
+            : (is_string($slot->start_time) ? $slot->start_time : null);
+
+        $endTime = $slot->end_time instanceof Carbon
+            ? $slot->end_time->format('H:i')
+            : (is_string($slot->end_time) ? $slot->end_time : null);
+
+        if ($startTime && $endTime && $startTime !== $endTime) {
+            $timeDisplay = "{$startTime} - {$endTime}";
+        } elseif ($startTime) {
+            $timeDisplay = $startTime;
+        } else {
+            $timeDisplay = 'Time TBC';
+        }
+
+        $startDateTime = ($startDate && $startTime)
+            ? Carbon::createFromFormat('Y-m-d H:i', "{$startDate->format('Y-m-d')} {$startTime}", 'Asia/Kuala_Lumpur')
+            : null;
+
+        return [
+            'date_display' => $dateDisplay,
+            'time_display' => $timeDisplay,
+            'start_datetime' => $startDateTime,
+        ];
     }
 }

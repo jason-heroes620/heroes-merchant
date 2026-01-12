@@ -17,7 +17,6 @@ return new class extends Migration
 
             $table->enum('activation_mode', ['keep_rm', 'custom_free_credits', 'convert_credits'])->nullable();
             $table->decimal('price_in_rm', 10, 2)->nullable();
-
             $table->unsignedInteger('free_credits')->nullable();
             $table->unsignedInteger('paid_credits')->nullable();
             $table->foreignUuid('conversion_id')->nullable();
